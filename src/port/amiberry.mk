@@ -1,0 +1,61 @@
+#
+# amiberry.mk - builds Amiberry's libretro core as a static library.
+#
+# BMAmiga runs Amiberry through its libretro core (third_party/amiberry/
+# libretro): the emulator without SDL3 or its GUI, giving pictures, sound
+# and input through the libretro API, which src/port/platform.c provides.
+# Amiberry's own libretro/Makefile knows the sources and flags; this file
+# is read after it (make -f Makefile -f amiberry.mk) and adds a target that
+# archives the objects into a static library instead of a shared one,
+# with the objects in BMA_OBJDIR, so that builds for different computers
+# (the PC simulator, the Pi) don't mix.
+#
+#   make -C third_party/amiberry/libretro -f Makefile \
+#        -f $(abspath src/port/amiberry.mk) BMA_OBJDIR=/abs/dir \
+#        BMA_LIB=/abs/libamiberry.a /abs/libamiberry.a
+#
+# This file is part of BMAmiga, a bare metal Amiga emulator for the
+# Raspberry Pi. See LICENSE for licensing details.
+#
+
+ifeq ($(BMA_OBJDIR),)
+$(error BMA_OBJDIR must be set)
+endif
+ifeq ($(BMA_LIB),)
+$(error BMA_LIB must be set)
+endif
+
+# The core's objects, moved under BMA_OBJDIR: "../src/x.o" (AMIBERRY_DIR)
+# becomes BMA_OBJDIR/src/x.o, "./x.o" (LIBRETRO_DIR) BMA_OBJDIR/libretro/x.o.
+bma_obj = $(patsubst ./%,$(BMA_OBJDIR)/libretro/%,$(patsubst ../%,$(BMA_OBJDIR)/%,$(1)))
+BMA_OBJECTS := $(call bma_obj,$(OBJECTS))
+
+# BMAmiga's own calls into Amiberry (src/port/bridge.cpp), built with the
+# core's flags so that it can use its headers.
+BMA_PORT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
+BMA_OBJECTS += $(BMA_OBJDIR)/bmamiga/bridge.o
+
+$(BMA_OBJDIR)/bmamiga/%.o: $(BMA_PORT)/%.cpp | $(NLOHMANN_JSON_HEADER)
+	@mkdir -p $(dir $@)
+	@$(CXX) $(INCFLAGS) $(FLAGS) $(BMA_FLAGS) -std=gnu++17 -c -o $@ $<
+
+$(BMA_LIB): $(BMA_OBJECTS)
+	@mkdir -p $(dir $@)
+	@rm -f $@
+	$(AR) rcs $@ $^
+
+$(BMA_OBJDIR)/libretro/%.o: ./%.cpp | $(NLOHMANN_JSON_HEADER)
+	@mkdir -p $(dir $@)
+	@$(CXX) $(INCFLAGS) $(FLAGS) $(BMA_FLAGS) -std=gnu++17 -c -o $@ $<
+
+$(BMA_OBJDIR)/libretro/%.o: ./%.c
+	@mkdir -p $(dir $@)
+	@$(CC) $(INCFLAGS) $(FLAGS) $(BMA_FLAGS) -std=gnu99 -c -o $@ $<
+
+$(BMA_OBJDIR)/%.o: ../%.cpp | $(NLOHMANN_JSON_HEADER)
+	@mkdir -p $(dir $@)
+	@$(CXX) $(INCFLAGS) $(FLAGS) $(BMA_FLAGS) -std=gnu++17 -c -o $@ $<
+
+$(BMA_OBJDIR)/%.o: ../%.c
+	@mkdir -p $(dir $@)
+	@$(CC) $(INCFLAGS) $(FLAGS) $(BMA_FLAGS) -std=gnu99 -c -o $@ $<

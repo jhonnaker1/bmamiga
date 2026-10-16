@@ -10,12 +10,12 @@
 //  - how long a frame takes on one core of this PC;
 //  - the pictures are written to tools/pi4scaler/out/ as PPM files.
 //
-// BMCoco's source is RGB565 (BMA800XL's is 8-bit indexed): the test card is
+// BMAmiga's source is RGB565 (BMA800XL's is 8-bit indexed): the test card is
 // drawn with BMA800XL's palette and converted, so the checks are the same.
 //
 //   tools/pi4scaler/run_tests.sh
 //
-// This file is part of BMCoco, a bare metal Tandy Color Computer emulator for
+// This file is part of BMAmiga, a bare metal Amiga emulator for
 // the Raspberry Pi. See LICENSE for licensing details.
 //
 
@@ -28,7 +28,7 @@
 #include <string.h>
 #include <vector>
 
-// BMCoco's frame buffer (src/port/platform.c) and XRoar's usual picture.
+// BMAmiga's frame buffer (src/port/platform.c) and XRoar's usual picture.
 static const int SrcW = 736, SrcH = 288;
 static const int ViewX = 0, ViewY = 0, ViewW = 640, ViewH = 240;
 

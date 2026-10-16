@@ -3,7 +3,7 @@
 //
 // The Pi 4's display: Circle's framebuffer driver (CBcmFrameBuffer), which
 // asks the VideoCore firmware for a framebuffer through the mailbox
-// property interface. The firmware puts it on the screen; BMCoco scales
+// property interface. The firmware puts it on the screen; BMAmiga scales
 // the CoCo's picture into it.
 //
 // The picture comes from XRoar as RGB565 (BMA800XL's, from atari800, is
@@ -40,12 +40,12 @@
 //    semaphore.cpp: Circle's VCHIQ waits yield, which is how the Pi 3 runs
 //    them while it waits for a frame.
 //
-// This file is part of BMCoco, a bare metal Tandy Color Computer emulator for
+// This file is part of BMAmiga, a bare metal Amiga emulator for
 // the Raspberry Pi. See LICENSE for licensing details.
 //
 
-#ifndef BMCOCO_PI4_VIDEO_H_
-#define BMCOCO_PI4_VIDEO_H_
+#ifndef BMAMIGA_PI4_VIDEO_H_
+#define BMAMIGA_PI4_VIDEO_H_
 
 #include "frameshare.h"
 #include "scaler.h"
@@ -65,9 +65,9 @@ public:
   ~Pi4Video(void);
 
   // Which driver puts the picture on the screen (the video_driver option):
-  // the firmware's framebuffer, or BMCoco's own display lists on the HVS
+  // the firmware's framebuffer, or BMAmiga's own display lists on the HVS
   // (src/pi4kms/ or, on the Pi 5, src/pi5kms/; docs/PI4.md), on the
-  // firmware's video mode or (Kms) with BMCoco setting the mode too.
+  // firmware's video mode or (Kms) with BMAmiga setting the mode too.
   enum class Driver { Firmware, Hvs, Kms };
 
   // Core 0, at start up: takes a double buffered framebuffer and, if asked

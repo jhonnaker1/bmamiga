@@ -4,43 +4,49 @@
 #   make -C tools/hostsim
 #   tools/hostsim/run_tests.sh
 #
+# Amiberry's libretro core is built as a static library first, with
+# Amiberry's own libretro/Makefile and src/port/amiberry.mk, under
+# build/amiberry (it takes a few minutes the first time).
+#
 
-ROOT := ../..
-XROAR := $(ROOT)/third_party/xroar
-include $(ROOT)/src/port/xroar.mk
-
-XROAR_VERSION := $(shell $(ROOT)/tools/xroar_version.sh)
+ROOT := $(abspath ../..)
+AMIBERRY := $(ROOT)/third_party/amiberry
+OUT := $(abspath build)
 
 CC ?= cc
-# The simulator runs in a directory standing in for the SD card.
-CFLAGS = -O2 -g -std=gnu11 -DHAVE_CONFIG_H -I $(ROOT)/src/port -I $(XROAR) -I $(XROAR)/src \
-         -I $(XROAR)/portalib -DXROAR_VERSION=\"$(XROAR_VERSION)\" \
-         -DROMPATH=\"roms:.\" -DCONFPATH=\".\" \
-         -DBMCOCO_HOST_LIBC -Dregcomp=bmcoco_regcomp -Dregexec=bmcoco_regexec \
-         -Dregfree=bmcoco_regfree
+CXX ?= c++
 
-OUT := build
-OBJS := $(addprefix $(OUT)/portalib/,$(XROAR_PORTALIB_SRCS:.c=.o)) \
-        $(addprefix $(OUT)/xroar/,$(XROAR_SRCS:.c=.o)) \
-        $(OUT)/port/platform.o $(OUT)/port/joystick.o $(OUT)/port/menu.o \
-        $(OUT)/port/osd.o $(OUT)/port/becker.o $(OUT)/port/dwserver.o $(OUT)/port/posix_extra.o \
-        $(OUT)/host_sim.o $(OUT)/live.o
+# Amiberry's time and sleeps are BMAmiga's (src/port/clock.c).
+BMA_FLAGS := -Dclock_gettime=bma_clock_gettime -Dclock_gettime_nsec_np=bma_clock_gettime_nsec_np \
+             -Dnanosleep=bma_nanosleep -Dusleep=bma_usleep
 
-all: $(OUT)/bmcoco_sim
+CFLAGS = -O2 -g -std=gnu11 -I $(ROOT)/src/port -I $(AMIBERRY)/libretro \
+         -I $(AMIBERRY)/libretro/libretro-common/include -I $(AMIBERRY)/src \
+         -DBMAMIGA_HOST_LIBC
 
-$(OUT)/bmcoco_sim: $(OBJS)
-	$(CC) -o $@ $(OBJS) -lm
+AMIBERRY_LIB := $(OUT)/amiberry/libamiberry.a
+PORT_OBJS := $(addprefix $(OUT)/port/,platform.o keys.o osd.o menu.o clock.o)
+OBJS := $(PORT_OBJS) $(OUT)/host_sim.o $(OUT)/live.o
 
-$(OUT)/portalib/%.o: $(XROAR)/portalib/%.c $(ROOT)/src/port/config.h
+all: $(OUT)/bmamiga_sim
+
+$(OUT)/bmamiga_sim: $(OBJS) $(AMIBERRY_LIB)
+	$(CXX) -o $@ $(OBJS) $(AMIBERRY_LIB) -lz -liconv -lpthread -lm \
+	    -framework CoreFoundation -framework DiskArbitration -framework IOKit
+
+# The core is built again from scratch when BMA_FLAGS change (its objects
+# don't depend on the flags).
+$(OUT)/amiberry/flags: FORCE
 	@mkdir -p $(dir $@)
-	@$(CC) $(CFLAGS) -w -c -o $@ $<
+	@if [ "$$(cat $@ 2>/dev/null)" != "$(BMA_FLAGS)" ]; then \
+	    rm -rf $(OUT)/amiberry; mkdir -p $(OUT)/amiberry; echo "$(BMA_FLAGS)" > $@; fi
 
-$(OUT)/xroar/%.o: $(XROAR)/src/%.c $(ROOT)/src/port/config.h
-	@mkdir -p $(dir $@)
-	@$(CC) $(CFLAGS) -w -c -o $@ $<
+$(AMIBERRY_LIB): $(OUT)/amiberry/flags FORCE
+	@$(MAKE) -s -C $(AMIBERRY)/libretro -f Makefile -f $(ROOT)/src/port/amiberry.mk \
+	    BMA_OBJDIR=$(OUT)/amiberry BMA_LIB=$@ BMA_FLAGS="$(BMA_FLAGS)" $@
 
-$(OUT)/port/%.o: $(ROOT)/src/port/%.c $(ROOT)/src/port/config.h $(ROOT)/src/port/bmcoco.h \
-                 $(ROOT)/src/port/osd.h $(ROOT)/src/host.h
+$(OUT)/port/%.o: $(ROOT)/src/port/%.c $(ROOT)/src/port/bmamiga.h $(ROOT)/src/port/osd.h \
+                 $(ROOT)/src/host.h
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -Wall -Wextra -Wno-unused-parameter -c -o $@ $<
 
@@ -55,4 +61,4 @@ $(OUT)/live.o: live.c live.h
 clean:
 	rm -rf $(OUT)
 
-.PHONY: all clean
+.PHONY: all clean FORCE

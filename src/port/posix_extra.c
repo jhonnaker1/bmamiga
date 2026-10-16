@@ -14,7 +14,7 @@
  * The host simulator builds this file too, with the regex functions renamed
  * (see tools/hostsim/Makefile), so it is tested on every run.
  *
- * This file is part of BMCoco, a bare metal Tandy Color Computer emulator for
+ * This file is part of BMAmiga, a bare metal Amiga emulator for
  * the Raspberry Pi. See LICENSE for licensing details.
  */
 
@@ -435,15 +435,15 @@ void regfree(regex_t *preg)
 
 /* ---- Files -------------------------------------------------------------------- */
 
-#ifndef BMCOCO_HOST_LIBC
+#ifndef BMAMIGA_HOST_LIBC
 
 /* The part of PATH after the last '/'. This is libgen.h's basename(),
    which XRoar calls; newlib's string.h declares the GNU one under another
    symbol, so this one is given its symbol name directly. PATH isn't
    changed. */
-char *bmcoco_basename(char *path) __asm__("basename");
+char *bmamiga_basename(char *path) __asm__("basename");
 
-char *bmcoco_basename(char *path)
+char *bmamiga_basename(char *path)
 {
 	char *slash = strrchr(path, '/');
 	return slash != NULL ? slash + 1 : path;

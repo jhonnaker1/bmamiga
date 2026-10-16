@@ -5,12 +5,12 @@
 // headers, shader_*.h for V3D 4.2 or shader71_*.h for V3D 7.1, each
 // included once, in shaders.cpp.
 //
-// This file is part of BMCoco, a bare metal Tandy Color Computer emulator for
+// This file is part of BMAmiga, a bare metal Amiga emulator for
 // the Raspberry Pi. See LICENSE for licensing details.
 //
 
-#ifndef BMCOCO_PI4V3D_SHADERS_H_
-#define BMCOCO_PI4V3D_SHADERS_H_
+#ifndef BMAMIGA_PI4V3D_SHADERS_H_
+#define BMAMIGA_PI4V3D_SHADERS_H_
 
 #include "shader.h"
 

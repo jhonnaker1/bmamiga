@@ -12,12 +12,12 @@
 // pm), with Circle's include/circle/memorymap64.h for where the BCM2712's
 // AXI and SoC peripherals are.
 //
-// This file is part of BMCoco, a bare metal Tandy Color Computer emulator for
+// This file is part of BMAmiga, a bare metal Amiga emulator for
 // the Raspberry Pi. See LICENSE for licensing details.
 //
 
-#ifndef BMCOCO_PI4V3D_REGS_H_
-#define BMCOCO_PI4V3D_REGS_H_
+#ifndef BMAMIGA_PI4V3D_REGS_H_
+#define BMAMIGA_PI4V3D_REGS_H_
 
 #include <stdint.h>
 

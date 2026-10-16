@@ -1,7 +1,7 @@
 //
 // kernel.cpp
 //
-// This file is part of BMCoco, a bare metal Tandy Color Computer emulator for the
+// This file is part of BMAmiga, a bare metal Amiga emulator for the
 // Raspberry Pi. See LICENSE for licensing details.
 //
 // Parts of the USB, frame buffer and sound handling are based on BMC64.
@@ -30,11 +30,11 @@
 extern "C" {
 // From src/port/platform.c: the emulator's entry point, which runs on core
 // 1, and its Reboot / Shut Down request.
-void bmcoco_main(void);
-void bmcoco_request_power(int power_off);
+void bmamiga_main(void);
+void bmamiga_request_power(int power_off);
 }
 
-static const char FromKernel[] = "bmcoco";
+static const char FromKernel[] = "bmamiga";
 
 // Sample rate the VideoCore plays audio at.
 #define HW_SAMPLE_RATE 44100
@@ -83,7 +83,7 @@ void CEmulatorCore::Run(unsigned nCore) {
     while (!m_bLaunch) {
       DataMemBarrier();
     }
-    bmcoco_main();
+    bmamiga_main();
   }
 #if RASPPI >= 4
   // Cores 2 and 3 help draw smoothed and CRT frames (src/pi4/video.h).
@@ -178,7 +178,7 @@ bool CKernel::Initialize(void) {
     return false;
   }
   mLogger.RegisterPanicHandler(PanicHandler);
-  mLogger.Write(FromKernel, LogNotice, "BMCoco " BMCOCO_VERSION " (" BMCOCO_GIT
+  mLogger.Write(FromKernel, LogNotice, "BMAmiga " BMAMIGA_VERSION " (" BMAMIGA_GIT
                 ", XRoar " XROAR_VERSION ")");
 
   if (!mTimer.Initialize()) {
@@ -199,8 +199,8 @@ bool CKernel::Initialize(void) {
     mLogger.Write(FromKernel, LogError, "Cannot mount the SD card");
     return false;
   }
-  // Settings saved by the BMCoco menu win over cmdline.txt.
-  mOptions.LoadSettings("SD:/bmcoco.cfg");
+  // Settings saved by the BMAmiga menu win over cmdline.txt.
+  mOptions.LoadSettings("SD:/bmamiga.cfg");
 
   // Until here the log went to the serial port. No setting means no log.
   const char *logging = mOptions.Get("enable_logging", "off");
@@ -303,7 +303,7 @@ TShutdownMode CKernel::Run(void) {
   // One core (the Pi Zero): the emulator runs here and yields once a frame,
   // which lets the USB task and Circle's other tasks run.
   new CUSBPlugAndPlayTask;
-  bmcoco_main();
+  bmamiga_main();
   return ShutdownHalt;
 #else
   mEmulatorCore.Launch();
@@ -392,7 +392,7 @@ void CKernel::CheckPowerButton(void) {
     m_nPowerButtonDown = now | 1;
   } else if (now - m_nPowerButtonDown >= CLOCKHZ / 20) {
     mLogger.Write(FromKernel, LogNotice, "Power button: Shut Down");
-    bmcoco_request_power(1);
+    bmamiga_request_power(1);
     m_bPowerButtonSeenUp = false;
   }
 }

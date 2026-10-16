@@ -26,12 +26,12 @@
 //    the rule that only Write(), GetQueueFramesAvail() and IsActive() may
 //    be called on other cores than core 0.
 //
-// This file is part of BMCoco, a bare metal Tandy Color Computer emulator for
+// This file is part of BMAmiga, a bare metal Amiga emulator for
 // the Raspberry Pi. See LICENSE for licensing details.
 //
 
-#ifndef BMCOCO_PI4_SOUND_H_
-#define BMCOCO_PI4_SOUND_H_
+#ifndef BMAMIGA_PI4_SOUND_H_
+#define BMAMIGA_PI4_SOUND_H_
 
 #include <circle/interrupt.h>
 #include <circle/sound/soundbasedevice.h>

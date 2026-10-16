@@ -1,17 +1,17 @@
 //
 // kernel.h
 //
-// The Circle kernel for BMCoco: brings up the hardware, then runs the
+// The Circle kernel for BMAmiga: brings up the hardware, then runs the
 // XRoar emulator on core 1 while core 0 services USB. The Pi Zero has
 // one core: the emulator runs on it, and USB is serviced by a task between
 // frames (as in BMC64's Pi Zero build).
 //
-// This file is part of BMCoco, a bare metal Tandy Color Computer emulator for the
+// This file is part of BMAmiga, a bare metal Amiga emulator for the
 // Raspberry Pi. See LICENSE for licensing details.
 //
 
-#ifndef BMCOCO_KERNEL_H_
-#define BMCOCO_KERNEL_H_
+#ifndef BMAMIGA_KERNEL_H_
+#define BMAMIGA_KERNEL_H_
 
 #include <SDCard/emmc.h>
 #include <circle/actled.h>

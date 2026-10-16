@@ -12,7 +12,7 @@
 
 if [ ! -f sdcard/config.txt ]
 then
-    echo "Must be run from the BMCoco root directory." >&2
+    echo "Must be run from the BMAmiga root directory." >&2
     exit 1
 fi
 

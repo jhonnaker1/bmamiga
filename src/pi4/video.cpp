@@ -3,7 +3,7 @@
 //
 // See video.h for what this is and the sources it follows.
 //
-// This file is part of BMCoco, a bare metal Tandy Color Computer emulator for
+// This file is part of BMAmiga, a bare metal Amiga emulator for
 // the Raspberry Pi. See LICENSE for licensing details.
 //
 
@@ -189,7 +189,7 @@ bool Pi4Video::Initialize(bool crt, bool smooth, bool curvature, Driver driver) 
     } else {
       // Sharp and smooth are scaled by the HVS; the CRT shader is drawn by
       // the ARM at up to 1080 lines and scaled the rest of the way.
-      CLogger::Get()->Write(FromVideo, LogNotice, "Picture by BMCoco's display lists on the HVS");
+      CLogger::Get()->Write(FromVideo, LogNotice, "Picture by BMAmiga's display lists on the HVS");
     }
   }
   FlushStartupLog();

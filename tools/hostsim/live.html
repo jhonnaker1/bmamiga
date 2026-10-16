@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>BMCoco Live</title>
+<title>BMAmiga Live</title>
 <style>
   :root {
     --bg: #101010;
@@ -84,26 +84,24 @@
 </style>
 </head>
 <body>
-<h1>BMCOCO <span>live in the host simulator</span></h1>
+<h1>BMAMIGA <span>live in the host simulator</span></h1>
 <div id="screen-wrap" tabindex="0">
   <canvas id="screen" width="640" height="240"></canvas>
   <div id="click">Click here to start (keyboard and sound)</div>
 </div>
 <div id="bar">
   <button data-key="69">Menu (F12)</button>
-  <button data-key="67">Reset (F10)</button>
-  <button data-key="68">Turbo (F11)</button>
-  <button data-key="41">BREAK (Esc)</button>
-  <button data-key="74">CLEAR (Home)</button>
+  <button data-key="68">Warp (F11)</button>
+  <button data-key="78">Help (Page Down)</button>
   <button id="sound">Sound: off</button>
 </div>
 <div id="status">Connecting...</div>
-<div id="help">Type straight into the screen once it has focus. Arrow keys are the CoCo's arrows; a gamepad works as the right joystick (A fire, X Space, Y Enter, Home menu).</div>
+<div id="help">Type straight into the screen once it has focus (the Windows or Command keys are the Amiga keys). Click the screen to use the mouse; a gamepad is the joystick (A fire). F12 opens BMAmiga's menu, F11 warp.</div>
 
 <script>
 "use strict";
 
-// KeyboardEvent.code to USB HID usage, which BMCoco takes.
+// KeyboardEvent.code to USB HID usage, which BMAmiga takes.
 const USAGE = {
   Enter: 0x28, Escape: 0x29, Backspace: 0x2a, Tab: 0x2b, Space: 0x2c,
   Minus: 0x2d, Equal: 0x2e, BracketLeft: 0x2f, BracketRight: 0x30,
@@ -168,7 +166,7 @@ document.querySelectorAll("button[data-key]").forEach((b) => {
 
 // ---- Mouse ----
 // Clicking the screen captures the mouse (Esc lets it go): it is the
-// CoCo's mouse when a joystick port has Mouse. Sent at most once a frame.
+// the Amiga's mouse. Sent at most once a frame.
 let mouseDx = 0, mouseDy = 0, mouseButtons = 0, mouseDirty = false;
 const locked = () => document.pointerLockElement === canvas;
 canvas.addEventListener("click", () => {

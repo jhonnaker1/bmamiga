@@ -8,12 +8,12 @@
 // Sources: the BCM2712 device tree (addresses) and the behaviour of the
 // Linux vc4 display driver (registers, fields and values).
 //
-// This file is part of BMCoco, a bare metal Tandy Color Computer emulator for
+// This file is part of BMAmiga, a bare metal Amiga emulator for
 // the Raspberry Pi. See LICENSE for licensing details.
 //
 
-#ifndef BMCOCO_PI5KMS_REGS_H_
-#define BMCOCO_PI5KMS_REGS_H_
+#ifndef BMAMIGA_PI5KMS_REGS_H_
+#define BMAMIGA_PI5KMS_REGS_H_
 
 #include <stdint.h>
 

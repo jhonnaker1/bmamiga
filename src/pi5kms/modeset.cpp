@@ -3,7 +3,7 @@
 //
 // See modeset.h.
 //
-// This file is part of BMCoco, a bare metal Tandy Color Computer emulator for
+// This file is part of BMAmiga, a bare metal Amiga emulator for
 // the Raspberry Pi. See LICENSE for licensing details.
 //
 
@@ -126,7 +126,7 @@ bool ModeSetter::Current(Timing *timing) {
   }
   if (known == 0) {
     CLogger::Get()->Write(FromModeSet, LogNotice,
-                          "Video mode %ux%u (totals %ux%u) isn't one BMCoco switches",
+                          "Video mode %ux%u (totals %ux%u) isn't one BMAmiga switches",
                           h_active, v_active, h_total, v_total);
     return false;
   }

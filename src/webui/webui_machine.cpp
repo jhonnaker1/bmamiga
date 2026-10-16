@@ -22,7 +22,7 @@
 #include <stdio.h>
 
 // The machine running (src/port/platform.c).
-extern "C" const char *bmcoco_machine_description(void);
+extern "C" const char *bmamiga_machine_description(void);
 
 namespace {
 
@@ -47,7 +47,7 @@ const WebUiMachine *WebUiMachineGet(void) {
   return &kMachine;
 }
 
-const char *WebUiMachineName(void) { return bmcoco_machine_description(); }
+const char *WebUiMachineName(void) { return bmamiga_machine_description(); }
 
 boolean WebUiMachineCanRun(const char *ext) {
   for (const char *const *type = kMachine.run_types; *type != 0; type++) {

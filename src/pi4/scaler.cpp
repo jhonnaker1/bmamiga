@@ -4,7 +4,7 @@
 // See scaler.h for what this is, the sources it follows and where it
 // differs from them.
 //
-// This file is part of BMCoco, a bare metal Tandy Color Computer emulator for
+// This file is part of BMAmiga, a bare metal Amiga emulator for
 // the Raspberry Pi. See LICENSE for licensing details.
 //
 
@@ -13,7 +13,7 @@
 #include <math.h>
 #include <string.h>
 
-// BMCoco's crt-pi settings (BMC64's defaults, see scaler.h).
+// BMAmiga's crt-pi settings (BMC64's defaults, see scaler.h).
 const float Pi4Scaler::CurvatureX = 0.10f;
 const float Pi4Scaler::CurvatureY = 0.15f;
 const float Pi4Scaler::ScanlineWeight = 6.0f;

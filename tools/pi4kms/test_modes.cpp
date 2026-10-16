@@ -5,7 +5,7 @@
 // src/pi4kms/modes.*): EDID, choosing the mode, the AVI InfoFrame, the
 // PHY's settings and the audio clock.
 //
-// This file is part of BMCoco, a bare metal Tandy Color Computer emulator for
+// This file is part of BMAmiga, a bare metal Amiga emulator for
 // the Raspberry Pi. See LICENSE for licensing details.
 //
 
@@ -22,7 +22,7 @@ using namespace kms;
 // NTSC 262 lines at 1.789790 MHz.
 static const double PalFps = 1773447.0 / 114 / 312;
 static const double NtscFps = 1789790.0 / 114 / 262;
-// XRoar's (BMCoco's): video lines of 912 ticks of its 14.31818 MHz clock,
+// XRoar's (BMAmiga's): video lines of 912 ticks of its 14.31818 MHz clock,
 // 262 a frame for an NTSC CoCo 1/2, 263 for a CoCo 3, 312 for a PAL CoCo.
 static const double CocoFps = 14318180.0 / 912 / 262;
 static const double Coco3Fps = 14318180.0 / 912 / 263;
@@ -114,7 +114,7 @@ static void TestChooseMode(void) {
 
   // The CoCo 2 (59.92 Hz) is within CTA-861's 0.5 %; the CoCo 3 (59.70 Hz)
   // and a PAL CoCo (50.32 Hz) are just outside, so they get the standard
-  // 60 or 50 Hz mode, which BMCoco locks to (as on a Pi 3), even from the
+  // 60 or 50 Hz mode, which BMAmiga locks to (as on a Pi 3), even from the
   // other rate.
   ok = ChooseMode(*CtaMode(4), CocoFps, edid, &chosen);
   snprintf(what, sizeof what, "720p60 -> VIC %u, %.5f Hz", chosen.vic, chosen.Refresh());

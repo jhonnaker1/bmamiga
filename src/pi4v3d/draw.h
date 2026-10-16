@@ -16,12 +16,12 @@
 //    v3d_tiling.c: the UIF texture layout.
 //  - src/broadcom/cle/v3d_packet.xml: the record layouts.
 //
-// This file is part of BMCoco, a bare metal Tandy Color Computer emulator for
+// This file is part of BMAmiga, a bare metal Amiga emulator for
 // the Raspberry Pi. See LICENSE for licensing details.
 //
 
-#ifndef BMCOCO_PI4V3D_DRAW_H_
-#define BMCOCO_PI4V3D_DRAW_H_
+#ifndef BMAMIGA_PI4V3D_DRAW_H_
+#define BMAMIGA_PI4V3D_DRAW_H_
 
 #include "gpu.h"
 #include "shader.h"

@@ -3,7 +3,7 @@
 //
 // The Pi 5's direct display driver's picture: two 32-bit pixel buffers,
 // shown in turn as one HVS plane, scaled to its place on the screen by the
-// BCM2712's HVS (hvs.h). BMCoco draws a frame into the buffer not on
+// BCM2712's HVS (hvs.h). BMAmiga draws a frame into the buffer not on
 // screen, then flips. The same interface as the Pi 4's (src/pi4kms/).
 //
 // The buffers are in the ARM's memory when the HVS reads the firmware's
@@ -20,12 +20,12 @@
 //    semaphore.cpp: Circle's VCHIQ waits yield, which is how the Pi 3 runs
 //    them while it waits for a frame.
 //
-// This file is part of BMCoco, a bare metal Tandy Color Computer emulator for
+// This file is part of BMAmiga, a bare metal Amiga emulator for
 // the Raspberry Pi. See LICENSE for licensing details.
 //
 
-#ifndef BMCOCO_PI5KMS_DISPLAY_H_
-#define BMCOCO_PI5KMS_DISPLAY_H_
+#ifndef BMAMIGA_PI5KMS_DISPLAY_H_
+#define BMAMIGA_PI5KMS_DISPLAY_H_
 
 #include "hvs.h"
 #include "modeset.h"

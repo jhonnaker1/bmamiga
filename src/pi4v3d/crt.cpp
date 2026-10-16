@@ -3,7 +3,7 @@
 //
 // See crt.h.
 //
-// This file is part of BMCoco, a bare metal Tandy Color Computer emulator for
+// This file is part of BMAmiga, a bare metal Amiga emulator for
 // the Raspberry Pi. See LICENSE for licensing details.
 //
 
@@ -138,7 +138,7 @@ bool Crt::Test(void) {
     return false;
   }
   // Stripes, steps and single pixels, in varied colours (BMA800XL's test
-  // palette, as RGB565: BMCoco's pictures are RGB565).
+  // palette, as RGB565: BMAmiga's pictures are RGB565).
   for (unsigned y = 0; y < Lines; y++) {
     for (unsigned x = 0; x < Pitch; x++) {
       unsigned i = (((x / 3) * 5 + y * 7) ^ ((x * y) & 0x11)) & 255;

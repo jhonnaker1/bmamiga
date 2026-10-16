@@ -4,38 +4,43 @@
 # scripted tests and checks the results.
 #
 #   tools/hostsim/run_tests.sh
-#   BMCOCO_ROMS=/path/to/roms tools/hostsim/run_tests.sh
+#   BMAMIGA_ROMS=/path/to/roms BMAMIGA_WORKBENCH=/path/to/workbench13.adf \
+#       tools/hostsim/run_tests.sh
 #
-# The tests run a small stand-in ROM (make_test_rom.py), since the real
-# ROMs can't be shipped. With BMCOCO_ROMS set to a folder holding real ROMs
-# (bas13.rom, extbas11.rom, disk11.rom, coco3.rom), Color BASIC is tested
+# Kickstart ROMs can't be shipped, so the tests start the Amiga with AROS,
+# the free replacement Kickstart that Amiberry comes with. With
+# BMAMIGA_ROMS set to a folder holding a Kickstart 1.3 ROM (kick13.rom, or
+# Amiga Forever's amiga-os-130.rom with its rom.key) and BMAMIGA_WORKBENCH
+# to a Workbench 1.3 disk, Workbench is booted, typed at and clicked on
 # too. Output, including screenshots (.ppm), goes to tools/hostsim/out/.
 #
 
 set -u
 
 HERE=$(cd "$(dirname "$0")" && pwd)
+ROOT=$(cd "$HERE/../.." && pwd)
 OUT=$HERE/out
-SIM=$HERE/build/bmcoco_sim
+SIM=$HERE/build/bmamiga_sim
 
 make -s -C "$HERE" -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)" || exit 1
 
 rm -rf "$OUT"
-mkdir -p "$OUT/testroms"
-python3 "$HERE/make_test_rom.py" "$OUT/testroms" > /dev/null || exit 1
+mkdir -p "$OUT/aros"
+cp "$ROOT"/third_party/amiberry/roms/aros-*.bin "$OUT/aros/"
 
 FAILED=0
 pass() { echo "PASS  $1"; }
 fail() { echo "FAIL  $1: $2"; FAILED=$((FAILED + 1)); }
 
 # run NAME REFRESH ROMS CMDLINE SCRIPT: runs the simulator in out/NAME, a
-# stand-in SD card with ROMS as its roms folder.
+# stand-in SD card with ROMS as its roms folder (and a disks folder), for
+# at most 5 minutes.
 run() {
     local name=$1 refresh=$2 roms=$3 cmdline=$4 script=$5
-    mkdir -p "$OUT/$name"
-    ln -s "$roms" "$OUT/$name/roms"
-    (cd "$OUT/$name" && printf "$script" | BMCOCO_REFRESH=$refresh \
-        BMCOCO_CMDLINE="root=. $cmdline" "$SIM" > log.txt 2>&1)
+    mkdir -p "$OUT/$name/disks"
+    [ -e "$OUT/$name/roms" ] || ln -s "$roms" "$OUT/$name/roms"
+    (cd "$OUT/$name" && printf "$script" | BMAMIGA_REFRESH=$refresh \
+        BMAMIGA_CMDLINE="root=. $cmdline" perl -e 'alarm 300; exec @ARGV' "$SIM" > log.txt 2>&1)
 }
 
 # check_log NAME REGEX MESSAGE: the log must contain REGEX
@@ -47,13 +52,24 @@ check_log() {
     fi
 }
 
-# check_audio NAME: no underruns, sound was made, every frame presented
-check_audio() {
-    local log=$OUT/$1/log.txt line frame presented changes
-    if grep -q "audio underrun" "$log"; then
-        fail "$1" "audio underrun (see out/$1/log.txt)"
+# check_cfg NAME LINE MESSAGE: bmamiga.cfg must have LINE (a regex)
+check_cfg() {
+    if grep -Eq "$2" "$OUT/$1/bmamiga.cfg" 2>/dev/null; then
+        pass "$1: $3"
     else
-        pass "$1: no audio underruns"
+        fail "$1" "$3 (bmamiga.cfg: $(tr '\n' ' ' < "$OUT/$1/bmamiga.cfg" 2>/dev/null))"
+    fi
+}
+
+# check_frames NAME: no audio underruns once started (frame 300), and every
+# frame presented
+check_frames() {
+    local log=$OUT/$1/log.txt line frame presented late
+    late=$(grep "audio underrun" "$log" | sed 's/.*frame \([0-9]*\):.*/\1/' | awk '$1 > 300' | wc -l)
+    if [ "$late" -eq 0 ]; then
+        pass "$1: no audio underruns once started"
+    else
+        fail "$1" "$late audio underruns after frame 300 (see out/$1/log.txt)"
     fi
     line=$(grep "frames presented" "$log" | tail -1)
     frame=$(echo "$line" | sed 's/.*frame \([0-9]*\):.*/\1/')
@@ -63,20 +79,12 @@ check_audio() {
     else
         fail "$1" "frames presented: $line"
     fi
-    changes=$(grep "changing samples" "$log" | tail -1 | sed 's/.*changing samples \([0-9]*\).*/\1/')
-    if [ "${changes:-0}" -gt 0 ]; then
-        pass "$1: sound output"
-    else
-        fail "$1" "no sound reached the output"
-    fi
 }
 
-# same NAME A B / differ NAME A B: compare two screenshots of out/NAME,
-# leaving out the top 60 lines, where the test ROM counts frames.
-screens_equal() {
-    python3 - "$1" "$2" <<'EOF'
+# PPM helpers: python3 ppm.py FILE ...
+cat > "$OUT/ppm.py" <<'EOF'
 import sys
-def body(path):
+def load(path):
     data = open(path, 'rb').read()
     fields, pos = [], 0
     while len(fields) < 4:
@@ -87,309 +95,126 @@ def body(path):
             end += 1
         fields.append(data[pos:end])
         pos = end
-    width = int(fields[1])
-    return data[pos + 1 + 60 * width * 3:]
-sys.exit(0 if body(sys.argv[1]) == body(sys.argv[2]) else 1)
+    return int(fields[1]), int(fields[2]), data[pos + 1:]
+cmd = sys.argv[1]
+if cmd == 'colour':            # FILE R G B: has a pixel of that colour
+    w, h, px = load(sys.argv[2])
+    want = bytes(int(v) for v in sys.argv[3:6])
+    sys.exit(0 if any(px[i:i + 3] == want for i in range(0, len(px), 3)) else 1)
+elif cmd == 'colours':         # FILE N: has at least N colours
+    w, h, px = load(sys.argv[2])
+    seen = {px[i:i + 3] for i in range(0, len(px), 3)}
+    sys.exit(0 if len(seen) >= int(sys.argv[3]) else 1)
+elif cmd == 'size':            # FILE W H
+    w, h, px = load(sys.argv[2])
+    sys.exit(0 if (w, h) == (int(sys.argv[3]), int(sys.argv[4])) else 1)
+elif cmd == 'pointer':         # FILE: where the (red) mouse pointer is
+    w, h, px = load(sys.argv[2])
+    pts = [(i % w, i // w) for i in range(w * h)
+           if px[3 * i] > 200 and px[3 * i + 1] < 90 and px[3 * i + 2] < 90]
+    print('%d %d' % (min(p[0] for p in pts), min(p[1] for p in pts)) if pts else 'none')
+elif cmd == 'differ':          # A B: the pictures differ
+    sys.exit(0 if load(sys.argv[2])[2] != load(sys.argv[3])[2] else 1)
 EOF
-}
-same() {
-    if [ -f "$OUT/$1/$2.ppm" ] && [ -f "$OUT/$1/$3.ppm" ] && screens_equal "$OUT/$1/$2.ppm" "$OUT/$1/$3.ppm"; then
-        pass "$1: $2 and $3 are the same"
-    else
-        fail "$1" "$2 and $3 differ"
-    fi
-}
-differ() {
-    if [ -f "$OUT/$1/$2.ppm" ] && [ -f "$OUT/$1/$3.ppm" ] && ! screens_equal "$OUT/$1/$2.ppm" "$OUT/$1/$3.ppm"; then
-        pass "$1: $2 and $3 differ"
-    else
-        fail "$1" "$2 and $3 should differ"
-    fi
-}
+ppm() { python3 "$OUT/ppm.py" "$@"; }
 
-# has_colour NAME FILE R G B MESSAGE: the screenshot has a pixel of that colour
-has_colour() {
-    if python3 - "$OUT/$1/$2.ppm" "$3" "$4" "$5" <<'EOF'
-import sys
-data = open(sys.argv[1], 'rb').read()
-fields, pos = [], 0
-while len(fields) < 4:
-    while data[pos:pos + 1].isspace():
-        pos += 1
-    end = pos
-    while not data[end:end + 1].isspace():
-        end += 1
-    fields.append(data[pos:end])
-    pos = end
-pixels = data[pos + 1:]
-want = bytes(int(v) for v in sys.argv[2:5])
-sys.exit(0 if any(pixels[i:i + 3] == want for i in range(0, len(pixels), 3)) else 1)
-EOF
-    then
-        pass "$1: $6"
-    else
-        fail "$1" "$6 (no $3,$4,$5 pixel in $2.ppm)"
-    fi
-}
-
-TESTROMS=$OUT/testroms
-
-echo "Boot, locked to a 60 Hz display"
-run boot 60 "$TESTROMS" "" '120 shot a.ppm\n121 shot b.ppm\n600 audio\n601 quit\n'
-check_log boot "machine 59\.9[0-9] Hz, synchronised to the display" "NTSC CoCo locked to 60 Hz"
-check_log boot "Tandy CoCo 2B \(NTSC|coco2bus|Colour Computer" "a CoCo 2 was chosen"
-check_audio boot
-if cmp -s "$OUT/boot/a.ppm" "$OUT/boot/b.ppm"; then
-    fail boot "the frame counter didn't move from one frame to the next"
+echo "AROS, with no Kickstart, on a 50 Hz display"
+run aros 50 "$OUT/aros" "" '1000 shot boot.ppm\n1000 audio\n1001 quit\n'
+check_log aros "machine 50\.[0-9]+ Hz, synchronised to the display" "a PAL Amiga locked to 50 Hz"
+check_log aros "Amiga 500" "an Amiga 500 (the default model)"
+check_frames aros
+if ppm size "$OUT/aros/boot.ppm" 752 576 && ppm colours "$OUT/aros/boot.ppm" 8; then
+    pass "aros: AROS's boot screen, 752x576"
 else
-    pass "boot: a new frame every display refresh"
+    fail aros "no AROS boot screen (see out/aros/boot.ppm)"
+fi
+if grep -q "migration" "$OUT/aros/log.txt"; then
+    fail aros "imported a desktop Amiberry's settings"
+else
+    pass "aros: no desktop Amiberry settings imported"
 fi
 
-echo "NTSC CoCo on a 50 Hz display"
-run timer 50 "$TESTROMS" "" '600 audio\n601 quit\n'
-check_log timer "timer paced" "falls back to timer pacing"
-if grep -q "audio underrun" "$OUT/timer/log.txt"; then
-    fail timer "audio underrun"
-else
-    pass "timer: no audio underruns"
-fi
-
-echo "PAL CoCo on a 50 Hz display"
-run pal 50 "$TESTROMS" "machine=coco2b" '300 audio\n301 quit\n'
-check_log pal "machine 50\.[0-9]+ Hz, synchronised to the display" "PAL CoCo locked to 50 Hz"
-
-echo "Keyboard"
-run keys 60 "$TESTROMS" "" '120 shot idle.ppm\n130 key 0x04 1\n140 shot a.ppm\n141 key 0x04 0\n150 shot idle2.ppm\n151 quit\n'
-differ keys idle a
-same keys idle idle2
-
-echo "Joysticks: analog stick, D-pad, GPIO"
-# Full left on the stick, the D-pad and a GPIO joystick all read X=0; half
-# way on the stick reads in between.
-run joy 60 "$TESTROMS" "" '120 pad 0 0\n120 axis 0 32768 32768\n140 shot centre.ppm\n150 axis 0 0 32768\n170 shot stick.ppm\n175 axis 0 16384 32768\n190 shot half.ppm\n200 axis 0 32768 32768\n200 pad 0 0x4000\n220 shot dpad.ppm\n230 pad 0 0\n230 gpio 0 0x04\n250 shot gpio.ppm\n260 gpio 0 0x10\n280 shot fire.ppm\n290 gpio 0 0\n310 shot centre2.ppm\n311 quit\n'
-differ joy centre stick
-differ joy stick half
-differ joy centre half
-same joy stick dpad
-same joy dpad gpio
-differ joy centre fire
-same joy centre centre2
+echo "On a 60 Hz display"
+run timer 60 "$OUT/aros" "" '1900 quit\n'
+check_log timer "display 60\.00 Hz, machine 50\.[0-9]+ Hz, timer paced" "a PAL Amiga timer paced on 60 Hz"
+# Amiberry's own waits, pacing itself, don't count as the Pi's work.
+check_log timer "load [0-9]+% .*, 0 of [0-9]+ frames late" "its pacing isn't counted as load"
 
 echo "Menu"
-run menu 60 "$TESTROMS" "" '120 shot before.ppm\n130 key 0x45 1\n131 key 0x45 0\n150 shot menu.ppm\n160 key 0x51 1\n161 key 0x51 0\n170 key 0x28 1\n171 key 0x28 0\n190 shot browse.ppm\n200 key 0x45 1\n201 key 0x45 0\n230 shot after.ppm\n231 quit\n'
-has_colour menu menu 255 129 0 "the menu shows its selection bar"
-differ menu menu browse
-same menu before after
-
-echo "Gamepad opens the menu"
-run padmenu 60 "$TESTROMS" "" '120 pad 0 0\n130 pad 0 0x0100\n135 pad 0 0\n150 shot menu.ppm\n151 quit\n'
-has_colour padmenu menu 255 129 0 "Home opens the menu"
-
-echo "The power key (Pi 400: Fn+F10) shuts down"
-run powerkey 60 "$TESTROMS" "" '150 key 0x66 1\n152 key 0x66 0\n250 quit\n'
-check_log powerkey "Shutting down" "the power key while playing"
-check_log powerkey "power off requested" "the power key powers off"
-run powerkeymenu 60 "$TESTROMS" "" '150 key 0x45 1\n152 key 0x45 0\n180 key 0x66 1\n182 key 0x66 0\n250 quit\n'
-check_log powerkeymenu "power off requested" "the power key in the menu powers off"
-
-echo "A Pi too slow for the frame lock"
-# Each frame takes 18 ms to emulate, a little over a 60 Hz refresh: locked
-# to the display that would be every other refresh (half speed, the sound
-# starved). BMCoco paces by the clock instead, and stretches the sound.
-(mkdir -p "$OUT/slow" && ln -s "$TESTROMS" "$OUT/slow/roms" && cd "$OUT/slow" && \
-    printf '2400 audio\n2401 quit\n' | BMCOCO_REFRESH=60 BMCOCO_SIM_FRAME_MS=18 \
-    BMCOCO_CMDLINE="root=." "$SIM" > log.txt 2>&1)
-check_log slow "longer than the display's .*timer paced until they fit" "falls back to timer pacing"
-check_log slow "BMCoco: load 10[0-9]% of a frame" "logs the load"
-line=$(grep "frames presented" "$OUT/slow/log.txt" | tail -1)
-frame=$(echo "$line" | sed 's/.*frame \([0-9]*\):.*/\1/')
-presented=$(echo "$line" | sed 's/.*: \([0-9]*\) frames presented/\1/')
-if [ -n "$frame" ] && [ $((presented * 100 / frame)) -ge 80 ]; then
-    pass "slow: runs at $((presented * 100 / frame))% speed (not 50%)"
+# F12 opens it: the selection bar is orange (Workbench's).
+run menu 50 "$OUT/aros" "" '200 key 0x45 1\n201 key 0x45 0\n230 shot menu.ppm\n240 key 0x29 1\n241 key 0x29 0\n280 shot closed.ppm\n281 quit\n'
+if ppm size "$OUT/menu/menu.ppm" 640 480 && ppm colour "$OUT/menu/menu.ppm" 255 137 0; then
+    pass "menu: F12 opens the menu"
 else
-    fail slow "speed: $line"
+    fail menu "no menu (see out/menu/menu.ppm)"
 fi
-underruns=$(grep -o 'underruns [0-9]*' "$OUT/slow/log.txt" | tail -1 | grep -o '[0-9]*')
-if [ "${underruns:-9999}" -lt 300 ]; then
-    pass "slow: the sound keeps going ($underruns underruns)"
+if ppm size "$OUT/menu/closed.ppm" 752 576; then
+    pass "menu: Esc closes it, back to the Amiga"
 else
-    fail slow "$underruns sound underruns"
+    fail menu "the menu didn't close (see out/menu/closed.ppm)"
 fi
 
-echo "Web UI reboot request"
-run reboot 60 "$TESTROMS" "" '120 webui reboot\n200 quit\n'
-check_log reboot "reboot requested" "reboots"
-
-echo "Settings are saved"
-run settings 60 "$TESTROMS" "" '120 key 0x45 1\n121 key 0x45 0\n130 key 0x0e 1\n131 key 0x0e 0\n140 key 0x28 1\n141 key 0x28 0\n150 key 0x28 1\n151 key 0x28 0\n160 key 0x45 1\n161 key 0x45 0\n200 quit\n'
-if grep -q "^typed_keys=0" "$OUT/settings/bmcoco.cfg" 2>/dev/null; then
-    pass "settings: Keyboard > Typed Characters saved to bmcoco.cfg"
+echo "Floppy disks"
+# Menu, Floppy Drives, DF0:, the disk (the browser starts in disks): kept
+# in bmamiga.cfg, and put in DF0: at the next boot.
+mkdir -p "$OUT/floppy/disks"
+head -c 901120 /dev/zero > "$OUT/floppy/disks/blank.adf"
+run floppy 50 "$OUT/aros" "" '200 key 0x45 1\n201 key 0x45 0\n220 key 0x28 1\n221 key 0x28 0\n240 key 0x28 1\n241 key 0x28 0\n260 key 0x28 1\n261 key 0x28 0\n300 quit\n'
+check_cfg floppy "^df0=.*disks/blank\.adf" "the disk is kept in bmamiga.cfg"
+(cd "$OUT/floppy" && printf '100 quit\n' | BMAMIGA_REFRESH=50 BMAMIGA_CMDLINE="root=." \
+    perl -e 'alarm 300; exec @ARGV' "$SIM" > log2.txt 2>&1)
+if grep -q "DF0: .*blank.adf" "$OUT/floppy/log2.txt"; then
+    pass "floppy: back in DF0: at the next boot"
 else
-    fail settings "typed_keys=0 not in bmcoco.cfg"
+    fail floppy "not in DF0: at the next boot (see out/floppy/log2.txt)"
 fi
 
-echo "Memory"
-# Menu, down seven to Memory, up two from 64K to 16K: the machine is reset
-# with 16K, the choice saved, and used again at the next boot.
-run memory 60 "$TESTROMS" "" '120 key 0x45 1\n121 key 0x45 0\n128 key 0x51 1\n129 key 0x51 0\n130 key 0x51 1\n131 key 0x51 0\n132 key 0x51 1\n133 key 0x51 0\n134 key 0x51 1\n135 key 0x51 0\n136 key 0x51 1\n137 key 0x51 0\n138 key 0x51 1\n139 key 0x51 0\n140 key 0x51 1\n141 key 0x51 0\n150 key 0x28 1\n151 key 0x28 0\n160 key 0x52 1\n161 key 0x52 0\n162 key 0x52 1\n163 key 0x52 0\n170 key 0x28 1\n171 key 0x28 0\n300 quit\n'
-check_log memory "16K = 16K motherboard RAM" "the menu sets 16K"
-if grep -q "^ram_coco2bus=16" "$OUT/memory/bmcoco.cfg" 2>/dev/null; then
-    pass "memory: ram_coco2bus=16 saved to bmcoco.cfg"
+echo "Model"
+# Menu, down to Model, Enter, down two (Amiga 500+): kept for the next
+# boot, which then starts that model.
+run model 50 "$OUT/aros" "" '200 key 0x45 1\n201 key 0x45 0\n220 key 0x51 1\n221 key 0x51 0\n240 key 0x28 1\n241 key 0x28 0\n260 key 0x51 1\n261 key 0x51 0\n270 key 0x51 1\n271 key 0x51 0\n280 key 0x28 1\n281 key 0x28 0\n300 quit\n'
+check_cfg model "^model=A500\+" "Amiga 500+ kept in bmamiga.cfg"
+(cd "$OUT/model" && printf '100 quit\n' | BMAMIGA_REFRESH=50 BMAMIGA_CMDLINE="root=." \
+    perl -e 'alarm 300; exec @ARGV' "$SIM" > log2.txt 2>&1)
+if grep -q "BMAmiga: Amiga 500+" "$OUT/model/log2.txt"; then
+    pass "model: the next boot is an Amiga 500+"
 else
-    fail memory "ram_coco2bus=16 not in bmcoco.cfg"
-fi
-(cd "$OUT/memory" && printf '100 quit\n' | BMCOCO_REFRESH=60 BMCOCO_CMDLINE="root=." "$SIM" > log2.txt 2>&1)
-if tail -1 "$OUT/memory/log2.txt" >/dev/null && grep "motherboard RAM" "$OUT/memory/log2.txt" | tail -1 | grep -q "16K = 16K"; then
-    pass "memory: 16K again at the next boot"
-else
-    fail memory "the next boot didn't have 16K (see out/memory/log2.txt)"
+    fail model "the next boot isn't an Amiga 500+ (see out/model/log2.txt)"
 fi
 
-echo "Mouse"
-# The Mouse in the right port: the pointer to the top left, the bottom
-# right, then the left button.
-run mouse 60 "$TESTROMS" "joy_right=mjoy0" '100 mouse -2000 -2000 0\n130 shot tl.ppm\n140 mouse 4000 4000 0\n170 shot br.ppm\n180 mouse 0 0 1\n210 shot fire.ppm\n220 mouse -2000 -2000 0\n250 shot tl2.ppm\n251 quit\n'
-check_log mouse "port 0 = Mouse" "Mouse plugged into the right port"
-differ mouse tl br
-differ mouse br fire
-same mouse tl tl2
+echo "Warp"
+run warp 50 "$OUT/aros" "" '200 key 0x44 1\n201 key 0x44 0\n400 shot warp.ppm\n401 key 0x44 1\n402 key 0x44 0\n600 quit\n'
+check_log warp "BMAmiga: warp on" "F11 turns warp on"
+check_log warp "BMAmiga: warp off" "and off again"
 
-echo "DriveWire drives"
-# Menu, down three to DriveWire, down one to Drive 0, the disks folder, the
-# image: it is drive 0 of the built-in server, kept in bmcoco.cfg.
-mkdir -p "$OUT/dwmenu/disks"
-head -c 161280 /dev/zero > "$OUT/dwmenu/disks/nitros9.dsk"
-run dwmenu 60 "$TESTROMS" "" '120 key 0x45 1\n121 key 0x45 0\n130 key 0x51 1\n131 key 0x51 0\n132 key 0x51 1\n133 key 0x51 0\n134 key 0x51 1\n135 key 0x51 0\n140 key 0x28 1\n141 key 0x28 0\n150 key 0x51 1\n151 key 0x51 0\n160 key 0x28 1\n161 key 0x28 0\n170 key 0x28 1\n171 key 0x28 0\n180 key 0x28 1\n181 key 0x28 0\n300 quit\n'
-if grep -q "^dw0=.*disks/nitros9.dsk" "$OUT/dwmenu/bmcoco.cfg" 2>/dev/null; then
-    pass "dwmenu: the image is DriveWire drive 0, saved to bmcoco.cfg"
-else
-    fail dwmenu "dw0 not in bmcoco.cfg"
-fi
-
-echo "Missing ROMs are named by their files"
-run cp400 60 "$TESTROMS" "machine=cp400" '100 quit\n'
-check_log cp400 "ROMs not found: cp400bas.rom, cp400extbas.rom" "a CP-400 without its ROMs names them"
-
-echo "Hard disks"
-# A card with a stand-in HDB-DOS ROM and a blank hard disk image. Menu,
-# Hard Disks (down two), Drive 0, the disks folder, the image: the IDE
-# interface is plugged in with it, and both come back at the next boot.
-mkdir -p "$OUT/hd/disks" "$OUT/hdroms"
-cp "$TESTROMS"/* "$OUT/hdroms/"
-head -c 16384 /dev/zero > "$OUT/hdroms/hdblba.rom"
-head -c 1048576 /dev/zero > "$OUT/hd/disks/test.ide"
-run hd 60 "$OUT/hdroms" "" '120 key 0x45 1\n121 key 0x45 0\n130 key 0x51 1\n131 key 0x51 0\n132 key 0x51 1\n133 key 0x51 0\n140 key 0x28 1\n141 key 0x28 0\n160 key 0x28 1\n161 key 0x28 0\n170 key 0x28 1\n171 key 0x28 0\n180 key 0x28 1\n181 key 0x28 0\n300 quit\n'
-check_log hd "Glenside \| IDE interface" "the IDE interface is plugged in"
-check_log hd "FILE hdblba.rom" "with HDB-DOS"
-if grep -q "^hd0=.*disks/test.ide" "$OUT/hd/bmcoco.cfg" 2>/dev/null && grep -q "^hd_cart=ide" "$OUT/hd/bmcoco.cfg"; then
-    pass "hd: the image and the interface saved to bmcoco.cfg"
-else
-    fail hd "hd0 / hd_cart not in bmcoco.cfg"
-fi
-(cd "$OUT/hd" && printf '100 quit\n' | BMCOCO_REFRESH=60 BMCOCO_CMDLINE="root=." "$SIM" > log2.txt 2>&1)
-if grep -q "IDE interface" "$OUT/hd/log2.txt" && grep -q "test.ide" "$OUT/hd/log2.txt"; then
-    pass "hd: the next boot has them again"
-else
-    fail hd "the next boot didn't have the hard disk (see out/hd/log2.txt)"
-fi
-
-if [ -n "${BMCOCO_ROMS:-}" ]; then
-    echo "Color BASIC (real ROMs from $BMCOCO_ROMS)"
-    run basic 60 "$BMCOCO_ROMS" "" '200 shot boot.ppm\n210 type PRINT "HELLO"\\n\n400 shot hello.ppm\n401 type SOUND 100,30\\n\n600 audio\n601 quit\n'
-    check_log basic "Colour BASIC CRC32 valid" "Color BASIC ROM found"
-    check_log basic "Disk Extended Colour BASIC" "Disk BASIC ROM found"
-    differ basic boot hello
-    check_audio basic
-
-    echo "CoCo 3 (real ROM)"
-    run coco3 60 "$BMCOCO_ROMS" "machine=coco3" '300 shot boot.ppm\n301 quit\n'
-    check_log coco3 "Super Extended Colour BASIC" "CoCo 3 ROM found"
-    check_log coco3 "synchronised to the display" "CoCo 3 locked to 60 Hz"
-
-    echo "Becker port (real ROMs, a stand-in DriveWire server)"
-    # The IDE interface (a stand-in HDB-DOS: only its Becker port is used)
-    # in xroar.conf. A BASIC program writes A to the port's data register,
-    # waits for the server's answer (Z) and writes it back.
-    # becker NAME CONNECT_FRAMES: connecting takes that many frames (as it
-    # can on the Pi); the CoCo goes on meanwhile, the port reading empty.
-    becker() {
-        local name=$1 frames=$2 server
-        mkdir -p "$OUT/$name/roms"
-        for f in "$BMCOCO_ROMS"/*; do ln -s "$f" "$OUT/$name/roms/" 2>/dev/null; done
-        head -c 8192 /dev/zero > "$OUT/$name/roms/hdblba.rom"
-        printf 'machine coco2bus\nmachine-cart ide\n' > "$OUT/$name/xroar.conf"
-        python3 - "$OUT/$name/server.log" <<'EOF' &
-import socket, sys
-log = open(sys.argv[1], 'w')
-s = socket.socket()
-s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-s.bind(('127.0.0.1', 65511))
-s.listen(1)
-s.settimeout(30)
-c, _ = s.accept()
-c.settimeout(30)
-data = c.recv(16)
-log.write('got %s\n' % list(data))
-log.flush()
-c.sendall(b'Z')
-data = c.recv(16)
-log.write('got back %s\n' % list(data))
-log.flush()
-EOF
-        server=$!
-        sleep 1
-        (cd "$OUT/$name" && printf '%s\n' '300 type 10 POKE &HFF42,65\n' '500 type 20 IF PEEK(&HFF41)=0 THEN 20\n' \
-            '800 type 30 POKE &HFF42,PEEK(&HFF42)\n' '1100 type RUN\n' '2000 shot result.ppm' '2001 quit' | \
-            BMCOCO_REFRESH=60 BMCOCO_IP=127.0.0.1 BMCOCO_SIM_CONNECT_FRAMES=$frames \
-            BMCOCO_CMDLINE="root=. becker_ip=127.0.0.1 becker_port=65511" "$SIM" > log.txt 2>&1)
-        wait $server 2>/dev/null
-        check_log $name "Becker port: connected to DriveWire server 127.0.0.1:65511" "connects to the server"
-        if grep -q "got \[65\]" "$OUT/$name/server.log" 2>/dev/null; then
-            pass "$name: the server got what BASIC wrote"
-        else
-            fail $name "the server didn't get A (see out/$name/server.log)"
-        fi
-        if grep -q "got back \[90\]" "$OUT/$name/server.log" 2>/dev/null; then
-            pass "$name: BASIC read the server's answer"
-        else
-            fail $name "BASIC didn't read Z (see out/$name/server.log)"
-        fi
-    }
-    echo "The built-in DriveWire server"
-    # No server address: the Becker port talks to BMCoco's own server,
-    # with test.dsk in drive 0 (sector 1 all 7s). BASIC writes to virtual
-    # channel 0, not open (as NitrOS-9 does: just the opcode and channel),
-    # reads sector 1 (READEX), sends the checksum, then writes each byte plus one plus
-    # the error it got into sector 2 (WRITE): sector 2 of the image must
-    # then be all 8s.
-    mkdir -p "$OUT/dw/roms" "$OUT/dw/disks"
-    for f in "$BMCOCO_ROMS"/*; do ln -s "$f" "$OUT/dw/roms/" 2>/dev/null; done
-    head -c 8192 /dev/zero > "$OUT/dw/roms/hdblba.rom"
-    printf 'machine coco2bus\nmachine-cart ide\n' > "$OUT/dw/xroar.conf"
-    python3 -c "import sys; sys.stdout.buffer.write(bytes(256) + bytes([7]) * 256 + bytes(256 * 33))" > "$OUT/dw/disks/test.dsk"
-    printf 'dw0=disks/test.dsk\n' > "$OUT/dw/bmcoco.cfg"
-    (cd "$OUT/dw" && printf '%s\n' \
-        '300 type 10 DIM D(255)\n' \
-        '500 type 20 FOR I=0 TO 6:READ A:POKE &HFF42,A:NEXT\n' \
-        '900 type 30 S=0:FOR I=0 TO 255:D(I)=PEEK(&HFF42):S=S+D(I):NEXT\n' \
-        '1400 type 40 H=INT(S/256):POKE &HFF42,H:POKE &HFF42,S-H*256:E=PEEK(&HFF42)\n' \
-        '2000 type 50 FOR I=0 TO 4:READ A:POKE &HFF42,A:NEXT\n' \
-        '2400 type 60 T=0:FOR I=0 TO 255:V=D(I)+1+E:POKE &HFF42,V:T=T+V:NEXT\n' \
-        '2900 type 70 H=INT(T/256):POKE &HFF42,H:POKE &HFF42,T-H*256:R=PEEK(&HFF42)\n' \
-        '3500 type 80 DATA 100,0,210,0,0,0,1,87,0,0,0,2\n' \
-        '3900 type RUN\n' \
-        '5000 quit' | \
-        BMCOCO_REFRESH=60 BMCOCO_CMDLINE="root=." "$SIM" > log.txt 2>&1)
-    check_log dw "Becker port: the built-in DriveWire server" "the Becker port uses the built-in server"
-    if python3 -c "import sys; d = open(sys.argv[1], 'rb').read(); sys.exit(0 if d[512:768] == bytes([8]) * 256 else 1)" "$OUT/dw/disks/test.dsk"; then
-        pass "dw: BASIC read a sector and wrote one through it"
+if [ -n "${BMAMIGA_ROMS:-}" ] && [ -n "${BMAMIGA_WORKBENCH:-}" ]; then
+    echo "Workbench 1.3 (Kickstart from $BMAMIGA_ROMS)"
+    mkdir -p "$OUT/wb/disks"
+    cp "$BMAMIGA_WORKBENCH" "$OUT/wb/disks/wb13.adf"
+    chmod u+w "$OUT/wb/disks/wb13.adf"
+    printf 'df0=disks/wb13.adf\n' > "$OUT/wb/bmamiga.cfg"
+    # Ctrl+D stops the Startup-Sequence; echo hello at the CLI; then the
+    # mouse moves 300 pixels across and 80 down.
+    script='2600 key 0xe0 1\n2601 key 0x07 1\n2602 key 0x07 0\n2603 key 0xe0 0\n2650 shot before.ppm\n2700 type echo hello\\n\n2950 shot typed.ppm\n'
+    for i in $(seq 0 19); do script="$script$((3000 + i)) mouse 15 4 0\n"; done
+    script="${script}3050 shot moved.ppm\n3050 audio\n3051 quit\n"
+    run wb 50 "$BMAMIGA_ROMS" "" "$script"
+    check_log wb "KS ROM v1\.3|Kickstart ROM.*1\.3|kick13" "Kickstart 1.3 found"
+    check_log wb "DF0: disks/wb13\.adf" "Workbench in DF0:"
+    check_frames wb
+    if ppm differ "$OUT/wb/before.ppm" "$OUT/wb/typed.ppm"; then
+        pass "wb: typing reached the CLI"
     else
-        fail dw "sector 2 of test.dsk isn't all 8s"
+        fail wb "the CLI didn't change when typed at (see out/wb/typed.ppm)"
     fi
-
-    becker becker 0
-    echo "Becker port: a server slow to answer doesn't stop the CoCo"
-    becker becker_slow 300
+    before=$(ppm pointer "$OUT/wb/typed.ppm")
+    after=$(ppm pointer "$OUT/wb/moved.ppm")
+    if [ "$before" != none ] && [ "$after" != none ] && [ "$before" != "$after" ] \
+        && [ $(( ${after% *} - ${before% *} )) -ge 200 ]; then
+        pass "wb: the mouse moves the pointer ($before -> $after)"
+    else
+        fail wb "the pointer didn't follow the mouse ($before -> $after)"
+    fi
 fi
 
 echo

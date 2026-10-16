@@ -2,15 +2,15 @@
 // options.h
 //
 // Reads key=value options from cmdline.txt on the SD card, and from
-// bmcoco.cfg, where the BMCoco menu saves its settings. A setting in
-// bmcoco.cfg wins over the same option in cmdline.txt.
+// bmamiga.cfg, where the BMAmiga menu saves its settings. A setting in
+// bmamiga.cfg wins over the same option in cmdline.txt.
 //
-// This file is part of BMCoco, a bare metal Tandy Color Computer emulator for the
+// This file is part of BMAmiga, a bare metal Amiga emulator for the
 // Raspberry Pi. See LICENSE for licensing details.
 //
 
-#ifndef BMCOCO_OPTIONS_H_
-#define BMCOCO_OPTIONS_H_
+#ifndef BMAMIGA_OPTIONS_H_
+#define BMAMIGA_OPTIONS_H_
 
 #include <circle/bcmpropertytags.h>
 

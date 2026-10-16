@@ -4,7 +4,7 @@
 // Writes control list packets (an opcode byte, then the packet's fields at
 // their bit positions, little endian) and the records they point to, for
 // V3D 4.2 (the Pi 4) or V3D 7.1 (the Pi 5). Only the packets and records
-// BMCoco uses.
+// BMAmiga uses.
 //
 // Packet codes, field positions and values from Mesa,
 // src/broadcom/cle/v3d_packet.xml (Copyright (C) 2016 Broadcom, MIT
@@ -13,12 +13,12 @@
 // src/gallium/drivers/v3d/v3dx_rcl.c, v3dx_emit.c and v3dx_state.c, and
 // src/broadcom/common/v3d_util.c (tile size, render target stride).
 //
-// This file is part of BMCoco, a bare metal Tandy Color Computer emulator for
+// This file is part of BMAmiga, a bare metal Amiga emulator for
 // the Raspberry Pi. See LICENSE for licensing details.
 //
 
-#ifndef BMCOCO_PI4V3D_CL_H_
-#define BMCOCO_PI4V3D_CL_H_
+#ifndef BMAMIGA_PI4V3D_CL_H_
+#define BMAMIGA_PI4V3D_CL_H_
 
 #include "shader.h"
 

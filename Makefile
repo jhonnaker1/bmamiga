@@ -1,5 +1,5 @@
 #
-# Makefile for the BMCoco kernel image.
+# Makefile for the BMAmiga kernel image.
 #
 # Run ./make_all.sh once first; it builds circle-stdlib and then this.
 # After that "make" rebuilds the kernel image for the board circle-stdlib is
@@ -20,8 +20,8 @@ include third_party/circle-stdlib/Config.mk
 # pick the board's display and sound code.
 include $(CIRCLEHOME)/Config.mk
 
-BMCOCO_VERSION ?= $(shell tools/version.sh --semver)
-BMCOCO_GIT ?= $(shell tools/version.sh --git)
+BMAMIGA_VERSION ?= $(shell tools/version.sh --semver)
+BMAMIGA_GIT ?= $(shell tools/version.sh --git)
 XROAR := third_party/xroar
 XROAR_VERSION := $(shell tools/xroar_version.sh)
 
@@ -72,8 +72,8 @@ INCLUDE := $(CIRCLE_STDLIB_INCLUDES) $(INCLUDE) -I $(CIRCLEHOME)/addon/fatfs
 # See src/port/fswrap.c
 LDFLAGS += --wrap=stat
 
-VERSION_DEFINES = -DBMCOCO_VERSION=\"$(BMCOCO_VERSION)\" \
-                  -DBMCOCO_GIT=\"$(BMCOCO_GIT)\" -DXROAR_VERSION=\"$(XROAR_VERSION)\"
+VERSION_DEFINES = -DBMAMIGA_VERSION=\"$(BMAMIGA_VERSION)\" \
+                  -DBMAMIGA_GIT=\"$(BMAMIGA_GIT)\" -DXROAR_VERSION=\"$(XROAR_VERSION)\"
 CFLAGS += $(VERSION_DEFINES)
 CPPFLAGS += $(VERSION_DEFINES)
 

@@ -3,21 +3,21 @@
 //
 // The Pi 5's direct display driver's use of the BCM2712's HVS: finds the
 // channel that feeds the HDMI port in use, and shows planes on it
-// through display lists BMCoco writes itself, scaled by the HVS with its
+// through display lists BMAmiga writes itself, scaled by the HVS with its
 // own filter kernels. Frames are paced by the channel's frame counter.
 //
 // The firmware's live lists (on both channels) are read first, so that
-// BMCoco's display list words, prefetch buffer and line buffer stay
+// BMAmiga's display list words, prefetch buffer and line buffer stay
 // clear of the memory they use. Display list memory used: 88 words from
 // 3072 (or 2048, or 1024): two kernels, then two list slots used in turn,
 // so the list being shown is never written to.
 //
-// This file is part of BMCoco, a bare metal Tandy Color Computer emulator for
+// This file is part of BMAmiga, a bare metal Amiga emulator for
 // the Raspberry Pi. See LICENSE for licensing details.
 //
 
-#ifndef BMCOCO_PI5KMS_HVS_H_
-#define BMCOCO_PI5KMS_HVS_H_
+#ifndef BMAMIGA_PI5KMS_HVS_H_
+#define BMAMIGA_PI5KMS_HVS_H_
 
 #include "dlist.h"
 #include "../pi4kms/filter.h"
@@ -94,7 +94,7 @@ private:
   uint32_t m_nFirmwareList;    // the firmware's list start, to restore
   uint64_t m_nFirmwareAddress;
   unsigned m_nFirmwarePitch;
-  unsigned m_nRegion;          // BMCoco's display list memory (words)
+  unsigned m_nRegion;          // BMAmiga's display list memory (words)
   unsigned m_nKernelSmooth, m_nKernelSharp;
   unsigned m_nSlot[2];
   unsigned m_nNextSlot;        // list slot written next: 0 or 1
@@ -110,7 +110,7 @@ private:
   unsigned m_nUpmAreas;
   unsigned m_LbmAreas[MaxAreas][2];
   unsigned m_nLbmAreas;
-  unsigned m_nUpmHandle;       // BMCoco's prefetch handle
+  unsigned m_nUpmHandle;       // BMAmiga's prefetch handle
 };
 
 } // namespace kms

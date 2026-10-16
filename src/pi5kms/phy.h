@@ -8,12 +8,12 @@
 //
 // Pure computation, so tools/pi4kms can test it on a PC.
 //
-// This file is part of BMCoco, a bare metal Tandy Color Computer emulator for
+// This file is part of BMAmiga, a bare metal Amiga emulator for
 // the Raspberry Pi. See LICENSE for licensing details.
 //
 
-#ifndef BMCOCO_PI5KMS_PHY_H_
-#define BMCOCO_PI5KMS_PHY_H_
+#ifndef BMAMIGA_PI5KMS_PHY_H_
+#define BMAMIGA_PI5KMS_PHY_H_
 
 #include <stdint.h>
 

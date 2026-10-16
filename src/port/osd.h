@@ -1,16 +1,16 @@
 /*
- * osd.h - BMCoco's on-screen display: menus, file browser, text entry.
+ * osd.h - BMAmiga's on-screen display: menus, file browser, text entry.
  *
- * XRoar's own menus belong to its GTK, Windows and Mac front ends, so BMCoco
- * draws its own, straight into the emulator's frame buffer, in the style of
- * a CoCo text screen. While the display is open the emulation is paused.
+ * BMAmiga's menu (F12: disks, model, video, sound, network, power) is
+ * drawn straight into the frame buffer, 40 columns by 24 rows. While the
+ * display is open the emulation is paused.
  *
- * This file is part of BMCoco, a bare metal Tandy Color Computer emulator for
- * the Raspberry Pi. See LICENSE for licensing details.
+ * This file is part of BMAmiga, a bare metal Amiga emulator for the
+ * Raspberry Pi. See LICENSE for licensing details.
  */
 
-#ifndef BMCOCO_OSD_H_
-#define BMCOCO_OSD_H_
+#ifndef BMAMIGA_OSD_H_
+#define BMAMIGA_OSD_H_
 
 #include <stddef.h>
 #include <stdint.h>
@@ -93,4 +93,4 @@ void osd_notify(const char *text);
 /* Called by the video output each frame: draws the notification, if any. */
 void osd_draw_notification(uint16_t *fb, int pitch_px, int w, int h);
 
-#endif /* BMCOCO_OSD_H_ */
+#endif /* BMAMIGA_OSD_H_ */

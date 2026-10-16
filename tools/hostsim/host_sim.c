@@ -1,10 +1,10 @@
 /*
- * host_sim.c - runs the BMCoco emulator port on a PC for testing.
+ * host_sim.c - runs the BMAmiga emulator port on a PC for testing.
  *
  * Implements src/host.h with a simulated display, sound output and input,
  * so XRoar and the port in src/port/ can be tested without a Raspberry Pi.
  * Time is virtual: each display refresh advances the clock by one frame of
- * a 60 Hz (or BMCOCO_REFRESH Hz) display, so tests run as fast as the PC
+ * a 60 Hz (or BMAMIGA_REFRESH Hz) display, so tests run as fast as the PC
  * allows.
  *
  * A script on standard input drives the test, one command per line:
@@ -21,23 +21,24 @@
  *   <frame> run <path>             the web UI starts a file
  *   <frame> quit                   end the test
  *
- * BMCOCO_SIM_FRAME_MS=N makes each frame's emulation take N ms of the
+ * BMAMIGA_SIM_FRAME_MS=N makes each frame's emulation take N ms of the
  * virtual time, as on a computer too slow for it (a Pi 3 with the most
  * accurate artifact colours, say).
  *
- * BMCOCO_SIM_CONNECT_FRAMES=N makes background work (connecting to a
+ * BMAMIGA_SIM_CONNECT_FRAMES=N makes background work (connecting to a
  * DriveWire server) start N frames late, as connecting does on the Pi
  * when the server is slow to answer.
  *
- * With BMCOCO_LIVE=PORT it runs in real time instead, with no script: the
+ * With BMAMIGA_LIVE=PORT it runs in real time instead, with no script: the
  * screen, keyboard, gamepads and sound are in a web page at
  * http://127.0.0.1:PORT/ (live.c, live.html). tools/hostsim/live.sh starts it.
  *
- * This file is part of BMCoco, a bare metal Tandy Color Computer emulator for the
+ * This file is part of BMAmiga, a bare metal Amiga emulator for the
  * Raspberry Pi. See LICENSE for licensing details.
  */
 
 #include <pthread.h>
+#include <sys/stat.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -48,8 +49,8 @@
 #include "live.h"
 
 /* From src/port/platform.c, called by the web UI on the Pi. */
-void bmcoco_request_power(int power_off);
-void bmcoco_request_coldstart(void);
+void bmamiga_request_power(int power_off);
+void bmamiga_request_coldstart(void);
 void emu_autostart_interrupt(const char *path);
 
 /* ---- Options ---------------------------------------------------------------- */
@@ -57,7 +58,7 @@ void emu_autostart_interrupt(const char *path);
 static const char *option(const char *name)
 {
 	static char buf[1024];
-	const char *cmdline = getenv("BMCOCO_CMDLINE");
+	const char *cmdline = getenv("BMAMIGA_CMDLINE");
 	char *p, *save = NULL;
 	size_t n = strlen(name);
 	if (cmdline == NULL)
@@ -70,8 +71,8 @@ static const char *option(const char *name)
 	return NULL;
 }
 
-/* Settings changed by the menu, which win over BMCOCO_CMDLINE, as
-   bmcoco.cfg does on the Pi. Saved to ./bmcoco.cfg. */
+/* Settings changed by the menu, which win over BMAMIGA_CMDLINE, as
+   bmamiga.cfg does on the Pi. Saved to ./bmamiga.cfg. */
 static char set_name[48][24], set_value[48][72];
 static int n_set;
 
@@ -92,7 +93,7 @@ int host_option_set(const char *name, const char *value)
 
 int host_options_save(void)
 {
-	FILE *f = fopen("bmcoco.cfg", "w");
+	FILE *f = fopen("bmamiga.cfg", "w");
 	int i;
 	if (f == NULL)
 		return 0;
@@ -101,11 +102,11 @@ int host_options_save(void)
 	return fclose(f) == 0;
 }
 
-/* ./bmcoco.cfg from an earlier run, as the Pi reads it at boot. */
+/* ./bmamiga.cfg from an earlier run, as the Pi reads it at boot. */
 static void load_settings(void)
 {
 	char line[160];
-	FILE *f = fopen("bmcoco.cfg", "r");
+	FILE *f = fopen("bmamiga.cfg", "r");
 	if (f == NULL)
 		return;
 	while (fgets(line, sizeof(line), f) != NULL) {
@@ -174,8 +175,8 @@ static double real_time(void)
 	return t - start;
 }
 
-/* A slow computer (BMCOCO_SIM_FRAME_MS): the next frame's emulation, due
-   once a frame has been shown, after start up (where BMCoco times the
+/* A slow computer (BMAMIGA_SIM_FRAME_MS): the next frame's emulation, due
+   once a frame has been shown, after start up (where BMAmiga times the
    display). The first look at the clock after that sees it before. */
 static double work_due;
 
@@ -303,16 +304,18 @@ void host_video_set_view(int x, int y, int w, int h, double aspect)
 	fprintf(stderr, "[sim] view %dx%d at %d,%d aspect %.3f\n", w, h, x, y, aspect);
 }
 
-/* Saves the visible screen with each line twice, so it looks as on a TV. */
+/* Saves the visible screen; a short one (under 300 lines, the PAL
+   Amiga's lores screen without interlace) with each line twice, so it
+   looks as on a TV. */
 static void screenshot(const char *name)
 {
 	FILE *f = fopen(name, "wb");
-	int x, y, r;
+	int x, y, r, lines = view_h < 300 ? 2 : 1;
 	if (!f)
 		return;
-	fprintf(f, "P6\n%d %d\n255\n", view_w, view_h * 2);
+	fprintf(f, "P6\n%d %d\n255\n", view_w, view_h * lines);
 	for (y = view_y; y < view_y + view_h; y++)
-		for (r = 0; r < 2; r++)
+		for (r = 0; r < lines; r++)
 			for (x = view_x; x < view_x + view_w; x++) {
 				uint16_t c = fb[y * fb_pitch + x];
 				fputc(((c >> 11) & 0x1f) * 255 / 31, f);
@@ -519,9 +522,9 @@ static void run_script(void)
 			screenshot(line + n + 1);
 		} else if (strcmp(cmd, "webui") == 0) {
 			if (strstr(line + n, "reboot"))
-				bmcoco_request_power(0);
+				bmamiga_request_power(0);
 			else if (strstr(line + n, "coldstart"))
-				bmcoco_request_coldstart();
+				bmamiga_request_coldstart();
 		} else if (strcmp(cmd, "audio") == 0) {
 			fprintf(stderr, "[sim] frame %ld: audio written %ld frames in %ld writes, "
 			        "queue before write min %.0f, after write max %.0f, underruns %ld, "
@@ -600,7 +603,7 @@ void host_power_off(void)
 
 int host_network_address(char *address, unsigned size)
 {
-	const char *ip = getenv("BMCOCO_IP");
+	const char *ip = getenv("BMAMIGA_IP");
 	if (ip == NULL || frame < 100)
 		return 0;
 	snprintf(address, size, "%s", ip);
@@ -649,7 +652,7 @@ void host_network_status(char *text, unsigned size)
 		snprintf(text, size, "Off");
 }
 
-/* BMCOCO_WIFI=1 pretends Wi-Fi is running, with a few networks around. */
+/* BMAMIGA_WIFI=1 pretends Wi-Fi is running, with a few networks around. */
 int host_wifi_scan(struct host_wifi_ap *aps, int max)
 {
 	static const struct host_wifi_ap found[] = {
@@ -659,7 +662,7 @@ int host_wifi_scan(struct host_wifi_ap *aps, int max)
 		{"CoCoNet", -60, 0},
 	};
 	int i, n = (int) (sizeof(found) / sizeof(found[0]));
-	if (getenv("BMCOCO_WIFI") == NULL)
+	if (getenv("BMAMIGA_WIFI") == NULL)
 		return -1;
 	for (i = 0; i < n && i < max; i++)
 		aps[i] = found[i];
@@ -708,7 +711,7 @@ int host_set_log_destination(int destination)
 	return 1;
 }
 
-extern void bmcoco_main(void);
+extern void bmamiga_main(void);
 
 /* For live.c */
 void sim_push_key(int usage, int pressed)
@@ -735,25 +738,37 @@ const uint16_t *sim_screen(int *w, int *h, int *pitch)
 
 int main(void)
 {
-	const char *r = getenv("BMCOCO_LIVE");
+	const char *r = getenv("BMAMIGA_LIVE");
 	if (r) {
 		live = 1;
 		if (!live_init(atoi(r)))
 			return 1;
 	}
-	r = getenv("BMCOCO_REFRESH");
+	r = getenv("BMAMIGA_REFRESH");
 	if (r)
 		refresh = atof(r);
-	r = getenv("BMCOCO_SIM_FRAME_MS");
+	r = getenv("BMAMIGA_SIM_FRAME_MS");
 	if (r != NULL)
 		frame_work = atof(r) / 1000.0;
-	r = getenv("BMCOCO_SIM_CONNECT_FRAMES");
+	r = getenv("BMAMIGA_SIM_CONNECT_FRAMES");
 	if (r)
 		connect_frames = atol(r);
-	r = getenv("BMCOCO_REFRESH_LATER");
+	r = getenv("BMAMIGA_REFRESH_LATER");
 	if (r)
 		refresh_later = atof(r);
 	load_settings();
-	bmcoco_main();
+	/* Amiberry looks for a desktop Amiberry's settings in the home folder
+	   (and imports them); the tests must not see the PC's. */
+	{
+		char home[1024];
+		if (getcwd(home, sizeof home - 8) != NULL) {
+			strcat(home, "/home");
+			mkdir(home, 0755);
+			setenv("HOME", home, 1);
+			unsetenv("XDG_CONFIG_HOME");
+			unsetenv("XDG_DATA_HOME");
+		}
+	}
+	bmamiga_main();
 	return 0;
 }

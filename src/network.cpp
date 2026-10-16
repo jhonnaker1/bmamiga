@@ -39,7 +39,7 @@
 #include "host.h"
 
 static const char FromNetwork[] = "network";
-#define HOSTNAME "bmcoco"
+#define HOSTNAME "bmamiga"
 #define FIRMWARE_PATH "SD:/firmware/"
 #define WPA_CONFIG "SD:/wpa_supplicant.conf"
 

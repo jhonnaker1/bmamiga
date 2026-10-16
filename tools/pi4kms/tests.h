@@ -3,12 +3,12 @@
 //
 // Shared by the direct display driver's PC tests (see test.cpp).
 //
-// This file is part of BMCoco, a bare metal Tandy Color Computer emulator for
+// This file is part of BMAmiga, a bare metal Amiga emulator for
 // the Raspberry Pi. See LICENSE for licensing details.
 //
 
-#ifndef BMCOCO_TOOLS_PI4KMS_TESTS_H_
-#define BMCOCO_TOOLS_PI4KMS_TESTS_H_
+#ifndef BMAMIGA_TOOLS_PI4KMS_TESTS_H_
+#define BMAMIGA_TOOLS_PI4KMS_TESTS_H_
 
 extern int g_failed;
 void Check(bool ok, const char *name, const char *what);

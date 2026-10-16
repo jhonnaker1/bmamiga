@@ -1,3 +1,15 @@
+# Changelog
+
+## Unreleased
+
+- BMAmiga starts, from BMCoco 0.5.1: Amiberry (its libretro core) in place
+  of XRoar, running in the PC simulator. AROS without Kickstart ROMs, or
+  Kickstarts from roms (Amiga Forever's too); floppies DF0: to DF3:, the model,
+  warp, resets in the F12 menu; the keyboard, mouse and joystick; the frame
+  lock, with Amiberry's clock following the frames shown
+
+BMCoco's history, from which BMAmiga comes, follows.
+
 ## 0.5.1 – 2026-10-16
 
 - The web UI shows the machine running ("Tandy CoCo 3 (NTSC)"), not always

@@ -558,7 +558,7 @@ body.modal-open { overflow: hidden; }
 
 /* ---------- name ---------- */
 
-/* BMCoco as the CoCo shows text: dark letters on a green block, with the
+/* BMAmiga as the CoCo shows text: dark letters on a green block, with the
    colour bar under it. */
 .sidebar-name, .welcome-text {
   font-family: var(--mono);

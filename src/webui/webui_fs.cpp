@@ -276,12 +276,12 @@ boolean IsConfigFile(const char *name) {
   return FALSE;
 }
 
-// xroar.conf and bmcoco.cfg (the BMCoco menu's settings) are
+// xroar.conf and bmamiga.cfg (the BMAmiga menu's settings) are
 // editable too, but (unlike the files above) stay uploadable so a prepared
 // copy can still be dropped on the card.
 boolean IsEditableName(const char *name) {
   return IsConfigFile(name) || CiEqual(name, "xroar.conf") ||
-         CiEqual(name, "bmcoco.cfg");
+         CiEqual(name, "bmamiga.cfg");
 }
 
 // The config files are editable only in the volume root.

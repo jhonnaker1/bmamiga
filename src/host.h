@@ -5,12 +5,12 @@
  * Everything it needs from the hardware goes through these functions, which
  * are implemented in src/kernel.cpp.
  *
- * This file is part of BMCoco, a bare metal Tandy Color Computer emulator for the
+ * This file is part of BMAmiga, a bare metal Amiga emulator for the
  * Raspberry Pi. See LICENSE for licensing details.
  */
 
-#ifndef BMCOCO_HOST_H_
-#define BMCOCO_HOST_H_
+#ifndef BMAMIGA_HOST_H_
+#define BMAMIGA_HOST_H_
 
 #include <stdint.h>
 
@@ -24,7 +24,7 @@ const char *host_option(const char *name, const char *default_value);
 int host_option_int(const char *name, int default_value);
 double host_option_double(const char *name, double default_value);
 /* Changes a setting, which then wins over cmdline.txt; host_options_save()
-   writes the settings to bmcoco.cfg on the SD card. Both return 0 on
+   writes the settings to bmamiga.cfg on the SD card. Both return 0 on
    failure. */
 int host_option_set(const char *name, const char *value);
 int host_options_save(void);
@@ -151,7 +151,7 @@ void host_log(const char *message);
 /* Where the log goes (enable_logging=off|uart|file). */
 #define HOST_LOG_OFF  0
 #define HOST_LOG_UART 1  /* serial port, GPIO14/15 at 115200 */
-#define HOST_LOG_FILE 2  /* serial port and /bmcoco.log on the SD card */
+#define HOST_LOG_FILE 2  /* serial port and /bmamiga.log on the SD card */
 int host_log_destination(void);
 /* Changes it at once. Returns 0 if the log file cannot be opened. */
 int host_set_log_destination(int destination);
@@ -160,4 +160,4 @@ int host_set_log_destination(int destination);
 }
 #endif
 
-#endif /* BMCOCO_HOST_H_ */
+#endif /* BMAMIGA_HOST_H_ */

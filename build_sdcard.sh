@@ -118,9 +118,9 @@ do
     then
         if [ "$board" = "pi4" ] || [ "$board" = "pi5" ]
         then
-            export BMCOCO_AARCH=64
+            export BMAMIGA_AARCH=64
         else
-            export BMCOCO_AARCH=32
+            export BMAMIGA_AARCH=32
         fi
         source "$SRC_DIR/get_gnu_toolchain.sh"
         make -j"$(nproc)"

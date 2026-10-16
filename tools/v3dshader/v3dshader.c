@@ -21,7 +21,7 @@
  * Broadcom and Raspberry Pi Ltd; vk_nir.c Copyright (C) 2015 Intel
  * Corporation and (C) 2022 Collabora; all MIT licence.
  *
- * This file is part of BMCoco, a bare metal Tandy Color Computer emulator for
+ * This file is part of BMAmiga, a bare metal Amiga emulator for
  * the Raspberry Pi. See LICENSE for licensing details.
  */
 

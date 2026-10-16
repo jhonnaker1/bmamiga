@@ -1,145 +1,60 @@
-# BMCoco
+# BMAmiga
 
-BMCoco is a bare metal Tandy Color Computer emulator for the Raspberry Pi
-Zero, 2, 3, 4 and 5. It runs the [XRoar](https://www.6809.org.uk/xroar/)
-emulator directly on the hardware, with no Linux underneath, the same way
-[BMC64](https://github.com/randyrossi/bmc64) does for the Commodore 64 and
-[BMA800XL](https://github.com/aminch/bma800xl) for the Atari 800XL.
+BMAmiga is a bare metal Amiga emulator for the Raspberry Pi 4 and 5. It
+runs [Amiberry](https://github.com/BlitterStudio/amiberry), the Amiga
+emulator built on WinUAE, directly on the hardware, with no Linux
+underneath, the same way [BMC64](https://github.com/randyrossi/bmc64) does
+for the Commodore 64, [BMA800XL](https://github.com/aminch/bma800xl) for the
+Atari 800XL and [BMCoco](https://github.com/jhonnaker1/bmcoco) for the Tandy
+Color Computer.
 
-BMCoco is based on [BMA800XL](https://github.com/aminch/bma800xl) by Adam
-Minchinton, which is based on [BMC64](https://github.com/randyrossi/bmc64) by
-Randy Rossi. It is a fork of BMA800XL with the Atari emulator replaced by
-XRoar; the kernel, display, sound, network and web UI come from those two
-projects.
+BMAmiga is based on [BMCoco](https://github.com/jhonnaker1/bmcoco), which is
+based on [BMA800XL](https://github.com/aminch/bma800xl) by Adam Minchinton,
+which is based on [BMC64](https://github.com/randyrossi/bmc64) by Randy
+Rossi. The emulator is replaced by Amiberry; the kernel, display, sound,
+network and web UI come from those projects.
 
-- Boots straight into Color BASIC in a couple of seconds
-- Emulates the CoCo 1, 2 and 3 (and, from the same code, the Dragon 32/64
-  and the MC-10)
-- Frames locked to the display's refresh for perfectly smooth scrolling
-  (60 Hz for an NTSC CoCo), with the sound kept in step
-- NTSC artifact colours, as CoCo games expect, or S-Video and RGB
-- Disk images (DSK, VDK, JVC, OS9, DMK) with RS-DOS, tapes (CAS), cartridges
-  (CCC, ROM) and machine code programs (BIN, HEX, S19)
-- Hard disk images on an IDE interface, and a built-in DriveWire server for
-  the Becker port (NitrOS-9's DriveWire builds run with no other computer)
-- USB keyboards; USB gamepads as the CoCo's analog joysticks (an analog stick
-  gives the full 0-63 range); real joysticks wired to the GPIO header
-- No shutdown needed: just switch it off (changed disks are written back
-  within a few seconds)
-- A menu (F12) for everything: programs, disks, tapes, cartridges, machine,
-  joysticks, video, keyboard, sound, network
-- Optional Ethernet or Wi-Fi with BMC64's web UI: manage the SD card from a
-  browser and start programs
+**BMAmiga is in development.** It runs in the PC simulator
+(`tools/hostsim`); the Raspberry Pi kernels come next.
+
+## How it works
+
+Amiberry is built as its libretro core (`third_party/amiberry/libretro`):
+the emulator without its SDL3 window and its GUI, which gives its pictures
+and sound and takes its input through the libretro API. It is linked into
+BMAmiga as a library (`src/port/amiberry.mk`), and `src/port/platform.c` is
+the "frontend" it talks to, on top of the kernel services in `src/host.h`:
+
+- Pictures go to the display, locked to its refresh when it runs at the
+  Amiga's rate (50 Hz for a PAL Amiga), with Amiberry's clock following the
+  frames shown (`src/port/clock.c`).
+- Sound is kept in step with the display.
+- USB keyboards (Amiberry's usual PC layout: the Windows keys are the Amiga
+  keys), the mouse, and gamepads or GPIO joysticks as the joystick.
+- F12 opens BMAmiga's menu: floppy drives DF0: to DF3:, the model (Amiga
+  500, 500+, 600, 1200, 4000, CD32, CDTV), warp (also F11), resets, video,
+  sound, network.
 
 ## ROMs
 
-The CoCo's ROMs are copyrighted by Tandy and Microsoft and are not included.
-Copy your own into the `roms` folder of the SD card: `bas13.rom` and
-`extbas11.rom` for a CoCo 2, `disk11.rom` for disks, `coco3.rom` for a
-CoCo 3. See [docs/ROMS.txt](docs/ROMS.txt).
+Kickstart ROMs are copyrighted, so they are not included. Copy yours into
+the SD card's `roms` folder: `kick13.rom`, `kick31.rom` and so on, or Amiga
+Forever's `amiga-os-*.rom` files with their `rom.key`, which Amiberry
+recognises by their contents. Without any, the Amiga starts with AROS, the
+free replacement Kickstart that Amiberry comes with.
 
-All the CoCo ROMs can be downloaded from the Color Computer Archive:
-https://colorcomputerarchive.com/repo/ROMs/XRoar/CoCo/. They are already named
-the way XRoar, and so BMCoco, looks for them: copy the files from both its
-`BASIC_OS` folder (Color BASIC, Extended BASIC, CoCo 3) and its `DOS` folder
-(Disk BASIC) into `roms`.
-
-## Supported hardware
-
-Raspberry Pi 3 Model B, B+ and A+, and the Raspberry Pi Zero 2 W
-(`kernel8-32.img`), and the Raspberry Pi 2 Model B (`kernel7.img`). The card
-has a kernel for each and each Pi starts its own. Video and sound go out over
-HDMI; sound can also go to the 3.5mm jack.
-
-The Raspberry Pi 4 Model B and Pi 400 (`kernel8-rpi4.img`, 64-bit) are
-supported too, with the display run at the CoCo's exact refresh rate on either
-HDMI port, the CRT effect and smooth scaling drawn by its 3D GPU, and sound
-over HDMI or the Pi 4 B's 3.5mm jack. See [docs/PI4.md](docs/PI4.md).
-
-The Raspberry Pi 5, Pi 500 and Pi 500+ (`kernel_2712.img`, 64-bit) are
-supported too. See [docs/PI5.md](docs/PI5.md).
-
-The Raspberry Pi Zero and Zero W (`kernel.img`) work like the Pi 2 and 3,
-with everything on their one, slower core: a CoCo 1 or 2 with the quicker
-artifact colours suits them best; when the Pi can't keep up, BMCoco runs as
-fast as it can (see the User Guide's *Display and timing*).
-
-Pi 4 support comes from BMA800XL 1.1.0, and the Pi 4's 3D GPU, the Pi 5 and
-the Pi Zero from BMA800XL 1.2.0 to 1.4.0.
-
-## Getting started
-
-1. Format an SD card as FAT32.
-2. Copy the contents of a release zip (or of `build/sdcard/` after building)
-   to the root of the card.
-3. Copy your ROMs into `roms`, and your CoCo files to the card. The `disks`,
-   `tapes`, `carts` and `programs` folders are there for them, but any folder
-   works.
-4. Boot the Pi with a USB keyboard connected. You get the `OK` prompt. Press
-   **F12** for the menu, then *Run a Program* to start something.
-
-The display is set to 720p at 60 Hz to suit an NTSC CoCo. For a PAL CoCo, see
-the [User Guide](docs/USER_GUIDE.md#display-and-timing).
-
-## Keys
-
-| Key                  | Does                                                 |
-|----------------------|------------------------------------------------------|
-| F12                  | Menu                                                 |
-| F11                  | Turbo on/off                                         |
-| F10 / Shift+F10      | Reset / hard reset (power off and on)                |
-| Esc                  | BREAK                                                |
-| Home                 | CLEAR                                                |
-| Arrow keys           | The CoCo's arrow keys                                |
-| Alt, Caps Lock or Windows, F1, F2 | The CoCo 3's ALT, CTRL, F1 and F2       |
-
-Keys type the characters printed on them (Shift+' types `"`); turn off
-*Typed Characters* in the menu's *Keyboard* page for games that want the
-CoCo's own layout.
-
-Gamepads are Joystick 1 and 2: the left stick or D-pad moves, **A** is the
-fire button, **B** the CoCo 3's second button, **X** types Space and **Y**
-Enter. **Home**, or **Select+Start** together, opens the menu, where the
-D-pad moves, **A** chooses and **B** goes back.
-
-See the [User Guide](docs/USER_GUIDE.md) for all the details, including the
-options in `cmdline.txt` and the GPIO joystick wiring.
-
-## Building
+## The PC simulator
 
 ```
-./build_sdcard.sh
+tools/hostsim/run_tests.sh
+BMAMIGA_ROMS=/path/to/roms BMAMIGA_WORKBENCH=/path/to/workbench13.adf tools/hostsim/run_tests.sh
 ```
 
-builds everything (the kernels for both boards; `./build_sdcard.sh pi3` or
-`pi2` builds one) and stages the SD card files in `build/sdcard/`. It works
-on Linux and macOS. See [docs/BUILDING.md](docs/BUILDING.md).
+The first build compiles Amiberry, which takes a few minutes. The tests
+boot AROS, open the menu, choose disks and models and check the display
+lock and the sound; with a Kickstart 1.3 ROM and a Workbench 1.3 disk they
+boot Workbench, type at its CLI and move the mouse.
 
-## How it fits together
+## License
 
-```
-src/main.cpp, kernel.cpp   Circle kernel: USB, GPIO, SD card; runs XRoar on core 1
-src/fbl.cpp                Display (dispmanx layer, optional CRT shader), from BMC64
-src/vchiqsound*.cpp        Sound over HDMI or the headphone jack, from BMC64
-src/network.cpp, webui/    Ethernet / Wi-Fi and the web UI, from BMC64
-src/host.h                 What the kernel offers the emulator
-src/port/platform.c        XRoar's user interface, video and sound modules; main loop
-src/port/joystick.c        Gamepads and GPIO joysticks as the CoCo's joysticks
-src/port/menu.c, osd.c     The menu, drawn in the CoCo 3's font
-src/port/config.h, xroar.mk  XRoar's build options and source list
-third_party/xroar          XRoar (submodule)
-third_party/circle-stdlib  Circle and newlib (submodule)
-src/pi4/                   Pi 4 display, smooth scaling / CRT shader, HDMI sound
-src/pi4kms/                Pi 4 direct display driver (docs/PI4.md)
-tools/hostsim              Runs the emulator port on a PC for testing
-tools/pi4scaler            Tests the Pi 4's smooth scaling and CRT shader on a PC
-tools/pi4kms               Tests the Pi 4 display driver's calculations on a PC
-```
-
-XRoar is used unmodified: everything specific to BMCoco is in `src/`.
-
-## Licence
-
-BMCoco is free software under the GNU General Public License version 3; see
-[LICENSE](LICENSE). It includes software from other projects under their own
-licences; see [docs/THIRD_PARTY.md](docs/THIRD_PARTY.md).
+GPL 3 (see LICENSE). Amiberry is GPL 3 too.

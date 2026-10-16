@@ -2,17 +2,17 @@
 // logging.h
 //
 // Where the log (Circle's logger and stdio, so XRoar's messages too)
-// goes: the serial port (UART), the serial port and /bmcoco.log on the
+// goes: the serial port (UART), the serial port and /bmamiga.log on the
 // SD card (file), or nowhere.
 // Set with enable_logging=off|uart|file, as in BMC64, or in the menu.
 // Based on BMC64's CLoggingDevice (third_party/common/menu_logging_device.cpp).
 //
-// This file is part of BMCoco, a bare metal Tandy Color Computer emulator for the
+// This file is part of BMAmiga, a bare metal Amiga emulator for the
 // Raspberry Pi. See LICENSE for licensing details.
 //
 
-#ifndef BMCOCO_LOGGING_H_
-#define BMCOCO_LOGGING_H_
+#ifndef BMAMIGA_LOGGING_H_
+#define BMAMIGA_LOGGING_H_
 
 #include <circle/device.h>
 #include <circle/spinlock.h>
@@ -20,7 +20,7 @@
 #include "host.h"
 #include "sdcard/sd_fs.h"
 
-#define LOG_FILE "/bmcoco.log"
+#define LOG_FILE "/bmamiga.log"
 
 // During start up, writes the log to the card now if it goes to the file
 // (see CLogDevice::Flush()); afterwards does nothing. Implemented by the

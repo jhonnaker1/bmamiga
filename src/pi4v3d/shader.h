@@ -8,12 +8,12 @@
 // The uniform kinds and fields follow Mesa, src/broadcom/compiler/
 // v3d_compiler.h (Copyright (C) 2016 Broadcom, MIT licence).
 //
-// This file is part of BMCoco, a bare metal Tandy Color Computer emulator for
+// This file is part of BMAmiga, a bare metal Amiga emulator for
 // the Raspberry Pi. See LICENSE for licensing details.
 //
 
-#ifndef BMCOCO_PI4V3D_SHADER_H_
-#define BMCOCO_PI4V3D_SHADER_H_
+#ifndef BMAMIGA_PI4V3D_SHADER_H_
+#define BMAMIGA_PI4V3D_SHADER_H_
 
 #include <stdint.h>
 

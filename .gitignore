@@ -10,7 +10,7 @@ build/
 .board
 
 # Release archives
-bmcoco-*.zip
+bmamiga-*.zip
 
 # PC test harness
 tools/hostsim/build/

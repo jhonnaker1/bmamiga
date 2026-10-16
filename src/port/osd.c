@@ -1,15 +1,14 @@
 /*
- * osd.c - BMCoco's on-screen display: menus, file browser, text entry.
+ * osd.c - BMAmiga's on-screen display: menus, file browser, text entry.
  *
- * Text is drawn with the CoCo 3's GIME character set (from XRoar), each
- * character 16x10 pixels in a 640x240 area: 40 columns by 24 rows, like a
- * CoCo 3 WIDTH 40 screen, and coloured like the VDG's green text screen.
+ * From BMCoco and BMAmiga. Text is drawn with a public domain 8x8 font
+ * (the IBM VGA font, as Amiberry's libretro on-screen keyboard has it,
+ * src/osdep/imgui_osk_font.h), each character doubled to 16x20 pixels in
+ * a 640x480 area: 40 columns by 24 rows.
  *
- * This file is part of BMCoco, a bare metal Tandy Color Computer emulator for
- * the Raspberry Pi. See LICENSE for licensing details.
+ * This file is part of BMAmiga, a bare metal Amiga emulator for the
+ * Raspberry Pi. See LICENSE for licensing details.
  */
-
-#include "top-config.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -19,23 +18,22 @@
 #include <strings.h>
 #include <sys/stat.h>
 
-#include "hkbd.h"
-#include "tcc1014/font-gime.h"
-
 #include "../host.h"
-#include "bmcoco.h"
+#include "bmamiga.h"
 #include "osd.h"
 
-#define OSD_W 640
-#define OSD_H 240
-#define CELL_W 16
-#define CELL_H 10
+#include "osdep/imgui_osk_font.h"
 
-/* RGB565 colours, after the VDG's. */
-#define C_BLACK   0x0000
-#define C_GREEN   0x0fe1  /* bright green: text */
-#define C_DKGREEN 0x0400  /* dark green: labels and hints */
-#define C_ORANGE  0xfc00  /* the selection */
+#define OSD_W 640
+#define OSD_H 480
+#define CELL_W 16
+#define CELL_H 20
+
+/* RGB565 colours: Workbench 1.3's blue, white and orange. */
+#define C_BLACK   0x02b5  /* the background: Workbench 1.3 blue (0x05a) */
+#define C_GREEN   0xffff  /* text: white */
+#define C_DKGREEN 0x8c71  /* labels and hints: grey */
+#define C_ORANGE  0xfc40  /* the selection: Workbench orange (0xf80) */
 #define C_RED     0xf800
 
 #define REPEAT_DELAY 0.40
@@ -50,29 +48,27 @@ static void flush_input(void);
 
 static uint16_t *osd_fb(int *pitch)
 {
-	return bmcoco_framebuffer(pitch);
+	return bmamiga_framebuffer(pitch);
 }
 
-/* Rows 0-9 of the GIME's 8x12 glyphs; each pixel is drawn two wide. */
+/* A glyph of the 8x8 font (8 bytes, a row each, the leftmost pixel in
+   bit 0; the font starts at '!'), each pixel drawn 2x2, with 2 blank lines
+   above and below. */
 static void draw_char_at(uint16_t *fb, int pitch, int x, int y, unsigned char c,
                          uint16_t fg, uint16_t bg)
 {
-	const unsigned char *glyph;
+	const uint8_t *glyph = NULL;
 	int row, col;
 	if (c >= 0x80 || c < 0x20)
 		c = '?';
-	glyph = &font_gime[c * 12];
+	if (c >= OSK_FONT_FIRST_CHAR && c - OSK_FONT_FIRST_CHAR < OSK_FONT_GLYPHS)
+		glyph = &osk_font_8x8[(c - OSK_FONT_FIRST_CHAR) * 8];
 	for (row = 0; row < CELL_H; row++) {
 		uint16_t *p = fb + (y + row) * pitch + x;
-		unsigned bits = glyph[row];
-		/* The GIME shows '_' as a left arrow and '^' as an up arrow;
-		   file names want the ASCII characters. */
-		if (c == '_')
-			bits = row == 8 ? 0xfc : 0;
-		else if (c == '^')
-			bits = row == 1 ? 0x10 : row == 2 ? 0x28 : row == 3 ? 0x44 : 0;
+		int font_row = (row - 2) / 2;
+		unsigned bits = glyph != NULL && row >= 2 && font_row < 8 ? glyph[font_row] : 0;
 		for (col = 0; col < 8; col++) {
-			uint16_t colour = (bits & (0x80 >> col)) ? fg : bg;
+			uint16_t colour = (bits & (1u << col)) ? fg : bg;
 			p[0] = colour;
 			p[1] = colour;
 			p += 2;
@@ -148,7 +144,7 @@ void osd_open(void)
 	closing = FALSE;
 	flush_input();
 	clear_screen();
-	bmcoco_osd_view(TRUE);
+	bmamiga_osd_view(TRUE);
 }
 
 void osd_close(void)
@@ -159,7 +155,7 @@ void osd_close(void)
 	closing = FALSE;
 	flush_input();
 	clear_screen();
-	bmcoco_osd_view(FALSE);
+	bmamiga_osd_view(FALSE);
 }
 
 int osd_is_open(void)
@@ -174,38 +170,21 @@ int osd_closing(void)
 
 /* ---- Input --------------------------------------------------------------------- */
 
-/* Characters for keys when XRoar's keyboard tables aren't set up (US). */
-static int us_char(int usage, int shift)
+/* The character a key types (US layout). */
+static int key_char(int usage)
 {
 	static const char normal[] = "1234567890\n\033\b\t -=[]\\#;'`,./";
 	static const char shifted[] = "!@#$%^&*()\n\033\b\t _+{}|~:\"~<>?";
+	unsigned mods = host_key_modifiers();
+	int shift = (mods & 0x22) != 0;
+	if (mods & 0x11)  /* Ctrl */
+		return 0;
 	if (usage >= 0x04 && usage <= 0x1d)
 		return (shift ? 'A' : 'a') + usage - 0x04;
 	if (usage >= 0x1e && usage <= 0x38) {
 		int c = (shift ? shifted : normal)[usage - 0x1e];
 		return c >= ' ' ? c : 0;
 	}
-	return 0;
-}
-
-/* The character a key types, using XRoar's table for the keyboard layout
-   set with keyboard= in cmdline.txt. */
-static int key_char(int usage)
-{
-	unsigned mods = host_key_modifiers();
-	int shift = (mods & 0x22) != 0;
-	int altgr = (mods & 0x40) != 0;
-	int level = (shift ? HK_LEVEL_SHIFT : 0) | (altgr ? HK_LEVEL_ALTGR : 0);
-	unsigned sym;
-	if (usage < 0 || usage >= HK_NUM_SCANCODES)
-		return 0;
-	if (mods & 0x11)  /* Ctrl */
-		return 0;
-	sym = hkbd.code_to_sym[level][usage];
-	if (sym >= 0x20 && sym < 0x7f)
-		return (int) sym;
-	if (sym == 0 && !altgr)
-		return us_char(usage, shift);
 	return 0;
 }
 
@@ -320,7 +299,7 @@ static int poll_input(int pads)
 	int usage, pressed, key;
 	double now = host_time();
 
-	if (bmcoco_pending_requests()) {
+	if (bmamiga_pending_requests()) {
 		closing = TRUE;
 		return OSD_KEY_MENU;
 	}
@@ -332,7 +311,7 @@ static int poll_input(int pads)
 		}
 		if (usage == USAGE_POWER) {
 			/* Shut Down, as during play (platform.c). */
-			bmcoco_request_power(1);
+			bmamiga_request_power(1);
 			closing = TRUE;
 			return OSD_KEY_MENU;
 		}
@@ -379,7 +358,7 @@ int osd_poll_key(int pads)
 	key = poll_input(pads);
 	if (key == OSD_KEY_NONE) {
 		/* Waits for the next display refresh. */
-		bmcoco_idle();
+		bmamiga_idle();
 		host_video_present(TRUE);
 		if (!pads)
 			flush_pads();
@@ -621,7 +600,7 @@ void osd_message(const char *text, int wait)
 	int was_open = is_open;
 	if (!was_open)
 		osd_open();
-	draw_frame("BMCoco", wait ? "Press any key" : NULL);
+	draw_frame("BMAmiga", wait ? "Press any key" : NULL);
 	draw_wrapped(5, OSD_ROWS - 7, text, C_GREEN);
 	if (wait) {
 		osd_read_key();
