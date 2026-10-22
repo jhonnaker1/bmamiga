@@ -57,15 +57,15 @@ next item starting with it.
 | Item           | What it does |
 |----------------|--------------|
 | Run a Program  | Choose a disk, tape, cartridge or program and start it: XRoar inserts it and types the commands to run it (`RUN"..."` from a disk, `CLOAD` from a tape, ...) |
-| Disk Drives    | Insert or eject a disk in drives 0-3, and write protect it |
+| Disk Drives    | Insert or eject a disk in drives 0-3, and write protect it; Show Disk Activity (see below) |
 | Hard Disks     | Hard disk images for drives 0 and 1 of an IDE interface (see Hard disks) |
 | DriveWire      | The DriveWire server for the Becker port, built in or on another computer, and the built-in one's drives 0-3 (see The Becker port) |
 | Cassette       | Insert a tape (then type `CLOAD` or `CLOADM`), rewind, eject, fast loading |
-| Cartridge      | Plug in a cartridge file, one of XRoar's built in cartridges (Disk BASIC and others), or none |
+| Cartridge      | Plug in a cartridge file, one of XRoar's built in cartridges (Disk BASIC and others), or none; and the RS-232 Pak with its virtual modem (see below) |
 | Machine        | CoCo 1, 2 or 3, PAL or NTSC, with or without a 6309, and the other machines XRoar emulates. Machines without ROMs are marked |
 | Memory         | The machine's RAM: 128K, 512K, 1M or 2M for a CoCo 3, 4K to 64K for a CoCo 1 or 2 (or a Dragon). The machine is reset with it, and it is kept for that machine |
 | Joysticks      | What is plugged into each joystick port, which gamepad is which joystick, GPIO joysticks, and a joystick test |
-| Video          | TV input (composite with artifact colours, S-Video, or RGB for the CoCo 3), the artifact colour renderer, how much border to show, the frame lock, the resolution (Pi 5), the CRT effect and its curvature, smooth scaling |
+| Video          | TV input (composite with artifact colours, S-Video, or RGB for the CoCo 3), the artifact colour renderer, how much border to show, the screen size (smaller for a TV that cuts off the edges), the frame lock, the resolution (Pi 5), the CRT effect and its curvature, smooth scaling |
 | Keyboard       | Typed characters on or off, and the PC keyboard's layout |
 | Sound          | Volume, and HDMI or the headphone jack |
 | Network        | Ethernet or Wi-Fi, and the web UI (see below) |
@@ -133,6 +133,19 @@ a pointer over the picture, as the CoCo's own mouse does (OS-9's Multi-Vue,
 paint programs, CoCo 3 games), with the left button as fire and the right
 as the second button. `mouse_speed` (percent) changes how far it moves.
 
+**A Hi-Res Mouse**: give a port **Hi-Res Mouse (USB)** (or
+`joy_right=hjoy0`) for the USB mouse through Tandy's Hi-Res Joystick
+Interface (26-3028), which gives 640 positions across instead of the
+joystick's 64. Software has to read the interface itself; others see a
+joystick stuck at one side, as with the real interface. The interface is
+timed: the program drops the DAC ($FF20) from $FF to a low value and counts
+until the comparator ($FF00 bit 7) goes to 1. Across the screen that takes
+629 to 5792 microseconds for X and 1257 to 4307 for Y, the range of the
+HIRESMS reader (X 0-616 at double speed, Y 0-182 at normal speed). Programs
+written for other timing can be matched with `hires_mouse_x` and
+`hires_mouse_y` (microseconds for the left/top and right/bottom edges):
+OS-9's driver reads 0 to 639 with `1133,5423` on both.
+
 **Joysticks on the GPIO header**: set `gpio_joysticks=1` in `cmdline.txt`
 (or in the menu, then reboot). The wiring is BMC64's "GPIO Config 1". The
 pins are active low (each switch connects the pin to ground) and BMCoco
@@ -145,6 +158,9 @@ turns on the Pi's pull-ups:
 | Left   | 27                | 12                |
 | Right  | 22                | 13                |
 | Fire   | 23                | 19                |
+
+In the menus either GPIO joystick moves the cursor and fire chooses, as a
+gamepad's D-pad and A do.
 
 Ground is on pins 6, 9, 14, 20, 25, 30, 34 or 39 of the header. These are
 digital (switch) joysticks, like an Atari-style stick with an adapter;
@@ -225,8 +241,30 @@ interface, which has one too. NitrOS-9's DriveWire builds (such as the
 BMCoco has a DriveWire server built in, so no other computer is needed:
 choose disk images for its drives 0 to 3 in the menu's *DriveWire*
 (NitrOS-9's `/X0` to `/X3`; kept as `dw0` to `dw3` in `bmcoco.cfg`). It
-also gives NitrOS-9 the time. It has no virtual serial channels (`/N`,
-`/Z`), printing or named objects.
+also gives NitrOS-9 the time, and its network (below). It has no `/Z`
+windows, printing or named objects.
+
+### NitrOS-9 on the network
+
+With networking on, the built-in server's virtual channels (NitrOS-9's
+`/N`, `/N0` to `/N14`) reach the internet, as with DriveWire 4 or
+pyDriveWire, so NitrOS-9's network programs and terminal programs work
+with no other computer. The first line a program writes to a channel says
+what it is for:
+
+- `tcp connect host port`: what NitrOS-9's network programs send (its
+  `lib/net.as`). The server connects, in the background (NitrOS-9 keeps
+  running), and answers `OK connected to host:port`, or `FAIL` and an
+  error number (246: nothing answered, 216: no such host). From then on
+  the channel is the connection, both ways, until either end closes it.
+- `ATDT host:port` and the other AT commands: a Hayes modem, as the
+  RS-232 Pak's (see below), for terminal programs on `/N`: `CONNECT` or
+  `NO CARRIER`, `+++`, `ATH`, `ATO`, `ATZ`, `ATV`, `ATQ`, `ATI`. As with
+  pyDriveWire, the modem doesn't echo what's typed until `ATE1`.
+- `dw disk show`, `dw server show`: what NitrOS-9's `dw` command shows.
+
+Incoming connections (`tcp listen`, `join`, `kill`, and a modem answering
+calls) aren't supported.
 
 To use a server on another computer instead (DriveWire 4 or pyDriveWire on
 a PC, for example), set *Server* to *Another Computer* and type its
@@ -236,6 +274,47 @@ address, in the background (the CoCo keeps running), and tries again every
 10 seconds if the server isn't there; the log says when it connects. An
 address of `127.0.0.1` or `localhost`, as in an `xroar.conf` from a PC,
 means the built-in server: nothing else can listen there on the Pi.
+
+## The RS-232 Pak and calling BBSes
+
+BMCoco can add Tandy's RS-232 Pak, with a virtual modem on its cable, for
+calling telnet BBSes from CoCo terminal programs: the Deluxe RS-232
+Program Pak, Ultimaterm, Mikey-Term, Greg-E-Term and others written for the
+Pak (a 6551 at `$FF68`), and NitrOS-9's `/T2`. Turn on *RS-232 Pak
+(Modem)* in the menu's *Cartridge* page (`rs232=1` in `cmdline.txt`), and
+networking.
+
+The Pak goes in beside the cartridge plugged in, as if both were in a
+Multi-Pak: Disk BASIC's controller usually is, so terminal programs can be
+loaded from disk. With no cartridge at all the Pak isn't there either; a
+terminal program on a cartridge (the Deluxe RS-232 Program Pak's ROM, from
+*Load Cartridge File*) is the cartridge then.
+
+In the terminal program, type:
+
+```
+ATDTbbs.example.com:23
+```
+
+with the BBS's name or IP address and its port (23, telnet's, if there is
+none). The call is made in the background, so the CoCo keeps running
+while it connects: `CONNECT` (with the Pak's baud rate) when it does, `NO
+CARRIER` if nobody answers (which can take a few minutes for an address
+where nothing is there at all). Any key while it dials stops it.
+
+Other commands: `+++` (with a second of quiet before and after) to get
+back to the modem with the call kept, `ATH` to hang up, `ATO` to go back
+online, `ATZ` to reset the modem, `ATE0` / `ATE1` echo off and on, `ATV0` /
+`ATV1` number or word replies, `ATQ1` no replies, `ATI` what it is. The
+settings terminal programs set modems up with (`AT&F`, `&C1`, `&D2`,
+`S0=0`, `X4` and so on) answer `OK`. Dropping DTR (as many programs do to
+hang up) hangs up too. The modem doesn't answer calls (`ATA` says `NO
+CARRIER`).
+
+The Pak takes bytes as fast as the program reads them and sends them at
+once, whatever the baud rate set. Its interrupt goes to the cartridge
+port's CART line, as on the real Pak; programs that use it (rather than
+watching the status register) haven't been tried yet.
 
 ## Networking and the web UI
 
@@ -310,7 +389,8 @@ web UI.
 | `artifacts`         | `none`, `simple`, `5bit`, `partial`, `simulated` | XRoar's | Artifact colour renderer |
 | `picture`           | `zoomed`, `title`, `action`, `underscan` | `title` | How much border to show |
 | `aspect`            | number                       | `1.0`    | Multiplies the width of the picture |
-| `scale`             | 0.1 to 1.0                   | `1.0`    | Height of the picture as a fraction of the screen |
+| `disk_activity`     | `0`, `1`                     | `1`      | While a floppy disk, a hard disk or a DriveWire drive is read or written, show the drive and sector at the bottom left (Disk Drives, Show Disk Activity) |
+| `scale`             | 0.1 to 1.0                   | `1.0`    | Height of the picture as a fraction of the screen (Video, Screen Size; less for a TV that cuts off the edges) |
 | `smooth`            | `0`, `1`                     | `0`      | Bilinear filtering instead of sharp pixels |
 | `crt_shader`        | `0`, `1`                     | `0`      | CRT look (scanlines) from BMC64 |
 | `crt_curvature`     | `0`, `1`                     | `0`      | With `crt_shader`, a curved screen |
@@ -323,11 +403,13 @@ web UI.
 | `audio_buffer_ms`   | 20 to 500                    | `60`     | Sound buffer; raise it if the sound breaks up |
 | `keyboard`          | `us`, `gb`, `de`, `fr`, ... (XRoar's `-kbd-lang`) | `us` | PC keyboard layout |
 | `typed_keys`        | `0`, `1`                     | `1`      | Keys type the characters printed on them (see Keyboard) |
-| `joy_right`, `joy_left` | `joy0`, `joy1`, `kjoy0` (arrow keys), `mjoy0` (mouse) | `joy0`, `joy1` | What is plugged into each joystick port |
+| `joy_right`, `joy_left` | `joy0`, `joy1`, `kjoy0` (arrow keys), `mjoy0` (mouse), `hjoy0` (Hi-Res Mouse) | `joy0`, `joy1` | What is plugged into each joystick port |
 | `joy1_pad`, `joy2_pad` | `0` automatic, `1`-`4` a gamepad, `-1` none | `0` | Gamepad for Joystick 1 and 2 |
 | `mouse_speed`       | percent                      | `100`    | How far the mouse moves the pointer (see Joysticks) |
+| `hires_mouse_x`, `hires_mouse_y` | start,end (microseconds) | `629,5792`, `1257,4307` | The Hi-Res Mouse's timing for each axis (see Joysticks) |
 | `ram_NAME`          | K, e.g. `ram_coco3=2048`     | machine's | The RAM of machine NAME (the menu's *Memory*) |
 | `hd0`, `hd1`, `hd_cart` | paths, a cartridge name  | none     | Hard disk images and their cartridge (the menu's *Hard Disks*) |
+| `rs232`             | `0`, `1`                     | `0`      | The RS-232 Pak with a virtual modem, beside the cartridge (Cartridge, RS-232 Pak) |
 | `becker_ip`, `becker_port` | address, port         | none (built in), `65504` | The Becker port's DriveWire server on another computer |
 | `dw0` ... `dw3`     | paths                        | none     | The built-in DriveWire server's disk images (the menu's *DriveWire*) |
 | `gpio_joysticks`    | `0`, `1`                     | `0`      | Joysticks on the GPIO header |
@@ -336,7 +418,7 @@ web UI.
 | `webui`             | `0`, `1`                     | `1`      | Web UI when networking is on |
 | `webui_pin`         | digits                       | none     | PIN for the web UI |
 | `timezone`          | minutes east of UTC          | `0`      | Time zone for the network clock |
-| `usbpowerdelay`     | milliseconds                 | `1000`   | Circle: wait for USB devices to power up |
+| `usbpowerdelay`     | milliseconds                 | Circle's | Circle: wait for USB devices to power up (by default 300 ms, 510 ms behind a hub) |
 
 Anything else XRoar can do can go in `xroar.conf` in the root of the card,
 one option per line without the leading `-` (see XRoar's manual), for
@@ -377,7 +459,50 @@ artifact renderer (*Simple* or *5-bit*). Otherwise raise
 
 **Keyboard or gamepad not working**: unplug it and plug it in again; devices
 can come and go while the emulator runs. Some keyboards need a longer
-`usbpowerdelay`.
+`usbpowerdelay` (add `usbpowerdelay=1000` to `cmdline.txt`).
+
+**8BitDo M30 2.4G buttons are wrong**: its receiver can be left in Switch
+mode, where it acts as a Switch Pro controller. With the pad connected,
+hold Home (the heart) and D-pad Down for 5 seconds until the LEDs flash; it
+goes back to its own mode and keeps it.
+
+**The TV cuts off the top and bottom of the picture or the menu**: many TVs
+enlarge the picture and crop its edges (overscan). Make *Video*, *Screen
+Size* smaller (90% usually does), or turn overscan off on the TV ("Just
+Scan", "Screen Fit" or "1:1").
+
+**NitrOS-9 can't reach the network**: check that networking is on (the
+address shows at the bottom of the screen at start up) and that the Becker
+port uses the built-in server (*DriveWire*, *Server*); the log shows each
+channel's calls (`DriveWire channel 0: connected to ...`).
+
+**A terminal program can't reach a BBS**: check that *RS-232 Pak (Modem)*
+is on in *Cartridge*, that a cartridge is plugged in (Disk BASIC's
+controller, say), that the network is on, and the BBS's address and port:
+`ATDT` then the name or IP address, a colon, and the port. `NO CARRIER`
+means nothing answered there.
+
+**A program seems stuck loading**: watch the bottom left of the screen.
+While a floppy disk is read, a red light shows there with the drive (D),
+track (T), side (H) and sector (S), as in `D0 T17 H0 S03`. A light that
+stays on with the track and sector not moving, or a red message (`no disk`:
+the drive is empty; `not found` or `CRC error`: a sector the program wants
+isn't on the disk, or is damaged; `seek error`), usually means the wrong
+disk is in the drive or the disk image is bad. Many DOSes retry for ever
+rather than give up.
+
+Hard disks and DriveWire drives are shown there the same way, whichever
+was busy last:
+
+- `HD0 LSN 1234`: hard disk 0 or 1 of the IDE interface (HDB-DOS,
+  NitrOS-9), or the NX32's or MOOH's SD card, at sector 1234. A program
+  that uses the drive's cylinders and heads instead shows `HD0 C12 H3 S4`.
+  `error` in red: the drive turned the command down (a sector past the
+  end of the image, or no drive there).
+- `DW0 LSN 1234`: DriveWire drive 0 at sector 1234, with the built-in
+  server or one on another computer. In red, what the server answered:
+  `no disk` (nothing in that drive), `write protected`, `CRC error`,
+  `read error` or `write error`.
 
 **A game's colours are wrong**: choose the other composite phase in *Video*,
 *TV Input*.

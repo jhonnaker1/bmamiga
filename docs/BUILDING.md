@@ -52,7 +52,8 @@ and Pi Zero 2 W, `kernel7.img` for the Pi 2, `kernel.img` for the Pi Zero
 and Zero W, `kernel8-rpi4.img` (with `armstub8-rpi4.bin`) for the Pi 4 B
 and Pi 400, and `kernel_2712.img` for the Pi 5, Pi 500 and Pi 500+.
 `./build_sdcard.sh pi3`, `./build_sdcard.sh pi2`, `./build_sdcard.sh pi0`,
-`./build_sdcard.sh pi4` or `./build_sdcard.sh pi5` builds just one. Copy the contents of that folder to the root of a FAT32
+`./build_sdcard.sh pi4` or `./build_sdcard.sh pi5` builds just one, and
+`./build_sdcard.sh pi4 pi5` several. Copy the contents of that folder to the root of a FAT32
 formatted SD card.
 
 While developing, `./build_sdcard.sh --skip-patches` keeps the third party
@@ -126,19 +127,25 @@ display). The web page is served on 127.0.0.1 only.
 
 The simulator can also be driven by a script of key presses and
 screenshots; see the top of `tools/hostsim/host_sim.c` for the commands.
+[SIMULATOR.md](SIMULATOR.md) has more: setting it up, debugging it with
+gdb, lldb or strace, XRoar's traces, and getting a log from the Pi.
 
-`tools/pi4scaler` tests the Pi 4's smooth scaling and CRT shader
-(`src/pi4/scaler.*`): every pixel is checked against crt-pi worked out in
+`tools/pi4scaler` tests the shared Pi 4/5 ARM smooth scaling and CRT shader
+(`src/av/scaler.*`): every pixel is checked against crt-pi worked out in
 floating point, and the pictures are written to `tools/pi4scaler/out/`.
-`tools/pi4kms` tests the calculations of the Pi 4's direct display driver
-(`src/pi4kms/`, see [PI4.md](PI4.md)): filter kernels, display lists,
-EDID, the choice of video mode, the AVI InfoFrame and the PHY's settings.
+`tools/pi4kms` tests the Pi 4/5 direct display drivers (`src/kms/`, see
+[PI4.md](PI4.md) and [PI5.md](PI5.md)): shared filter kernels, EDID, mode
+choice, HDMI packets and audio clocks, and each board's display lists and
+PHY settings.
 Both come from BMA800XL.
 
 ```
 tools/pi4scaler/run_tests.sh
 tools/pi4kms/run_tests.sh
 ```
+
+`build_sdcard.sh` runs all three first and stops if any test fails;
+`--skip-tests` leaves them out.
 
 ## The web UI
 
@@ -164,15 +171,24 @@ with `tools/gen_webui_assets.py` whenever an asset changes.
 | `src/port/menu.c`, `osd.c`   | The menu and its on-screen display          |
 | `src/port/posix_extra.c`     | regcomp(), basename(), access() for newlib  |
 | `src/port/becker.c`          | XRoar's Becker port (DriveWire over TCP, connecting in the background), or the built-in server |
+| `src/port/hires.c`           | The Tandy Hi-Res Joystick Interface with the USB mouse (`hjoy0`), timed from the DAC's writes |
 | `src/port/dwserver.c`        | The built-in DriveWire server               |
+| `src/port/activity.c`        | Hard disk and DriveWire activity, shown with the floppy's: seen on the cartridge bus and in the Becker port |
+| `src/port/cartbus.c`         | The RS-232 Pak and the activity light beside the cartridge plugged in (one wrapper round its read and write) |
+| `src/port/rs232.c`           | The RS-232 Pak (a 6551 at `$FF68`) with its virtual Hayes modem |
+| `src/port/netcall.c`         | Outgoing TCP calls made in the background, and telnet, for the modem and DriveWire's virtual channels |
+| `src/port/fswrap.c`          | `stat()` of the SD card's root, which FatFs can't do (`--wrap=stat`) |
 | `src/port/config.h`          | XRoar's build configuration                 |
 | `src/port/xroar.mk`          | Which XRoar sources are built               |
 | `src/patches/`               | Changes applied to Circle by `make_all.sh`  |
 | `sdcard/`                    | Files for the SD card                       |
 | `third_party/xroar`          | XRoar (submodule)                           |
 | `third_party/circle-stdlib`  | Circle and newlib (submodule)               |
-| `src/pi4/`                   | Pi 4 display, smooth scaling / CRT shader, HDMI sound |
-| `src/pi4kms/`                | Pi 4 direct display driver                  |
+| `src/av/`                    | Shared Pi 4/5 video, ARM scaling / CRT shader and sound |
+| `src/v3d/`                   | Shared Pi 4/5 GPU driver and CRT rendering  |
+| `src/kms/common/`            | Shared Pi 4/5 filter kernels and mode calculations |
+| `src/kms/pi4/`               | Pi 4 direct display driver and PHY          |
+| `src/kms/pi5/`               | Pi 5 direct display driver and PHY          |
 | `tools/hostsim`              | PC test harness                             |
-| `tools/pi4scaler`            | PC test of the Pi 4's smooth scaling and CRT shader |
+| `tools/pi4scaler`            | PC test of shared Pi 4/5 ARM scaling and CRT rendering |
 | `tools/pi4kms`               | PC test of the Pi 4 display driver's calculations |

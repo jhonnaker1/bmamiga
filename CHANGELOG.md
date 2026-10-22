@@ -2,13 +2,126 @@
 
 ## Unreleased
 
-- BMAmiga starts, from BMCoco 0.5.1: Amiberry (its libretro core) in place
-  of XRoar, running in the PC simulator. AROS without Kickstart ROMs, or
+- BMAmiga starts, from BMCoco: Amiberry (its libretro core) in place of
+  XRoar, running in the PC simulator. AROS without Kickstart ROMs, or
   Kickstarts from roms (Amiga Forever's too); floppies DF0: to DF3:, the model,
   warp, resets in the F12 menu; the keyboard, mouse and joystick; the frame
   lock, with Amiberry's clock following the frames shown
+- Rebuilt on BMCoco 0.5.5 (it started from 0.5.1): its BMA800XL 1.4.2 merge
+  (the display code in src/av, src/v3d and src/kms, GPIO menu navigation),
+  the CPU clock and smooth sound fixes, Screen Size, and the rest
 
 BMCoco's history, from which BMAmiga comes, follows.
+
+## 0.5.5 – 2026-10-20
+
+- Hard disk and DriveWire activity, shown at the bottom left as the floppy
+  disk's is (*Show Disk Activity*): `HD0 LSN 1234` for the IDE interface
+  and the NX32's and MOOH's SD card, `DW0 LSN 1234` for DriveWire (the
+  built-in server or another computer's), with the light on while a
+  sector is read or written, and errors in red (`error`; DriveWire's `no
+  disk`, `write protected`, ...). Whichever was busy last is shown
+- Hi-Res Mouse (USB) in the Joysticks page (`hjoy0`): the USB mouse
+  through Tandy's Hi-Res Joystick Interface, 640 positions across for
+  software that reads it. Timed for the HIRESMS reader (X 0-616, Y 0-182);
+  `hires_mouse_x` and `hires_mouse_y` in `cmdline.txt` change the timing
+  for other programs (OS-9's driver: `1133,5423` on both)
+- Fixed: the mouse's right button is the CoCo 3's second button, as the
+  User Guide says; the middle button (the wheel) was. XRoar numbers the
+  buttons left, middle, right; BMCoco gave it the USB order (left, right,
+  middle). Both the Mouse and the Hi-Res Mouse
+- Fixed: the *Arrow keys* joystick (Joysticks page, `joy_right=kjoy0`) did
+  nothing; the port it was given was left with no joystick at all. The
+  arrow keys now move it and left Alt fires
+- Fixed: hard disks chosen in the menu were lost at the next boot when no
+  machine was set (`machine=`): BMCoco then starts the first CoCo it has
+  ROMs for, which came with RS-DOS instead of the IDE interface. The
+  interface (and its images) now goes back in
+- Fixed: the built-in DriveWire server's virtual channels started with
+  connection 0 as theirs rather than none, so a reset of the CoCo, or
+  NitrOS-9 opening a channel, closed connection 0, whatever had it
+  (another channel's call, or the RS-232 Pak's)
+
+## 0.5.4 – 2026-10-19
+
+- NitrOS-9 on the network with the built-in DriveWire server: its virtual
+  channels (`/N`) reach the internet, as with DriveWire 4 or pyDriveWire.
+  `tcp connect host port` (NitrOS-9's network programs) connects in the
+  background and answers `OK connected` or `FAIL`; `ATDT` and the AT
+  commands make a channel a Hayes modem, for terminal programs; `dw disk
+  show` and `dw server show`. See "NitrOS-9 on the network" in the User
+  Guide
+- The RS-232 Pak, with a virtual modem: Cartridge, *RS-232 Pak (Modem)*
+  (`rs232=1`) puts a 6551 at `$FF68` beside the cartridge plugged in, for
+  CoCo terminal programs and NitrOS-9's `/T2`, and `ATDTbbs.example.com:23`
+  calls a telnet BBS, in the background (`CONNECT`, or `NO CARRIER`), with
+  `+++`, `ATH`, `ATO`, `ATZ` and the rest. XRoar has no RS-232 Pak; it is
+  BMCoco's own (`src/port/rs232.c`). See "The RS-232 Pak and calling
+  BBSes" in the User Guide
+- Tests: the stand-in HDB-DOS ROM is no longer written through a link into
+  BMCOCO_ROMS; dialling a stand-in BBS through the RS-232 Pak, +++ and ATH,
+  and a call nobody answers
+- Merged BMA800XL c33adfd: `build_sdcard.sh` runs the PC tests first
+  (`--skip-tests` leaves them out)
+
+## 0.5.3 – 2026-10-19
+
+- Pi Zero, 2, 3 and 4: run the ARM at its full clock. Without an operating
+  system asking for more the firmware left it at its lowest (600 MHz on a
+  Pi 3 B+, not 1.4 GHz), too slow for busy CoCo 3 games such as Rick
+  Dangerous, whose sound then broke up. The log shows the clock
+- Pi 4 and 5: fix the sound breaking up. Their HDMI plays at 48 kHz, but
+  XRoar made its sound at 44.1 kHz, so the buffer ran dry all the time and
+  the sound was stretched in jumps. XRoar now makes it at the output's rate
+- Video, Screen Size (100% down to 80%): makes the picture and the menu
+  smaller, for a TV that cuts off the edges (overscan). The same as the
+  `scale` option, now changed without editing `cmdline.txt`
+- Disk activity: while a floppy disk is read or written, a red light and
+  the drive, track, side and sector (`D0 T17 H0 S03`) at the bottom left
+  of the picture, and in red for a few seconds an empty drive, a sector not
+  found, a CRC error or a seek error, so that a program stuck loading (the
+  wrong disk in the drive, a bad image) can be seen to be. Disk Drives,
+  Show Disk Activity (`disk_activity=0`) turns it off
+- Fix the Pi hanging when the Becker port is used with a DriveWire server
+  on another computer (the built-in server was fine). Circle's C library
+  holds the lock on its table of open files for as long as a socket call
+  waits, so while the Becker port was connecting in the background, the
+  emulator opening a file (the cartridge's ROM, at the reset that follows)
+  waited for it for ever, and the network with it (no ping). The Becker
+  port now uses Circle's own sockets
+- Becker port with a DriveWire server on another computer: replies come
+  back within the frame. Circle runs the network once a frame, so each
+  request and reply took one or two frames (two of them per sector for
+  HDB-DOS); while the CoCo waits for a reply the network now runs every
+  half millisecond. A port that isn't a number from 1 to 65535 is reported
+  in the log rather than tried. Both from a tester's patch
+- From BMA800XL 1.4.1 and 1.4.2:
+  - The menus can be used with GPIO joysticks: either one moves, fire
+    chooses
+  - `cmdline.txt` leaves `usbpowerdelay` to Circle (300 ms, 510 ms behind a
+    hub) rather than 1000 ms, for a quicker start; add `usbpowerdelay=1000`
+    for a keyboard that needs longer
+  - `./build_sdcard.sh pi4 pi5` builds several boards at once
+  - The SD card's `licenses` folder: the notices and licences of the code
+    from other projects in the kernels (XRoar, Circle and newlib, BMC64's
+    Apache 2.0 code, crt-pi, Mesa and Linux's V3D code, the GCC runtime);
+    docs/THIRD_PARTY.md says where each is used
+  - The Pi 4 and 5's display and GPU code is in `src/av/`, `src/v3d/` and
+    `src/kms/`, as in BMA800XL
+  - Troubleshooting: an 8BitDo M30 2.4G whose receiver is in Switch mode
+- Simulator: BMCOCO_SIM_RATE=48000 plays the sound at the Pi 4 and 5's rate
+- docs/SIMULATOR.md: testing and debugging BMCoco on a PC (with gdb, lldb
+  or strace), XRoar's traces, and getting a log from the Pi
+
+## 0.5.2 – 2026-10-16
+
+- Fix the sound clicking or sounding wrong (PLAY on a CoCo 3, for one): a
+  CoCo 3 (59.69 Hz) locked to a 60 Hz display, or a PAL CoCo (50.32 Hz) to
+  50 Hz, runs up to 0.6% fast, more than BMCoco's corrections (one sample in
+  512) could take up, so the sound buffer filled and what didn't fit was cut
+  off. The sound is now squeezed or stretched smoothly, by up to 2%
+- Simulator: BMCOCO_SIM_WAV saves the sound, BMCOCO_SIM_CPU shows how hard
+  each screen is to emulate
 
 ## 0.5.1 – 2026-10-16
 

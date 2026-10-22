@@ -17,8 +17,9 @@
    yourself (see [BUILDING.md](BUILDING.md)) and use `build/sdcard/`.
 2. Format the SD card as FAT32.
 3. Extract the zip to the root of the card, so that the kernels
-   (`kernel8-32.img`, `kernel7.img`) and `config.txt` are at the top level,
-   not in a folder.
+   (`kernel_2712.img`, `kernel8-rpi4.img`, `kernel8-32.img`, `kernel7.img`,
+   `kernel.img`) and `config.txt` are at the top level, not in a folder (a
+   Pi 4 or 5 with them in a folder shows its firmware's "not found" screen).
 4. Copy your ROMs into the `roms` folder (see below).
 5. Copy your CoCo files to the card. The `disks`, `tapes`, `carts` and
    `programs` folders are there for them, but any folder works.
@@ -78,7 +79,8 @@ changed: `config.txt` and `cmdline.txt` if you edited them. Your settings
 (`bmcoco.cfg`, `xroar.conf`, `wpa_supplicant.conf`), ROMs and CoCo
 files are not in the release zip and stay as they are.
 
-With networking on, a new kernel (`kernel8-32.img` for a Pi 3 or Zero 2 W,
-`kernel7.img` for a Pi 2, `kernel.img` for a Pi Zero or Zero W) can also be uploaded in the web UI's file manager
-and started with **Reboot**. Updates that change other files (the Pi
+With networking on, a new kernel (`kernel_2712.img` for a Pi 5 or 500,
+`kernel8-rpi4.img` for a Pi 4 or 400, `kernel8-32.img` for a Pi 3 or Zero
+2 W, `kernel7.img` for a Pi 2, `kernel.img` for a Pi Zero or Zero W) can
+also be uploaded in the web UI's file manager and started with **Reboot**. Updates that change other files (the Pi
 firmware in the root or in `firmware/`) need the card in a computer.

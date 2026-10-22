@@ -4,7 +4,9 @@
 // This file is part of BMAmiga, a bare metal Amiga emulator for the
 // Raspberry Pi. See LICENSE for licensing details.
 //
-// Parts of the USB, frame buffer and sound handling are based on BMC64.
+// Parts of the USB, frame buffer and sound handling are based on BMC64's
+// kernel.cpp, and those parts remain under the Apache License 2.0
+// (sdcard/licenses/Apache-2.0.txt).
 //
 
 #include "kernel.h"
@@ -86,7 +88,7 @@ void CEmulatorCore::Run(unsigned nCore) {
     bmamiga_main();
   }
 #if RASPPI >= 4
-  // Cores 2 and 3 help draw smoothed and CRT frames (src/pi4/video.h).
+  // Cores 2 and 3 help draw smoothed and CRT frames (src/av/video.h).
   if (nCore >= 2) {
     Pi4Video::WorkerLoop(nCore);
   }
@@ -125,6 +127,9 @@ CKernel::CKernel(void)
       mSerial(0, FALSE, 0),
 #endif
       mLog(&mSerial), mTimer(&mInterrupt), mLogger(mKernelOptions.GetLogLevel(), &mTimer),
+#if RASPPI <= 4
+      mCPUThrottle(CPUSpeedMaximum),
+#endif
       mGPIOManager(&mInterrupt),
 #if RASPPI <= 3
       mVCHIQ(CMemorySystem::Get(), &mInterrupt),
@@ -184,6 +189,12 @@ bool CKernel::Initialize(void) {
   if (!mTimer.Initialize()) {
     return false;
   }
+#if RASPPI <= 4
+  mLogger.Write(FromKernel, LogNotice, "CPU clock %u MHz (%u to %u MHz)",
+                mCPUThrottle.GetClockRate() / 1000000,
+                mCPUThrottle.GetMinClockRate() / 1000000,
+                mCPUThrottle.GetMaxClockRate() / 1000000);
+#endif
   if (!mGPIOManager.Initialize()) {
     return false;
   }
@@ -233,7 +244,7 @@ bool CKernel::Initialize(void) {
 
 #if RASPPI >= 4
   // Display and sound are set up here, on core 0: Circle's sound drivers
-  // must be started on core 0 (see src/pi4/sound.h).
+  // must be started on core 0 (see src/av/sound.h).
   Pi4Sound::Output sound_output = Pi4Sound::Output::Auto;
   if (strcmp(audio_out, "hdmi") == 0) {
     sound_output = Pi4Sound::Output::Hdmi;

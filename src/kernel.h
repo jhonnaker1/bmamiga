@@ -15,6 +15,7 @@
 
 #include <SDCard/emmc.h>
 #include <circle/actled.h>
+#include <circle/cputhrottle.h>
 #include <circle/devicenameservice.h>
 #include <circle/exceptionhandler.h>
 #include <circle/gpiomanager.h>
@@ -44,11 +45,11 @@
 
 // The Pi 2 and 3 show the picture and play sound through the VideoCore
 // (dispmanx and VCHIQ, from BMC64); the Pi 4 and 5 through Circle's
-// framebuffer and HDMI sound drivers (src/pi4/).
+// framebuffer and HDMI sound drivers (src/av/).
 #if RASPPI >= 4
-#include "pi4/sound.h"
-#include "pi4/video.h"
-#include "pi4v3d/crt.h"
+#include "av/sound.h"
+#include "av/video.h"
+#include "v3d/crt.h"
 #else
 #include <vc4/vchiq/vchiqdevice.h>
 
@@ -161,6 +162,14 @@ private:
   CLogDevice mLog;
   CTimer mTimer;
   CLogger mLogger;
+#if RASPPI <= 4
+  // Without an operating system asking for more, the firmware leaves the
+  // ARM at its lowest clock (600 MHz on a Pi 3 B+, not 1.4 GHz); this
+  // sets the highest when it is constructed, before the SD card and Wi-Fi
+  // take their clocks. The firmware still slows it down if the chip gets
+  // too hot. (Update() is never called: it would slow it down at 60 C.)
+  CCPUThrottle mCPUThrottle;
+#endif
   CScheduler mScheduler;
   CGPIOManager mGPIOManager;
 #if RASPPI <= 3

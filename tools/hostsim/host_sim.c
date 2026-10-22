@@ -25,6 +25,11 @@
  * virtual time, as on a computer too slow for it (a Pi 3 with the most
  * accurate artifact colours, say).
  *
+ * BMAMIGA_SIM_WAV=FILE writes the sound output to FILE (16-bit WAV).
+ *
+ * BMAMIGA_SIM_CPU=1 prints the PC's CPU time a frame, every 60 frames: how
+ * hard each screen is to emulate.
+ *
  * BMAMIGA_SIM_CONNECT_FRAMES=N makes background work (connecting to a
  * DriveWire server) start N frames late, as connecting does on the Pi
  * when the server is slow to answer.
@@ -38,12 +43,16 @@
  */
 
 #include <pthread.h>
-#include <sys/stat.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <sys/stat.h>
+
+#include <errno.h>
+#include <netdb.h>
+#include <sys/socket.h>
 
 #include "../../src/host.h"
 #include "live.h"
@@ -200,8 +209,11 @@ void host_sleep_us(unsigned us)
 	tick();
 }
 
+static long yields;   /* host_yield() calls, for the Becker port's test */
+
 void host_yield(void)
 {
+	yields++;
 	if (live)
 		now = real_time();
 	else
@@ -210,7 +222,10 @@ void host_yield(void)
 
 /* ---- Sound ---------------------------------------------------------------- */
 
-#define HW_RATE 44100
+/* The output's rate: the VideoCore's 44100 Hz, or BMAMIGA_SIM_RATE (48000
+   for the Pi 4 and 5's HDMI, which take the latency at 44100 Hz). */
+static unsigned hw_rate = 44100;
+#define HW_RATE hw_rate
 static int snd_open = 0;
 static int snd_channels = 1;
 static unsigned snd_capacity = 0;
@@ -242,12 +257,15 @@ static void sound_advance(void)
 
 unsigned host_sound_open(unsigned freq, int channels, unsigned latency_frames)
 {
+	const char *rate = getenv("BMAMIGA_SIM_RATE");
 	(void) freq;
+	if (rate != NULL && atoi(rate) >= 8000)
+		hw_rate = (unsigned) atoi(rate);
 	snd_open = 1;
 	snd_channels = channels;
-	snd_capacity = latency_frames;
+	snd_capacity = (unsigned) ((unsigned long) latency_frames * hw_rate / 44100);
 	snd_last = now;
-	fprintf(stderr, "[sim] sound open: %d channel(s), %u frames\n", channels, latency_frames);
+	fprintf(stderr, "[sim] sound open: %d channel(s), %u frames\n", channels, snd_capacity);
 	return HW_RATE;
 }
 
@@ -260,8 +278,54 @@ unsigned host_sound_free_frames(void)
 	return snd_buffered >= cap ? 0 : (unsigned) (cap - snd_buffered);
 }
 
+/* BMAMIGA_SIM_WAV: the sound, as written, in a WAV file. */
+static FILE *wav;
+static unsigned long wav_bytes;
+
+static void wav_header(void)
+{
+	unsigned rate = HW_RATE, ch = (unsigned) snd_channels, bytes = (unsigned) wav_bytes;
+	unsigned char h[44] = "RIFF....WAVEfmt \x10\0\0\0\1\0";
+	unsigned v[] = {36 + bytes, 0, 0};
+	(void) v;
+	memcpy(h + 4, &(unsigned){36 + bytes}, 4);
+	h[22] = (unsigned char) ch; h[23] = 0;
+	memcpy(h + 24, &rate, 4);
+	memcpy(h + 28, &(unsigned){rate * ch * 2}, 4);
+	h[32] = (unsigned char) (ch * 2); h[33] = 0; h[34] = 16; h[35] = 0;
+	memcpy(h + 36, "data", 4);
+	memcpy(h + 40, &bytes, 4);
+	fseek(wav, 0, SEEK_SET);
+	fwrite(h, 1, 44, wav);
+	fseek(wav, 0, SEEK_END);
+}
+
+static void wav_close(void)
+{
+	if (wav != NULL) {
+		wav_header();
+		fclose(wav);
+		wav = NULL;
+	}
+}
+
+static void wav_write(const int16_t *samples, unsigned frames)
+{
+	const char *name;
+	if (wav == NULL) {
+		name = getenv("BMAMIGA_SIM_WAV");
+		if (name == NULL || (wav = fopen(name, "wb")) == NULL)
+			return;
+		wav_header();
+		atexit(wav_close);
+	}
+	fwrite(samples, 2, frames * snd_channels, wav);
+	wav_bytes += frames * snd_channels * 2;
+}
+
 void host_sound_write(const int16_t *samples, unsigned frames)
 {
+	wav_write(samples, frames);
 
 	unsigned i;
 	sound_advance();
@@ -533,6 +597,7 @@ static void run_script(void)
 			        snd_nonzero);
 			fprintf(stderr, "[sim] frame %ld: %ld frames presented\n", frame, presents);
 		} else if (strcmp(cmd, "quit") == 0) {
+			fprintf(stderr, "[sim] %ld yields between frames\n", yields);
 			fprintf(stderr, "[sim] quit at frame %ld (%.2f s)\n", frame, now);
 			exit(0);
 		}
@@ -558,9 +623,32 @@ static void tick(void)
 		exit(1);
 }
 
+static void cpu_report(void)
+{
+	static double last, sum;
+	static int frames, on = -1;
+	struct timespec ts;
+	double t;
+	if (on < 0)
+		on = getenv("BMAMIGA_SIM_CPU") != NULL;
+	if (!on)
+		return;
+	clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
+	t = ts.tv_sec + ts.tv_nsec / 1e9;
+	if (last > 0.0)
+		sum += t - last;
+	last = t;
+	if (++frames == 60) {
+		fprintf(stderr, "[sim] frame %ld: %.2f ms CPU a frame\n", frame, sum * 1000.0 / frames);
+		sum = 0.0;
+		frames = 0;
+	}
+}
+
 void host_video_present(int wait_vsync)
 {
 	presents++;
+	cpu_report();
 	if (live) {
 		if (wait_vsync) {
 			/* Wait for the next refresh of a 60 Hz display. */
@@ -625,6 +713,57 @@ static void *background_thread(void *p)
 		usleep(1000);
 	job.fn(job.arg);
 	return NULL;
+}
+
+/* TCP connections (host.h): the PC's own sockets; a connection is the
+   socket. */
+int host_tcp_connect(const char *host, const char *port)
+{
+	struct addrinfo hints, *info = NULL;
+	int fd;
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_STREAM;
+	if (getaddrinfo(host, port, &hints, &info) != 0 || info == NULL)
+		return -2;
+	fd = socket(info->ai_family, info->ai_socktype, info->ai_protocol);
+	if (fd >= 0 && connect(fd, info->ai_addr, info->ai_addrlen) < 0) {
+		close(fd);
+		fd = -1;
+	}
+	freeaddrinfo(info);
+	return fd < 0 ? -1 : fd;
+}
+
+int host_tcp_recv(int connection, void *buffer, unsigned size)
+{
+	ssize_t got = recv(connection, buffer, size, MSG_DONTWAIT);
+	if (got > 0)
+		return (int) got;
+	if (got < 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR))
+		return 0;
+	return -1;   /* closed, or broken */
+}
+
+int host_tcp_send(int connection, const void *buffer, unsigned size)
+{
+	ssize_t sent;
+	if (size == 0)
+		return 0;
+#ifdef MSG_NOSIGNAL
+	sent = send(connection, buffer, size, MSG_DONTWAIT | MSG_NOSIGNAL);
+#else
+	sent = send(connection, buffer, size, MSG_DONTWAIT);
+#endif
+	if (sent >= 0)
+		return (int) sent;
+	return errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR ? 0 : -1;
+}
+
+void host_tcp_close(int connection)
+{
+	if (connection >= 0)
+		close(connection);
 }
 
 int host_run_in_background(void (*fn)(void *arg), void *arg)
