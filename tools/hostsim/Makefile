@@ -16,16 +16,22 @@ OUT := $(abspath build)
 CC ?= cc
 CXX ?= c++
 
-# Amiberry's time and sleeps are BMAmiga's (src/port/clock.c).
+# Amiberry's time and sleeps are BMAmiga's (src/port/clock.c), and its
+# threads (src/port/circle/threads.c, the Pi's cooperative ones, tested
+# here too).
+BMA_THREADS := $(foreach f,create join detach self mutex_init mutex_destroy mutex_lock \
+                 mutex_trylock mutex_unlock cond_init cond_destroy cond_signal \
+                 cond_broadcast cond_wait cond_timedwait,-Dpthread_$(f)=bma_pthread_$(f)) \
+               -Dsched_yield=bma_sched_yield
 BMA_FLAGS := -Dclock_gettime=bma_clock_gettime -Dclock_gettime_nsec_np=bma_clock_gettime_nsec_np \
-             -Dnanosleep=bma_nanosleep -Dusleep=bma_usleep
+             -Dnanosleep=bma_nanosleep -Dusleep=bma_usleep $(BMA_THREADS)
 
 CFLAGS = -O2 -g -std=gnu11 -I $(ROOT)/src/port -I $(AMIBERRY)/libretro \
          -I $(AMIBERRY)/libretro/libretro-common/include -I $(AMIBERRY)/src \
          -DBMAMIGA_HOST_LIBC
 
 AMIBERRY_LIB := $(OUT)/amiberry/libamiberry.a
-PORT_OBJS := $(addprefix $(OUT)/port/,platform.o keys.o osd.o menu.o clock.o)
+PORT_OBJS := $(addprefix $(OUT)/port/,platform.o keys.o osd.o menu.o clock.o) $(OUT)/port/threads.o
 OBJS := $(PORT_OBJS) $(OUT)/host_sim.o $(OUT)/live.o
 
 all: $(OUT)/bmamiga_sim
@@ -49,6 +55,10 @@ $(OUT)/port/%.o: $(ROOT)/src/port/%.c $(ROOT)/src/port/bmamiga.h $(ROOT)/src/por
                  $(ROOT)/src/host.h
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -Wall -Wextra -Wno-unused-parameter -c -o $@ $<
+
+$(OUT)/port/threads.o: $(ROOT)/src/port/circle/threads.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(BMA_THREADS) -I $(AMIBERRY)/libretro/libco -Wall -Wextra -c -o $@ $<
 
 $(OUT)/host_sim.o: host_sim.c live.h $(ROOT)/src/host.h
 	@mkdir -p $(dir $@)

@@ -131,10 +131,10 @@ then
     nproc() { sysctl -n hw.ncpu; }
 fi
 
-if [ ! -f "$CIRCLE_HOME/Rules.mk" ] || [ ! -f "$SRC_DIR/third_party/xroar/src/xroar.c" ]
+if [ ! -f "$CIRCLE_HOME/Rules.mk" ] || [ ! -f "$SRC_DIR/third_party/amiberry/libretro/libretro.cpp" ]
 then
     echo "Fetching submodules..."
-    git -C "$SRC_DIR" submodule update --init third_party/xroar third_party/circle-stdlib
+    git -C "$SRC_DIR" submodule update --init third_party/amiberry third_party/circle-stdlib
     git -C "$CIRCLE_STDLIB" submodule update --init libs/circle libs/circle-newlib
     git -C "$CIRCLE_HOME" submodule update --init addon/wlan/hostap
 fi

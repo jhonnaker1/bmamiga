@@ -7,3 +7,6 @@
 	url = https://github.com/BlitterStudio/amiberry.git
 	ignore = dirty
 	shallow = true
+[submodule "third_party/zlib"]
+	path = third_party/zlib
+	url = https://github.com/madler/zlib.git

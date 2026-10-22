@@ -28,12 +28,15 @@ endif
 # The core's objects, moved under BMA_OBJDIR: "../src/x.o" (AMIBERRY_DIR)
 # becomes BMA_OBJDIR/src/x.o, "./x.o" (LIBRETRO_DIR) BMA_OBJDIR/libretro/x.o.
 bma_obj = $(patsubst ./%,$(BMA_OBJDIR)/libretro/%,$(patsubst ../%,$(BMA_OBJDIR)/%,$(1)))
-BMA_OBJECTS := $(call bma_obj,$(OBJECTS))
+# BMA_EXCLUDE: objects left out (relative to BMA_OBJDIR, "src/x.o"), when
+# BMA_EXTRA has BMAmiga's own in their place (the Pi's, src/port/circle).
+BMA_OBJECTS := $(filter-out $(addprefix $(BMA_OBJDIR)/,$(BMA_EXCLUDE)),$(call bma_obj,$(OBJECTS)))
 
-# BMAmiga's own calls into Amiberry (src/port/bridge.cpp), built with the
-# core's flags so that it can use its headers.
+# BMAmiga's own calls into Amiberry (src/port/bridge.cpp), and the files
+# in BMA_EXTRA (relative to src/port, without .cpp), built with the core's
+# flags so that they can use its headers.
 BMA_PORT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
-BMA_OBJECTS += $(BMA_OBJDIR)/bmamiga/bridge.o
+BMA_OBJECTS += $(BMA_OBJDIR)/bmamiga/bridge.o $(addprefix $(BMA_OBJDIR)/bmamiga/,$(addsuffix .o,$(BMA_EXTRA)))
 
 $(BMA_OBJDIR)/bmamiga/%.o: $(BMA_PORT)/%.cpp | $(NLOHMANN_JSON_HEADER)
 	@mkdir -p $(dir $@)

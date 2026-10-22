@@ -11,6 +11,15 @@
   (the display code in src/av, src/v3d and src/kms, GPIO menu navigation),
   the CPU clock and smooth sound fixes, Screen Size, and the rest
 
+- Amiberry's core builds for the Pi 4 and 5 (step 2, the Circle side;
+  the kernels are next): with circle-stdlib's newlib and the toolchain's
+  libstdc++, Amiberry unmodified, and BMAmiga's src/port/circle for what
+  they lack: cooperative POSIX threads on libco (tested in the simulator,
+  which runs them too), std::mutex and std::condition_variable over them,
+  thread-local storage, mmap() from the heap, iconv, the missing headers;
+  networking, crash handlers and the JIT left out for now. zlib 1.3.1 is a
+  submodule. make -C tools/picore builds it and checks the link
+
 BMCoco's history, from which BMAmiga comes, follows.
 
 ## 0.5.5 – 2026-10-20
