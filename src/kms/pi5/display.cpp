@@ -188,13 +188,20 @@ uint32_t *Display::BeginFrame(unsigned *pitch) {
   return m_pBuffer[m_nBack];
 }
 
-void Display::EndFrame(bool wait_vsync) {
+void Display::EndFrame(bool wait_vsync, unsigned first_line, unsigned lines) {
   if (!m_bHavePicture) {
     return;
   }
   uint32_t *buffer = m_pBuffer[m_nBack];
-  CleanAndInvalidateDataCacheRange((uintptr)buffer,
-                                   (size_t)m_nPitch * m_Plane.src_height * 4);
+  if (first_line < m_Plane.src_height) {
+    if (lines > m_Plane.src_height - first_line) {
+      lines = m_Plane.src_height - first_line;
+    }
+    if (lines != 0) {
+      CleanAndInvalidateDataCacheRange((uintptr)(buffer + (size_t)first_line * m_nPitch),
+                                       (size_t)m_nPitch * lines * 4);
+    }
+  }
   m_Plane.address = HvsAddress(buffer);
   unsigned now = m_Hvs.FrameCount();
   if (!m_Hvs.Show(&m_Plane)) {
@@ -267,11 +274,14 @@ bool Display::MatchRate(double fps, unsigned audio_fs, unsigned lines) {
     CLogger::Get()->Write(FromDisplay, LogNotice,
                           "No %ux%u mode at %.2f Hz the display lists; keeping %.2f Hz",
                           current.h_active, current.v_active, fps, current.Refresh());
+    m_ModeSetter.SetAudioClock(current, audio_fs);
     return false;
   }
   if (wanted.vic == current.vic &&
       (wanted.pixel_hz > current.pixel_hz ? wanted.pixel_hz - current.pixel_hz
                                           : current.pixel_hz - wanted.pixel_hz) < 1000) {
+    // The firmware's mode is the one wanted; the sound's clock for it.
+    m_ModeSetter.SetAudioClock(current, audio_fs);
     return false;
   }
   m_ModeSetter.Set(m_Hvs, wanted, audio_fs, Reinstall, this);

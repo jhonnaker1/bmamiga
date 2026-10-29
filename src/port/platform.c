@@ -913,6 +913,33 @@ static void fatal(const char *text)
 	}
 }
 
+/* ---- Speed, for the log ----------------------------------------------------- */
+
+/* Every 10 s, as BMNeXT does: how fast the Amiga runs against a real one,
+   the ARM's clock and temperature, and where the time went (the Amiga's
+   emulation, and the kernel's three parts of showing a frame: Circle's
+   tasks, the log, the picture, its wait for the display included). */
+static unsigned speed_frames;
+static double speed_since, speed_amiga;
+
+static void report_speed(double now)
+{
+	double span = now - speed_since, tasks, log, picture;
+	unsigned mhz, celsius;
+	if (span <= 0.0)
+		return;
+	host_cpu_status(&mhz, &celsius);
+	host_video_times(&tasks, &log, &picture);
+	LOG("speed %.0f%% (%u frames in %.1f s), ARM %u MHz %u C; Amiga %.0f%%, "
+	    "frames: tasks %.0f%% log %.0f%% picture %.0f%%%s\n",
+	    speed_frames * 100.0 / (span * bmamiga_core_frame_rate()), speed_frames, span,
+	    mhz, celsius, speed_amiga * 100.0 / span, tasks * 100.0 / span,
+	    log * 100.0 / span, picture * 100.0 / span, warp ? " (warp)" : "");
+	speed_since = now;
+	speed_frames = 0;
+	speed_amiga = 0.0;
+}
+
 void bmamiga_main(void)
 {
 	struct retro_system_av_info av;
@@ -956,9 +983,10 @@ void bmamiga_main(void)
 	update_sync_mode();
 	LOG("%s, %.2f Hz, sound %u Hz\n", bmamiga_machine_description(), machine_rate, ao_rate);
 
-	last_second = host_time();
+	last_second = speed_since = host_time();
 	for (;;) {
-		double now;
+		static int speed_seconds;
+		double now, amiga_start;
 
 		process_input();
 		if (open_menu) {
@@ -970,7 +998,10 @@ void bmamiga_main(void)
 		}
 
 		audio_this_frame = 0;
+		amiga_start = host_time();
 		retro_run();
+		speed_amiga += host_time() - amiga_start;
+		speed_frames++;
 		/* Frames without sound (the Amiga starting): silence instead,
 		   so that the output doesn't run dry. */
 		if (audio_this_frame == 0)
@@ -995,6 +1026,10 @@ void bmamiga_main(void)
 			last_second = now;
 			sync_files();
 			show_network_address();
+			if (++speed_seconds >= 10) {
+				speed_seconds = 0;
+				report_speed(now);
+			}
 		}
 		handle_requests();
 	}

@@ -35,6 +35,11 @@ before Amiberry starts, gives it one block.
 ## Memory and the rest (`posix.c`)
 
 - `mmap()` of anonymous memory is Circle's heap (no virtual memory).
+  Circle's `memalign()` asserts (stopping every core) for alignments over
+  a cache line, 64 bytes, so `mmap()` aligns inside a bigger block, and
+  `posix_memalign()`, which Amiberry uses for each memory bank (aligned to
+  a 4K page), does too, with `free()` wrapped (`--wrap=free` in the
+  Makefile) to free the real block.
   Amiberry reserves 4 GB for the Amiga's memory on 64-bit hosts (for its
   JIT), and tries smaller sizes until one is given: reservations over
   320 MB fail. The JIT is left out (`LIBRETRO_NO_JIT`).

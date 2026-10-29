@@ -40,6 +40,22 @@
   BMAmiga"). The CoCo's own changes are left out, and F11 keeps
   Amiberry's name, Warp
 
+- Before the first test on a Pi, from what BMNeXT's first Pi 5 test found
+  (its commits 5d529c4 and 288ddb9):
+  - Memory aligned to more than 64 bytes no longer comes from Circle's
+    memalign(), which asserts then and stops every core (BMNeXT's black
+    screen): Amiberry's memory banks (aligned to 4K pages by
+    posix_memalign()), mmap()'s 64K and thread-local storage are aligned
+    inside bigger blocks, with free() wrapped to give those back
+  - A crash on any core writes the log out before the Pi stops
+  - The Pi 5 is asked for its full clock, as the Pi 4 is
+  - Only the lines of the picture that changed are drawn and written out
+  - The Pi 5's HDMI sound at the right pitch (its CTS for the firmware's
+    mode)
+  - FatFs fast seek for disk images (patches to Circle and circle-newlib)
+  - Every 10 s the log has the Amiga's speed, the ARM's clock and
+    temperature, and where the time went
+
 BMCoco's history, from which BMAmiga comes, follows.
 
 ## 0.5.5 – 2026-10-20

@@ -70,8 +70,8 @@ include src/port/circle/circle.mk
 
 INCLUDE := $(CIRCLE_STDLIB_INCLUDES) $(INCLUDE) -I $(CIRCLEHOME)/addon/fatfs
 
-# See src/port/fswrap.c
-LDFLAGS += --wrap=stat
+# See src/port/fswrap.c, and posix_memalign() in src/port/circle/posix.c
+LDFLAGS += --wrap=stat --wrap=free
 
 VERSION_DEFINES = -DBMAMIGA_VERSION=\"$(BMAMIGA_VERSION)\" \
                   -DBMAMIGA_GIT=\"$(BMAMIGA_GIT)\" -DAMIBERRY_VERSION=\"$(AMIBERRY_VERSION)\"

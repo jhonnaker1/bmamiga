@@ -2,13 +2,14 @@
  * posix.c - the POSIX functions Amiberry uses that newlib and
  * circle-stdlib don't have, for BMAmiga on Circle.
  *
- *  - Memory: mmap() of anonymous memory is the heap's (Circle's
- *    memalign(), readable, writable and executable; there is no virtual
- *    memory). Amiberry reserves 4 GB for the Amiga's memory on 64-bit
+ *  - Memory: mmap() of anonymous memory is the heap's (readable,
+ *    writable and executable; there is no virtual memory). Amiberry reserves 4 GB for the Amiga's memory on 64-bit
  *    hosts (for its JIT, which BMAmiga doesn't build), then tries smaller
  *    sizes until one is given (osdep/amiberry_mem.cpp): reservations over
  *    MAP_LIMIT fail, so it gets that much, all real. mprotect() does
- *    nothing; munmap() frees a whole mapping.
+ *    nothing; munmap() frees a whole mapping. posix_memalign() with
+ *    more than Circle's memalign() can align (see below), with free()
+ *    wrapped (--wrap=free) to give the right block back.
  *  - Files: access(), pread(), pwrite(); chmod() and chown() do nothing
  *    (FAT has no owners and no modes).
  *  - Text: iconv() between UTF-8 and ISO-8859-1, the conversion Amiberry
@@ -44,17 +45,21 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
-void *memalign(size_t align, size_t size);   /* Circle's */
-
 /* ---- Memory ---------------------------------------------------------------- */
 
+/* Mappings are aligned to 64K, as a desktop's pages are at least. Circle's
+   memalign() can't give that: it asserts that the alignment is at most a
+   cache line (64 bytes), which on the Pi stops every core (BMNeXT's first
+   Pi 5 start was a black screen from this). So a mapping is a block from
+   malloc() 64K bigger, aligned inside it. */
 #define MAP_ALIGN (64 * 1024)
 #define MAP_LIMIT ((size_t) 320 * 1024 * 1024)
 
 #define MAX_MAPPINGS 256
 static struct {
-	void *start;
+	void *start;            /* what mmap() returned, aligned */
 	size_t length;
+	void *block;            /* what malloc() gave */
 } mappings[MAX_MAPPINGS];
 
 void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset)
@@ -88,11 +93,12 @@ void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset)
 		errno = ENOMEM;
 		return MAP_FAILED;
 	}
-	p = memalign(MAP_ALIGN, length);
-	if (p == NULL) {
+	mappings[i].block = malloc(length + MAP_ALIGN);
+	if (mappings[i].block == NULL) {
 		errno = ENOMEM;
 		return MAP_FAILED;
 	}
+	p = (void *) (((uintptr_t) mappings[i].block + MAP_ALIGN - 1) & ~(uintptr_t) (MAP_ALIGN - 1));
 	memset(p, 0, length);
 	mappings[i].start = p;
 	mappings[i].length = length;
@@ -104,8 +110,9 @@ int munmap(void *addr, size_t length)
 	int i;
 	for (i = 0; i < MAX_MAPPINGS; i++)
 		if (mappings[i].start == addr && mappings[i].length == length) {
-			free(addr);
+			free(mappings[i].block);
 			mappings[i].start = NULL;
+			mappings[i].block = NULL;
 			return 0;
 		}
 	/* Part of a mapping (decommitting): kept. */
@@ -142,12 +149,58 @@ int munlock(const void *addr, size_t length)
 	return 0;
 }
 
+/* posix_memalign(): Amiberry aligns each of the Amiga's memory banks to a
+   page (sysconf(_SC_PAGESIZE), 4096 here) and frees them with free(). Up
+   to a cache line (64 bytes, which Circle's malloc() always gives) it is
+   malloc(); more is a bigger block, aligned inside it and noted here, so
+   that free() (wrapped, below) frees the block. A few dozen at most. */
+#define HEAP_ALIGN 64
+#define MAX_ALIGNED 256
+static struct {
+	void *aligned;
+	void *block;
+} aligned_blocks[MAX_ALIGNED];
+static volatile unsigned aligned_count;
+
+void __real_free(void *p);
+
+void __wrap_free(void *p)
+{
+	unsigned i, n = aligned_count;
+	for (i = 0; i < n && p != NULL; i++)
+		if (aligned_blocks[i].aligned == p) {
+			void *block = aligned_blocks[i].block;
+			aligned_blocks[i] = aligned_blocks[n - 1];
+			aligned_count = n - 1;
+			__real_free(block);
+			return;
+		}
+	__real_free(p);
+}
+
 int posix_memalign(void **memptr, size_t alignment, size_t size)
 {
-	void *p = memalign(alignment < 16 ? 16 : alignment, size ? size : 1);
-	if (p == NULL)
+	void *block;
+	if (alignment == 0 || (alignment & (alignment - 1)) != 0)
+		return EINVAL;
+	if (size == 0)
+		size = 1;
+	if (alignment <= HEAP_ALIGN) {
+		block = malloc(size);
+		if (block == NULL)
+			return ENOMEM;
+		*memptr = block;
+		return 0;
+	}
+	if (aligned_count == MAX_ALIGNED)
 		return ENOMEM;
-	*memptr = p;
+	block = malloc(size + alignment);
+	if (block == NULL)
+		return ENOMEM;
+	*memptr = (void *) (((uintptr_t) block + alignment - 1) & ~(uintptr_t) (alignment - 1));
+	aligned_blocks[aligned_count].aligned = *memptr;
+	aligned_blocks[aligned_count].block = block;
+	aligned_count++;
 	return 0;
 }
 

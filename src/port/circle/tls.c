@@ -22,7 +22,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-void *memalign(size_t align, size_t size);   /* Circle's */
 
 extern unsigned char __tdata_start[], __tdata_end[], __tbss_start[], __tbss_end[];
 
@@ -50,8 +49,9 @@ int bma_tls_init(void)
 	for (align = 16; align <= 4096; align *= 2) {
 		/* The header (16 bytes) rounded up to ALIGN, then the data. */
 		size_t offset = align, size = offset + tdata + align + tbss;
-		unsigned char *block = memalign(align, size);
-		if (block == NULL)
+		/* posix.c's: Circle's memalign() asserts past 64 bytes. */
+		unsigned char *block;
+		if (posix_memalign((void **) &block, align, size) != 0)
 			return 0;
 		memset(block, 0, size);
 		memcpy(block + offset, __tdata_start, tdata);
