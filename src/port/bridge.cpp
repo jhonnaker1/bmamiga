@@ -149,6 +149,18 @@ void bmamiga_core_set_cd(const char *path, int builtin)
 	set_config_changed();
 }
 
+/* On a CD32, the joystick port is a CD32 pad (its seven buttons, which
+   CD32 games read as the pad sends them), as Amiberry itself would have
+   it: its libretro core makes it a plain joystick. Called each frame,
+   since the core sets the port again when its options change. */
+void bmamiga_core_cd32_pad(void)
+{
+	if (!currprefs.cs_cd32cd || currprefs.jports[1].mode == JSEM_MODE_JOYSTICK_CD32)
+		return;
+	changed_prefs.jports[1].mode = currprefs.jports[1].mode = JSEM_MODE_JOYSTICK_CD32;
+	inputdevice_updateconfig(&changed_prefs, &currprefs);
+}
+
 /* HARD: as if switched off and on; otherwise the reset keys. */
 void bmamiga_core_reset(int hard)
 {

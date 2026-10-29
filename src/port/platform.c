@@ -46,6 +46,7 @@ int bmamiga_core_insert_floppy(int drive, const char *path);
 void bmamiga_core_eject_floppy(int drive);
 int bmamiga_core_set_hard_drives(const char *const paths[4], const char *const names[4]);
 void bmamiga_core_set_cd(const char *path, int builtin);
+void bmamiga_core_cd32_pad(void);
 void bma_threads_yield(void);   /* circle/threads.c */
 void bmamiga_core_reset(int hard);
 void bmamiga_core_warp(int on);
@@ -660,7 +661,7 @@ static int mouse_dx, mouse_dy, mouse_buttons;
 
 static void core_input_poll(void) {}
 
-/* The joystick (port 2, the core's port 1): the first gamepad, or a GPIO
+/* The joystick in the Amiga's port 2: the first gamepad, or a GPIO
    joystick. A face buttons is fire, as the Amiga's one button; B the
    second (CD32 pads and some games). */
 static int16_t joypad(unsigned id)
@@ -712,7 +713,10 @@ static int16_t core_input_state(unsigned port, unsigned device, unsigned index, 
 		default: return 0;
 		}
 	}
-	if (device == RETRO_DEVICE_JOYPAD && port == 1) {
+	/* The core reads the gamepad of its port 0 (the player's, beside the
+	   mouse) as its joystick 0, which it puts in the Amiga's port 2; its
+	   port 1's pad would be a joystick in no port. */
+	if (device == RETRO_DEVICE_JOYPAD && port == 0) {
 		if (id == RETRO_DEVICE_ID_JOYPAD_MASK) {
 			int16_t mask = 0;
 			unsigned b;
@@ -1129,6 +1133,7 @@ void bmamiga_main(void)
 		   systems'), which take turns with the emulation, run at least
 		   once a frame. */
 		bma_threads_yield();
+		bmamiga_core_cd32_pad();
 		speed_amiga += host_time() - amiga_start;
 		speed_frames++;
 		/* Frames without sound (the Amiga starting): silence instead,

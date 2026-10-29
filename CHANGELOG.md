@@ -89,6 +89,12 @@ The first release: not yet tried on a real Pi.
     a white screen before
   - A floppy put in a drive from BMAmiga stays there after a hard reset
     (the reset put back the empty name disk_eject() had left)
+  - Amiberry's threads that sleep (the CD32's, the CD's audio) no longer
+    stop the whole Pi while they do: they wait while the emulation goes
+    on. A CD32 with a disc ran at half speed
+- The gamepad reaches the Amiga: the core reads its player's pad from its
+  port 0, beside the mouse, not port 1, where BMAmiga gave it. On a CD32
+  it is a CD32 pad, with the pad's own buttons, which CD32 games need
 
 BMCoco's history, from which BMAmiga comes, follows.
 

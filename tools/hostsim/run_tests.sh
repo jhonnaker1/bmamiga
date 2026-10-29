@@ -188,6 +188,12 @@ run warp 50 "$OUT/aros" "" '200 key 0x44 1\n201 key 0x44 0\n400 shot warp.ppm\n4
 check_log warp "BMAmiga: warp on" "F11 turns warp on"
 check_log warp "BMAmiga: warp off" "and off again"
 
+echo "Gamepad"
+# The first gamepad's fire button reaches the core as its player 1 (p1),
+# whose joystick is the one in the Amiga's port 2.
+run gamepad 50 "$OUT/aros" "" '200 pad 0 1\n210 pad 0 0\n300 quit\n'
+check_log gamepad "input p1 b down" "fire reaches the joystick in port 2"
+
 echo "Hard drives and CD"
 # A folder as DH0: and an ISO in the CD drive (uaescsi.device, which
 # Amiberry's file system mounts as CD0:), kept in bmamiga.cfg: mounted by

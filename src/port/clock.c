@@ -38,6 +38,7 @@
 #include "../host.h"
 
 void bma_threads_yield(void);   /* circle/threads.c */
+int bma_threads_sleep(double seconds);
 
 static double offset;       /* Amiberry's time = host_time() + offset */
 double bmamiga_clock_slept; /* seconds Amiberry has slept, for the load */
@@ -113,19 +114,23 @@ int bma_nanosleep(const struct timespec *req, struct timespec *rem)
 		return -1;
 	}
 	us = (double) req->tv_sec * 1e6 + req->tv_nsec / 1e3;
-	/* BMAmiga's threads are cooperative: a sleep lets the others run. */
-	bma_threads_yield();
-	bmamiga_clock_slept += us / 1e6;
-	host_sleep_us(us > 4e9 ? 4000000000u : (unsigned) us);
 	if (rem != NULL) {
 		rem->tv_sec = 0;
 		rem->tv_nsec = 0;
 	}
+	/* BMAmiga's threads are cooperative: a sleep lets the others run. */
+	if (bma_threads_sleep(us / 1e6))
+		return 0;
+	bma_threads_yield();
+	bmamiga_clock_slept += us / 1e6;
+	host_sleep_us(us > 4e9 ? 4000000000u : (unsigned) us);
 	return 0;
 }
 
 int bma_usleep(useconds_t us)
 {
+	if (bma_threads_sleep(us / 1e6))
+		return 0;
 	bma_threads_yield();
 	bmamiga_clock_slept += us / 1e6;
 	host_sleep_us((unsigned) us);

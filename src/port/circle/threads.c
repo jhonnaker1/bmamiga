@@ -516,12 +516,20 @@ static int never(struct thread *t)
 	return 0;
 }
 
-/* A sleep: the others run meanwhile (clock.c's sleeps call this). */
-void bma_threads_sleep(double seconds)
+/* A sleep of SECONDS (clock.c's sleeps call this). One of Amiberry's own
+   threads (the CD32's, the CD's audio, which poll every few milliseconds)
+   waits here until its time is up while the others, the emulation too,
+   go on: sleeping for real would stop the Amiga too (the CD32 ran at half
+   speed). Returns 0 for the emulation's own thread (the libretro core's),
+   which the caller sleeps for real: that is how it keeps time. */
+int bma_threads_sleep(double seconds)
 {
-	if (seconds <= 0.0) {
+	int self = current_index();
+	if (!threads[self].own)
+		return 0;
+	if (seconds <= 0.0)
 		bma_threads_yield();
-		return;
-	}
-	wait_for(current_index(), never, now_seconds() + seconds);
+	else
+		wait_for(self, never, now_seconds() + seconds);
+	return 1;
 }
