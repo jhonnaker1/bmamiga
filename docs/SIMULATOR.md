@@ -16,8 +16,8 @@ other program.
 
 ## What it can and can't show
 
-The simulator runs the Amiga emulation, the menu, floppy disks, models,
-warp, and BMAmiga's pacing and sound logic. A problem in any of those
+The simulator runs the Amiga emulation, the menu, floppy disks, hard
+drives and CDs, models, warp, and BMAmiga's pacing and sound logic. A problem in any of those
 usually shows up in it too.
 
 It does **not** run the Pi side: the Circle kernel, the Pi's display and
@@ -43,7 +43,7 @@ No Raspberry Pi toolchain is needed for the simulator.
 Get the source, with Amiberry (a git submodule, with its own libco):
 
 ```
-git clone <BMAmiga repository URL>
+git clone https://github.com/jhonnaker1/bmamiga.git
 cd bmamiga
 git submodule update --init --recursive third_party/amiberry
 ```

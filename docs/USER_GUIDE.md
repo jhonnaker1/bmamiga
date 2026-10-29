@@ -18,7 +18,7 @@ be switched off at any time.
 | `cmdline.txt`    | BMAmiga's options (see Options)                             |
 | `bmamiga.cfg`    | Settings changed in the menu (written by BMAmiga)           |
 | `roms/`          | The Kickstart ROMs: you supply them (see Kickstart ROMs)    |
-| `disks/`         | For your floppy images (any folder works)                   |
+| `disks/`         | For your floppy, hard disk and CD images (any folder works) |
 | `saves/`         | What Amiberry saves                                         |
 | `firmware/`      | Wi-Fi firmware                                              |
 
@@ -50,6 +50,7 @@ item. In a list, typing a letter jumps to the next item starting with it.
 | Item           | What it does |
 |----------------|--------------|
 | Floppy Drives  | Insert a floppy image in DF0: to DF3:, or eject one (see Floppy disks) |
+| Hard Drives and CD | Hard disk images or folders as DH0: to DH3:, and a CD image (see Hard drives and CD) |
 | Model          | Amiga 500 (Kickstart 1.3 or 1.2), 500+, 600, 1200 (2 MB, or with 8 MB Fast RAM), 4000/030, 4000/040, CD32, CDTV. Takes effect after a reboot |
 | Warp (F11)     | Run as fast as the Pi can, for loading and long waits; F11 turns it on and off |
 | Reset, Hard Reset | The Amiga's reset (as Ctrl+Amiga+Amiga), or power off and on |
@@ -75,6 +76,49 @@ and put back in at the next start.
 
 From the web UI, clicking a floppy image puts it in DF0: and resets the
 Amiga, to start a game or a boot disk from a browser.
+
+## Hard drives and CD
+
+*Hard Drives and CD* shows DH0: to DH3: and the CD drive.
+
+A hard drive is either:
+
+- **A hard disk image** (*Hard Disk Image...*): `.hdf`, or `.hdz`
+  (compressed). Images with a Rigid Disk Block (made with HDToolBox, or
+  Amiga Forever's `workbench-311.hdf` and the like) have their own
+  partitions and names; others are one partition.
+- **A folder on the card** (*Folder...*): browse into the folder and
+  choose *Use This Folder*. The Amiga sees it as a disk named after the
+  folder, and can read and write it: files the Amiga saves there are
+  ordinary files on the card, which a PC can read too. Amiberry keeps
+  what a PC's FAT file system can't (the Amiga's protection bits, dates
+  and comments) in small `.uaem` files beside them; leave those where
+  they are.
+
+A change to the hard drives takes effect at a **Hard Reset**, which the
+menu offers. The Amiga boots from DH0: when DF0: is empty; a floppy in
+DF0: comes first. Amiga Forever's `workbench-135.hdf` (with Kickstart 1.3)
+and `workbench-311.hdf` (with Kickstart 3.1 on an Amiga 1200) both boot
+as DH0:.
+
+The **CD** drive takes `.iso`, `.cue` (with its `.bin`), `.ccd`, `.nrg`,
+`.mds` and `.chd` images:
+
+- On a **CD32** or **CDTV** it is the console's own drive, and a disc put
+  in is used at once.
+- On the **other Amigas** it is a CD drive on Amiberry's SCSI device
+  (`uaescsi.device`, unit 0), which Amiberry mounts as **CD0:**, a
+  read-only volume named as the disc is, so the Amiga needs no CD file
+  system of its own. The first disc needs a Hard Reset (the menu offers
+  one); after that discs can be changed as the Amiga runs. Software that
+  talks to the drive itself (a CD player, or another CD file system) can
+  use `uaescsi.device` unit 0.
+
+The drives are remembered in `bmamiga.cfg` (`dh0` to `dh3`, `cd0`) and
+mounted when BMAmiga starts.
+
+From the web UI, clicking a hard disk image starts the Amiga from it as
+DH0:, and clicking a CD image starts it with that disc in the CD drive.
 
 ## Keyboard
 
@@ -163,8 +207,9 @@ The web UI has:
   off, then on again to restart; a Pi 400 switches itself off, and its
   power key starts it again), and **Disable Web UI** until the next reboot.
 - **Files**: browse the SD card; upload (or drag and drop) files into a
-  folder, download, rename, delete, and create folders. Clicking a floppy
-  image **starts it**: it goes in DF0: and the Amiga is reset.
+  folder, download, rename, delete, and create folders. Clicking a floppy,
+  hard disk or CD image **starts it**: it goes in DF0:, DH0: or the CD
+  drive, and the Amiga is reset.
   `cmdline.txt`, `config.txt`, `bmamiga.cfg` and `wpa_supplicant.conf` can
   be **edited** in the browser; changes take effect after a reboot, and
   the previous version is kept as `.bak`.
@@ -195,6 +240,8 @@ the web UI.
 |---------------------|------------------------------|----------|--------------|
 | `model`             | `A500`, `A500OG`, `A500+`, `A600`, `A1200OG`, `A1200`, `A4030`, `A4040`, `CD32`, `CDTV` | `A500` | The Amiga to emulate (the menu's *Model*) |
 | `df0` ... `df3`     | paths                        | none     | The floppy images in the drives (the menu's *Floppy Drives*) |
+| `dh0` ... `dh3`     | paths                        | none     | The hard drives: hard disk images or folders (the menu's *Hard Drives and CD*) |
+| `cd0`               | path                         | none     | The CD image in the CD drive |
 | `video_standard`    | `auto`, `pal`, `ntsc`        | `auto`   | The Amiga's video standard |
 | `statusline`        | `0`, `1`                     | `0`      | Amiberry's status line: drive lights and speed |
 | `aspect`            | number                       | `1.0`    | Multiplies the width of the picture |

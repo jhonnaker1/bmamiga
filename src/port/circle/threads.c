@@ -372,6 +372,10 @@ int bma_object_trylock(const void *object)
 	return 1;
 }
 
+/* Set when a thread waiting on a condition has been notified: it runs as
+   soon as the notifier lets go of its lock (below). */
+static int wake_pending;
+
 void bma_object_unlock(const void *object)
 {
 	struct object *o = find(object, 0);
@@ -380,6 +384,16 @@ void bma_object_unlock(const void *object)
 	if (--o->count <= 0) {
 		o->owner = 0;
 		o->count = 0;
+		/* A thread was woken (a semaphore posted: a lock, a notify, an
+		   unlock, as pthreads have it): it runs now, until it waits
+		   again, rather than whenever this one next waits or sleeps,
+		   which the emulation may not do for a long time (Amiberry's
+		   hard drive thread answered nothing while the Amiga waited for
+		   it). So a request handed to a thread is answered at once. */
+		if (wake_pending) {
+			wake_pending = 0;
+			switch_away(current_index());
+		}
 	}
 }
 
@@ -418,8 +432,12 @@ int bma_object_wait(const void *condition, const void *lock, long long ms)
 void bma_object_notify(const void *condition, int all)
 {
 	struct object *c = find(condition, 1);
+	int i;
 	(void) all;                 /* every waiter wakes: spurious wakeups are allowed */
 	c->generation++;
+	for (i = 0; i < MAX_THREADS; i++)
+		if (threads[i].used && threads[i].ready == notified && threads[i].wait_object == condition)
+			wake_pending = 1;
 }
 
 int pthread_mutex_init(pthread_mutex_t *mutex, const pthread_mutexattr_t *attr)

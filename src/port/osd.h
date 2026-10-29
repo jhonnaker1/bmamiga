@@ -87,6 +87,9 @@ int osd_confirm(const char *title, const char *question);
    are listed; NULL lists everything. Returns 1 with the path in PATH. */
 int osd_browse(const char *title, char *dir, size_t dir_size,
                const char *const exts[], char *path, size_t path_size);
+/* As osd_browse(), for a folder: "Use This Folder" chooses the one shown,
+   and only folders are listed. Returns 1 with its path in PATH. */
+int osd_browse_dir(const char *title, char *dir, size_t dir_size, char *path, size_t path_size);
 
 /* Draws a one line message over the emulator's picture, for a few seconds. */
 void osd_notify(const char *text);

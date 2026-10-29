@@ -40,7 +40,7 @@ is kept in `third_party/nlohmann-json`.
 ## Downloading the files
 
 ```
-git clone --recursive <BMAmiga repository URL>
+git clone --recursive https://github.com/jhonnaker1/bmamiga.git
 ```
 
 or, in an existing clone, `git submodule update --init --recursive`.
@@ -103,8 +103,8 @@ what Amiberry needs on Circle.
 simulated display, sound and input in place of the Raspberry Pi. It runs
 scripted tests: booting AROS, the display lock and timer pacing, a Pi too
 slow for the frame lock (`BMAMIGA_SIM_FRAME_MS` makes each frame take
-that long), the menu, floppy disks, models, warp, and checking the sound
-stays in step with the display. The first build compiles Amiberry, which
+that long), the menu, floppy disks, hard drives and CD images, models,
+warp, and checking the sound stays in step with the display. The first build compiles Amiberry, which
 takes a few minutes.
 
 ```
@@ -116,7 +116,7 @@ Kickstart ROMs can't be distributed, so the tests start the Amiga with
 AROS. With `BMAMIGA_ROMS` set to a folder holding a Kickstart 1.3 (as
 `kick13.rom`, or Amiga Forever's `amiga-os-130.rom` with its `rom.key`)
 and `BMAMIGA_WORKBENCH` to a Workbench 1.3 disk, they boot Workbench, type
-at its CLI and move the mouse too. Screenshots (`.ppm`) are written to
+at its CLI, move the mouse and write to a folder on the card as DH0: too. Screenshots (`.ppm`) are written to
 `tools/hostsim/out/`.
 
 To play with the port on the PC, run it live:
@@ -150,8 +150,8 @@ tools/pi4scaler/run_tests.sh
 tools/pi4kms/run_tests.sh
 ```
 
-`build_sdcard.sh` runs all three first and stops if any test fails;
-`--skip-tests` leaves them out.
+`build_sdcard.sh` runs all three first (the simulator's on macOS only)
+and stops if any test fails; `--skip-tests` leaves them out.
 
 ## The web UI
 

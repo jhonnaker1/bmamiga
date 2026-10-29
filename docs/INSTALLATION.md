@@ -12,7 +12,7 @@
 
 ## Prepare the SD card
 
-1. Download `bmamiga-v<version>.zip` from the releases page, or build it
+1. Download `bmamiga-v<version>.zip` from the [releases page](https://github.com/jhonnaker1/bmamiga/releases), or build it
    yourself (see [BUILDING.md](BUILDING.md)) and use `build/sdcard/`.
 2. Format the SD card as FAT32.
 3. Extract the zip to the root of the card, so that the kernels

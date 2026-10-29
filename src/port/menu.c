@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "../host.h"
 #include "bmamiga.h"
@@ -468,7 +469,7 @@ static const char *base_name(const char *path)
    last disk came from. */
 static char browse_dir[512];
 
-static int browse(const char *title, char *path, size_t size)
+static void start_browsing(void)
 {
 	if (browse_dir[0] == '\0') {
 		const char *root = bmamiga_sd_root();
@@ -476,7 +477,18 @@ static int browse(const char *title, char *path, size_t size)
 		snprintf(browse_dir, sizeof browse_dir, "%s%sdisks", root,
 		         len > 0 && root[len - 1] == '/' ? "" : "/");
 	}
-	return osd_browse(title, browse_dir, sizeof browse_dir, floppy_exts, path, size);
+}
+
+static int browse(const char *title, char *path, size_t size, const char *const exts[])
+{
+	start_browsing();
+	return osd_browse(title, browse_dir, sizeof browse_dir, exts, path, size);
+}
+
+static int browse_folder(const char *title, char *path, size_t size)
+{
+	start_browsing();
+	return osd_browse_dir(title, browse_dir, sizeof browse_dir, path, size);
 }
 
 static void floppy_menu(void)
@@ -509,12 +521,99 @@ static void floppy_menu(void)
 				continue;
 			}
 		}
-		if (browse(labels[d], path, sizeof path)) {
+		if (browse(labels[d], path, sizeof path, floppy_exts)) {
 			if (!bmamiga_insert_floppy(d, path))
 				osd_message("That disk can't be used.", TRUE);
 			else if (d == 0)
 				return;   /* back to the Amiga, which reads it */
 		}
+	}
+}
+
+/* ---- Hard drives and the CD ------------------------------------------------ */
+
+static const char *const hdf_exts[] = {"hdf", "hdz", NULL};
+static const char *const cd_exts[] = {"iso", "cue", "ccd", "nrg", "mds", "chd", NULL};
+
+/* After a change the Amiga needs: a hard reset now, if wanted. Returns
+   TRUE if it was reset (back to the Amiga). */
+static int offer_hard_reset(void)
+{
+	if (!osd_confirm("Hard Reset", "Hard reset the Amiga now to use it?"))
+		return FALSE;
+	bmamiga_hard_reset();
+	return TRUE;
+}
+
+/* DH0: to DH3: (a hard disk image, or a folder on the card, which the
+   Amiga sees as a volume of its name) and the CD drive. */
+static int hard_drive_menu(void)
+{
+	static char names[BMAMIGA_HARD_DRIVES + 1][48];
+	static const char *const labels[BMAMIGA_HARD_DRIVES] = {"DH0:", "DH1:", "DH2:", "DH3:"};
+	enum { H_CD = BMAMIGA_HARD_DRIVES };
+	int sel = 0;
+	for (;;) {
+		struct osd_item items[BMAMIGA_HARD_DRIVES + 6];
+		int n = 0, d, chosen, i;
+		char path[512];
+		const char *cd = bmamiga_cd();
+		for (d = 0; d < BMAMIGA_HARD_DRIVES; d++) {
+			const char *drive = bmamiga_hard_drive(d);
+			struct stat st;
+			if (drive == NULL)
+				snprintf(names[d], sizeof names[d], "(none)");
+			else if (stat(drive, &st) == 0 && S_ISDIR(st.st_mode))
+				snprintf(names[d], sizeof names[d], "%s/", base_name(drive));
+			else
+				snprintf(names[d], sizeof names[d], "%s", base_name(drive));
+			items[n++] = (struct osd_item){labels[d], names[d], OSD_ITEM_SUBMENU, d};
+		}
+		snprintf(names[H_CD], sizeof names[H_CD], "%s", cd ? base_name(cd) : "(empty)");
+		items[n++] = (struct osd_item){"CD", names[H_CD], OSD_ITEM_SUBMENU, H_CD};
+		items[n++] = (struct osd_item){"", NULL, OSD_ITEM_LABEL, -1};
+		items[n++] = (struct osd_item){"A hard drive is an HDF image or a", NULL, OSD_ITEM_LABEL, -1};
+		items[n++] = (struct osd_item){"folder; it is used from a Hard Reset.", NULL, OSD_ITEM_LABEL, -1};
+		chosen = osd_menu("Hard Drives and CD", items, n, &sel);
+		if (chosen < 0)
+			return FALSE;
+		if (chosen == H_CD) {
+			static const char *const cd_choices[] = {"Insert CD Image...", "Eject", NULL};
+			int was_empty = cd == NULL;
+			i = cd ? osd_choose("CD", cd_choices, 0) : 0;
+			if (i < 0)
+				continue;
+			if (i == 1) {
+				bmamiga_set_cd(NULL);
+				continue;
+			}
+			if (!browse("CD", path, sizeof path, cd_exts))
+				continue;
+			bmamiga_set_cd(path);
+			/* A CD32's or CDTV's drive takes it at once; the other Amigas'
+			   CD drive (uaescsi.device) is there from a hard reset, after
+			   which discs can be changed as the Amiga runs. */
+			if (!bmamiga_model_has_cd() && was_empty && offer_hard_reset())
+				return TRUE;
+			continue;
+		}
+		d = chosen;
+		{
+			static const char *const choices[] = {"Hard Disk Image...", "Folder...", "Remove", NULL};
+			static const char *const new_choices[] = {"Hard Disk Image...", "Folder...", NULL};
+			i = osd_choose(labels[d], bmamiga_hard_drive(d) ? choices : new_choices, 0);
+		}
+		if (i < 0)
+			continue;
+		if (i == 2)
+			bmamiga_set_hard_drive(d, NULL);
+		else if (i == 0 ? browse(labels[d], path, sizeof path, hdf_exts)
+		                : browse_folder(labels[d], path, sizeof path))
+			bmamiga_set_hard_drive(d, path);
+		else
+			continue;
+		if (offer_hard_reset())
+			return TRUE;
 	}
 }
 
@@ -538,7 +637,7 @@ static void model_menu(void)
 
 void bmamiga_menu(void)
 {
-	enum { M_FLOPPY, M_MODEL, M_WARP, M_RESET, M_HARD_RESET, M_VIDEO, M_SOUND, M_NETWORK,
+	enum { M_FLOPPY, M_HARD_DRIVES, M_MODEL, M_WARP, M_RESET, M_HARD_RESET, M_VIDEO, M_SOUND, M_NETWORK,
 	       M_ABOUT, M_REBOOT, M_OFF };
 	static int sel = 0;
 	char title[48];
@@ -549,6 +648,7 @@ void bmamiga_menu(void)
 	for (;;) {
 		struct osd_item items[] = {
 			{"Floppy Drives", NULL, OSD_ITEM_SUBMENU, M_FLOPPY},
+			{"Hard Drives and CD", NULL, OSD_ITEM_SUBMENU, M_HARD_DRIVES},
 			{"Model (reboot)", bmamiga_model_id(bmamiga_model()), OSD_ITEM_SUBMENU, M_MODEL},
 			{"Warp (F11)", NULL, check(bmamiga_warp()), M_WARP},
 			{"Reset", NULL, 0, M_RESET},
@@ -569,6 +669,9 @@ void bmamiga_menu(void)
 		case M_FLOPPY:
 			floppy_menu();
 			leave = TRUE;
+			break;
+		case M_HARD_DRIVES:
+			leave = hard_drive_menu();
 			break;
 		case M_MODEL: model_menu(); break;
 		case M_WARP: bmamiga_set_warp(!bmamiga_warp()); leave = TRUE; break;

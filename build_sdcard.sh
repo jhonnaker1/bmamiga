@@ -151,7 +151,13 @@ then
             exit 1
         fi
     }
-    run_tests "$SRC_DIR/tools/hostsim/run_tests.sh"
+    # The simulator builds on macOS only (docs/SIMULATOR.md).
+    if [ "$(uname -s)" = Darwin ]
+    then
+        run_tests "$SRC_DIR/tools/hostsim/run_tests.sh"
+    else
+        echo "Skipping tools/hostsim: the simulator builds on macOS only."
+    fi
     run_tests "$SRC_DIR/tools/pi4kms/run_tests.sh"
     run_tests "$SRC_DIR/tools/pi4scaler/run_tests.sh"
 fi

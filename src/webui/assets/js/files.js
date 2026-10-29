@@ -56,8 +56,14 @@ function isRunnable(name) {
   return canRun(extOf(name));
 }
 
-// A floppy image goes in DF0: and the Amiga is reset.
-const runVerb = (name) => "Start in DF0:";
+// A floppy image goes in DF0:, a hard disk image is DH0:, a CD image goes
+// in the CD drive; then the Amiga is reset.
+const runVerb = (name) => {
+  const ext = extOf(name);
+  if (["hdf", "hdz"].includes(ext)) return "Start as DH0:";
+  if (["iso", "cue", "ccd", "nrg", "mds", "chd"].includes(ext)) return "Start from CD";
+  return "Start in DF0:";
+};
 
 function fileIcon(name, isDir) {
   if (isDir) return "▸";

@@ -741,8 +741,10 @@ static void free_entries(struct entry *list, int n)
 	free(list);
 }
 
-int osd_browse(const char *title, char *dir, size_t dir_size,
-               const char *const exts[], char *path, size_t path_size)
+/* osd_browse(), and osd_browse_dir() with PICK_DIR: "Use This Folder" at
+   the top chooses the folder shown. */
+static int browse(const char *title, char *dir, size_t dir_size,
+                  const char *const exts[], char *path, size_t path_size, int pick_dir)
 {
 	char came_from[256] = "";
 
@@ -763,8 +765,9 @@ int osd_browse(const char *title, char *dir, size_t dir_size,
 			return 0;
 		}
 
-		/* The directory, then "..", then the entries. */
-		items = calloc(n + 2, sizeof(*items));
+		/* The directory, ("Use This Folder"), "..", then the entries. */
+		int first = pick_dir ? 3 : 2;
+		items = calloc(n + first, sizeof(*items));
 		if (items == NULL) {
 			free_entries(list, n);
 			return 0;
@@ -773,25 +776,36 @@ int osd_browse(const char *title, char *dir, size_t dir_size,
 		items[0].text = heading;
 		items[0].flags = OSD_ITEM_LABEL;
 		items[0].id = -2;
-		items[1].text = "..";
-		items[1].value = "<DIR>";
-		items[1].id = -3;
-		for (i = 0; i < n; i++) {
-			items[i + 2].text = list[i].name;
-			items[i + 2].value = list[i].is_dir ? "<DIR>" : NULL;
-			items[i + 2].id = i;
-			if (came_from[0] != '\0' && strcmp(list[i].name, came_from) == 0)
-				sel = i + 2;
+		if (pick_dir) {
+			items[1].text = "Use This Folder";
+			items[1].id = -4;
 		}
-		if (n > 0 && came_from[0] == '\0')
+		items[first - 1].text = "..";
+		items[first - 1].value = "<DIR>";
+		items[first - 1].id = -3;
+		for (i = 0; i < n; i++) {
+			items[i + first].text = list[i].name;
+			items[i + first].value = list[i].is_dir ? "<DIR>" : NULL;
+			items[i + first].id = i;
+			if (came_from[0] != '\0' && strcmp(list[i].name, came_from) == 0)
+				sel = i + first;
+		}
+		if (pick_dir)
+			sel = came_from[0] != '\0' ? sel : 1;
+		else if (n > 0 && came_from[0] == '\0')
 			sel = 2;
 
-		chosen = osd_menu(title, items, n + 2, &sel);
+		chosen = osd_menu(title, items, n + first, &sel);
 		free(items);
 
 		if (chosen == -1) {
 			free_entries(list, n);
 			return 0;
+		}
+		if (chosen == -4) {
+			snprintf(path, path_size, "%s", dir);
+			free_entries(list, n);
+			return 1;
 		}
 		if (chosen == -3) {
 			char *slash;
@@ -820,6 +834,18 @@ int osd_browse(const char *title, char *dir, size_t dir_size,
 		free_entries(list, n);
 		return 1;
 	}
+}
+
+int osd_browse(const char *title, char *dir, size_t dir_size,
+               const char *const exts[], char *path, size_t path_size)
+{
+	return browse(title, dir, dir_size, exts, path, path_size, FALSE);
+}
+
+int osd_browse_dir(const char *title, char *dir, size_t dir_size, char *path, size_t path_size)
+{
+	static const char *const none[] = {NULL};
+	return browse(title, dir, dir_size, none, path, path_size, TRUE);
 }
 
 /* ---- Notifications ------------------------------------------------------------ */

@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.1.0 – 2026-10-29
+
+The first release: not yet tried on a real Pi.
 
 - BMAmiga starts, from BMCoco: Amiberry (its libretro core) in place of
   XRoar, running in the PC simulator. AROS without Kickstart ROMs, or
@@ -71,6 +73,22 @@
 - The web UI in Workbench 1.3's colours: its blue, white and orange, the
   boing ball's red, and the Amiga logo's rainbow, in place of the CoCo's
   green
+
+- Hard drives and CD (the menu's *Hard Drives and CD*): DH0: to DH3:, each
+  an HDF image (with or without a Rigid Disk Block) or a folder on the
+  card, which the Amiga sees as a volume of its name and can write to;
+  and a CD image (ISO, CUE, CCD, NRG, MDS, CHD) in the CD32's or CDTV's
+  own drive, or on the other Amigas in uaescsi.device's unit 0, which
+  Amiberry's file system mounts as CD0: with no CD file system needed on
+  the Amiga. Kept in bmamiga.cfg (dh0 to dh3, cd0), and mounted by a hard
+  reset as the Amiga starts. The web UI starts HDF images as DH0: and CD
+  images in the CD drive
+  - Amiberry's other threads (the hard drives', the file system's) run:
+    a thread waiting on a mutex or condition is switched to when it is
+    released, and every thread gets a turn each frame. HDF images hung at
+    a white screen before
+  - A floppy put in a drive from BMAmiga stays there after a hard reset
+    (the reset put back the empty name disk_eject() had left)
 
 BMCoco's history, from which BMAmiga comes, follows.
 

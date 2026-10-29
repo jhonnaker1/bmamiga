@@ -32,6 +32,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <unistd.h>
 
 #include "libretro.h"
@@ -43,6 +44,9 @@
 /* bridge.cpp */
 int bmamiga_core_insert_floppy(int drive, const char *path);
 void bmamiga_core_eject_floppy(int drive);
+int bmamiga_core_set_hard_drives(const char *const paths[4], const char *const names[4]);
+void bmamiga_core_set_cd(const char *path, int builtin);
+void bma_threads_yield(void);   /* circle/threads.c */
 void bmamiga_core_reset(int hard);
 void bmamiga_core_warp(int on);
 double bmamiga_core_frame_rate(void);
@@ -544,16 +548,107 @@ void bmamiga_eject_floppy(int drive)
 		bmamiga_core_eject_floppy(drive);
 }
 
-/* The disks kept in bmamiga.cfg, put in once the Amiga is running. */
-static void insert_saved_floppies(void)
+/* ---- Hard drives and the CD -------------------------------------------- */
+
+/* DH0: to DH3: and the CD, kept in bmamiga.cfg (dh0 to dh3, cd0). */
+static char hard_drive[BMAMIGA_HARD_DRIVES][512];
+static char cd_image[512];
+
+const char *bmamiga_hard_drive(int drive)
 {
-	int d;
+	if (drive < 0 || drive >= BMAMIGA_HARD_DRIVES || hard_drive[drive][0] == '\0')
+		return NULL;
+	return hard_drive[drive];
+}
+
+const char *bmamiga_cd(void)
+{
+	return cd_image[0] != '\0' ? cd_image : NULL;
+}
+
+int bmamiga_model_has_cd(void)
+{
+	const char *id = bmamiga_model_id(bmamiga_model());
+	return strncmp(id, "CD32", 4) == 0 || strcmp(id, "CDTV") == 0;
+}
+
+/* The Amiga's name for a folder: its own name, without what a volume name
+   can't have (':' and '/', and ',' in Amiberry's configuration line). */
+static void volume_name(char *out, size_t size, const char *path)
+{
+	const char *slash = strrchr(path, '/');
+	size_t n = 0;
+	const char *p = slash != NULL && slash[1] != '\0' ? slash + 1 : path;
+	for (; *p != '\0' && n + 1 < size; p++)
+		if (*p != ':' && *p != '/' && *p != ',' && *p != '"')
+			out[n++] = *p;
+	out[n] = '\0';
+	if (n == 0)
+		snprintf(out, size, "Work");
+}
+
+/* Gives Amiberry the hard drives (mounted at the next hard reset). */
+static int apply_hard_drives(void)
+{
+	char names[BMAMIGA_HARD_DRIVES][32];
+	const char *paths[BMAMIGA_HARD_DRIVES], *name_ptrs[BMAMIGA_HARD_DRIVES];
+	int d, n;
+	for (d = 0; d < BMAMIGA_HARD_DRIVES; d++) {
+		paths[d] = hard_drive[d][0] != '\0' ? hard_drive[d] : NULL;
+		volume_name(names[d], sizeof names[d], hard_drive[d]);
+		name_ptrs[d] = names[d];
+	}
+	n = bmamiga_core_set_hard_drives(paths, name_ptrs);
+	for (d = 0; d < BMAMIGA_HARD_DRIVES; d++)
+		if (paths[d] != NULL)
+			LOG("DH%d: %s\n", d, paths[d]);
+	return n;
+}
+
+void bmamiga_set_hard_drive(int drive, const char *path)
+{
+	char key[8];
+	if (drive < 0 || drive >= BMAMIGA_HARD_DRIVES)
+		return;
+	snprintf(hard_drive[drive], sizeof hard_drive[drive], "%s", path ? path : "");
+	snprintf(key, sizeof key, "dh%d", drive);
+	save_setting(key, hard_drive[drive]);
+	if (core_running)
+		apply_hard_drives();
+}
+
+void bmamiga_set_cd(const char *path)
+{
+	snprintf(cd_image, sizeof cd_image, "%s", path ? path : "");
+	save_setting("cd0", cd_image);
+	if (core_running) {
+		bmamiga_core_set_cd(cd_image, bmamiga_model_has_cd());
+		if (cd_image[0] != '\0')
+			LOG("CD: %s\n", cd_image);
+	}
+}
+
+/* The disks kept in bmamiga.cfg, put in once the Amiga is running: the
+   floppies, and a CD32's or CDTV's disc, at once; the hard drives and
+   another Amiga's CD with a hard reset, from which the Amiga starts with
+   them (it has run only a frame). */
+static void insert_saved_media(void)
+{
+	int d, drives;
 	for (d = 0; d < BMAMIGA_FLOPPIES; d++) {
 		if (floppy[d][0] != '\0' && access(floppy[d], R_OK) == 0) {
 			bmamiga_core_insert_floppy(d, floppy[d]);
 			LOG("DF%d: %s\n", d, floppy[d]);
 		}
 	}
+	drives = apply_hard_drives();
+	if (cd_image[0] != '\0') {
+		bmamiga_core_set_cd(cd_image, bmamiga_model_has_cd());
+		LOG("CD: %s\n", cd_image);
+	}
+	/* A CD32's or CDTV's own drive takes a disc as it runs. */
+	if (drives > 0 || (cd_image[0] != '\0' && !bmamiga_model_has_cd()))
+		bmamiga_hard_reset();
 }
 
 /* ---- Input -------------------------------------------------------------------- */
@@ -846,10 +941,34 @@ int bmamiga_pending_requests(void)
 
 static void handle_requests(void)
 {
+	/* A CD32's or CDTV's disc goes in after its hard reset: Amiberry
+	   takes a few seconds to change a disc, and a reset meanwhile loses
+	   it. */
+	static char cd_after_reset[512];
+	if (cd_after_reset[0] != '\0') {
+		bmamiga_set_cd(cd_after_reset);
+		cd_after_reset[0] = '\0';
+	}
 	if (request_autostart) {
 		request_autostart = FALSE;
+		const char *dot = strrchr(autostart_path, '.');
+		const char *ext = dot != NULL ? dot + 1 : "";
 		LOG("web UI: starting %s\n", autostart_path);
-		bmamiga_insert_floppy(0, autostart_path);
+		/* A hard disk image as DH0:, a CD image in the CD drive, a
+		   floppy in DF0:; then the Amiga starts from it. */
+		if (strcasecmp(ext, "hdf") == 0 || strcasecmp(ext, "hdz") == 0)
+			bmamiga_set_hard_drive(0, autostart_path);
+		else if (strcasecmp(ext, "iso") == 0 || strcasecmp(ext, "cue") == 0
+		         || strcasecmp(ext, "ccd") == 0 || strcasecmp(ext, "nrg") == 0
+		         || strcasecmp(ext, "mds") == 0 || strcasecmp(ext, "chd") == 0) {
+			if (bmamiga_model_has_cd()) {
+				bmamiga_set_cd(NULL);
+				snprintf(cd_after_reset, sizeof(cd_after_reset), "%s", autostart_path);
+			} else {
+				bmamiga_set_cd(autostart_path);
+			}
+		} else
+			bmamiga_insert_floppy(0, autostart_path);
 		bmamiga_hard_reset();
 	}
 	if (request_coldstart) {
@@ -963,6 +1082,12 @@ void bmamiga_main(void)
 		snprintf(key, sizeof key, "df%d", d);
 		snprintf(floppy[d], sizeof floppy[d], "%s", host_option(key, ""));
 	}
+	for (d = 0; d < BMAMIGA_HARD_DRIVES; d++) {
+		char key[8];
+		snprintf(key, sizeof key, "dh%d", d);
+		snprintf(hard_drive[d], sizeof hard_drive[d], "%s", host_option(key, ""));
+	}
+	snprintf(cd_image, sizeof cd_image, "%s", host_option("cd0", ""));
 
 	retro_set_environment(core_environment);
 	retro_set_video_refresh(core_video);
@@ -1000,6 +1125,10 @@ void bmamiga_main(void)
 		audio_this_frame = 0;
 		amiga_start = host_time();
 		retro_run();
+		/* Amiberry's other threads (the hard drives', the file
+		   systems'), which take turns with the emulation, run at least
+		   once a frame. */
+		bma_threads_yield();
 		speed_amiga += host_time() - amiga_start;
 		speed_frames++;
 		/* Frames without sound (the Amiga starting): silence instead,
@@ -1008,7 +1137,7 @@ void bmamiga_main(void)
 			feed_silence();
 		if (!core_running) {
 			core_running = TRUE;
-			insert_saved_floppies();
+			insert_saved_media();
 		}
 		follow_frame_rate();
 

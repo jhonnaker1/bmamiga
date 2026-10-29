@@ -70,6 +70,16 @@ const char *bmamiga_machine_description(void);
 const char *bmamiga_floppy(int drive);
 int bmamiga_insert_floppy(int drive, const char *path);
 void bmamiga_eject_floppy(int drive);
+/* Hard drives DH0: to DH3:: a disk image (HDF) or a folder (NULL: none).
+   A change takes effect at the next hard reset. */
+#define BMAMIGA_HARD_DRIVES 4
+const char *bmamiga_hard_drive(int drive);
+void bmamiga_set_hard_drive(int drive, const char *path);
+/* The CD drive's image (NULL: none). */
+const char *bmamiga_cd(void);
+void bmamiga_set_cd(const char *path);
+/* True if the model has a CD drive of its own (CD32, CDTV). */
+int bmamiga_model_has_cd(void);
 /* Resets: the reset key combination (Ctrl+Amiga+Amiga), or switching the
    Amiga off and on. */
 void bmamiga_reset(void);

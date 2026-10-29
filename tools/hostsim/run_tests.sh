@@ -170,9 +170,10 @@ else
 fi
 
 echo "Model"
-# Menu, down to Model, Enter, down two (Amiga 500+): kept for the next
-# boot, which then starts that model.
-run model 50 "$OUT/aros" "" '200 key 0x45 1\n201 key 0x45 0\n220 key 0x51 1\n221 key 0x51 0\n240 key 0x28 1\n241 key 0x28 0\n260 key 0x51 1\n261 key 0x51 0\n270 key 0x51 1\n271 key 0x51 0\n280 key 0x28 1\n281 key 0x28 0\n300 quit\n'
+# Menu, down to Model (past Floppy Drives and Hard Drives and CD), Enter,
+# down two (Amiga 500+): kept for the next boot, which then starts that
+# model.
+run model 50 "$OUT/aros" "" '200 key 0x45 1\n201 key 0x45 0\n220 key 0x51 1\n221 key 0x51 0\n230 key 0x51 1\n231 key 0x51 0\n240 key 0x28 1\n241 key 0x28 0\n260 key 0x51 1\n261 key 0x51 0\n270 key 0x51 1\n271 key 0x51 0\n280 key 0x28 1\n281 key 0x28 0\n300 quit\n'
 check_cfg model "^model=A500\+" "Amiga 500+ kept in bmamiga.cfg"
 (cd "$OUT/model" && printf '100 quit\n' | BMAMIGA_REFRESH=50 BMAMIGA_CMDLINE="root=." \
     perl -e 'alarm 300; exec @ARGV' "$SIM" > log2.txt 2>&1)
@@ -186,6 +187,21 @@ echo "Warp"
 run warp 50 "$OUT/aros" "" '200 key 0x44 1\n201 key 0x44 0\n400 shot warp.ppm\n401 key 0x44 1\n402 key 0x44 0\n600 quit\n'
 check_log warp "BMAmiga: warp on" "F11 turns warp on"
 check_log warp "BMAmiga: warp off" "and off again"
+
+echo "Hard drives and CD"
+# A folder as DH0: and an ISO in the CD drive (uaescsi.device, which
+# Amiberry's file system mounts as CD0:), kept in bmamiga.cfg: mounted by
+# the hard reset BMAmiga makes as the Amiga starts.
+mkdir -p "$OUT/drives/disks/work" "$OUT/drives/cd"
+echo "hello from the card" > "$OUT/drives/disks/work/hello.txt"
+echo "hello from the cd" > "$OUT/drives/cd/readme.txt"
+hdiutil makehybrid -quiet -iso -joliet -default-volume-name BMTEST \
+    -o "$OUT/drives/disks/test.iso" "$OUT/drives/cd"
+printf 'dh0=disks/work\ncd0=disks/test.iso\n' > "$OUT/drives/bmamiga.cfg"
+run drives 50 "$OUT/aros" "model=A1200" '600 quit\n'
+check_log drives "BMAmiga: DH0: disks/work" "DH0: from bmamiga.cfg"
+check_log drives "Z2 0x00e90000 .*Filesystem autoconfig" "Amiberry's file system board, for the folder and CD0:"
+check_log drives "uaescsi.device:0 = IMAGE:.*test\.iso" "the ISO in uaescsi.device's unit 0"
 
 if [ -n "${BMAMIGA_ROMS:-}" ] && [ -n "${BMAMIGA_WORKBENCH:-}" ]; then
     echo "Workbench 1.3 (Kickstart from $BMAMIGA_ROMS)"
@@ -214,6 +230,23 @@ if [ -n "${BMAMIGA_ROMS:-}" ] && [ -n "${BMAMIGA_WORKBENCH:-}" ]; then
         pass "wb: the mouse moves the pointer ($before -> $after)"
     else
         fail wb "the pointer didn't follow the mouse ($before -> $after)"
+    fi
+fi
+
+if [ -n "${BMAMIGA_ROMS:-}" ] && [ -n "${BMAMIGA_WORKBENCH:-}" ]; then
+    echo "A folder as a hard drive, with Workbench 1.3"
+    # Workbench from DF0: (still in it after the hard reset that mounts
+    # the folder); Ctrl+D, then copy a file to DH0: and read one from it.
+    mkdir -p "$OUT/wbdir/disks/work"
+    cp "$BMAMIGA_WORKBENCH" "$OUT/wbdir/disks/wb13.adf"
+    chmod u+w "$OUT/wbdir/disks/wb13.adf"
+    echo "hello from the card" > "$OUT/wbdir/disks/work/hello.txt"
+    printf 'df0=disks/wb13.adf\ndh0=disks/work\n' > "$OUT/wbdir/bmamiga.cfg"
+    run wbdir 50 "$BMAMIGA_ROMS" "" '2600 key 0xe0 1\n2601 key 0x07 1\n2602 key 0x07 0\n2603 key 0xe0 0\n2700 type copy s:startup-sequence dh0:out.txt\\n\n3100 type type dh0:hello.txt\\n\n3400 shot typed.ppm\n3401 quit\n'
+    if [ -s "$OUT/wbdir/disks/work/out.txt" ]; then
+        pass "wbdir: the Amiga wrote a file to the folder"
+    else
+        fail wbdir "no out.txt in the folder (see out/wbdir/typed.ppm)"
     fi
 fi
 

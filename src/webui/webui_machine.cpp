@@ -39,10 +39,11 @@ extern "C" const char *bmamiga_machine_description(void);
 
 namespace {
 
-// What the web UI can start: floppy images, put in DF0: (as the menu's
-// floppy page takes them), the Amiga reset.
+// What the web UI can start, the Amiga reset after: floppy images (in
+// DF0:), hard disk images (as DH0:) and CD images (in the CD drive).
 const char *const kRunTypes[] = {
-    "adf", "adz", "dms", "ipf", "zip", 0,
+    "adf", "adz", "dms", "ipf", "zip", "hdf", "hdz",
+    "iso", "cue", "ccd", "nrg", "mds", "chd", 0,
 };
 
 const WebUiMachine kMachine = {
