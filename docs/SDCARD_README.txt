@@ -1,43 +1,40 @@
-BMCoco - bare metal Tandy Color Computer emulator for the Raspberry Pi
-=====================================================================
+BMAmiga - bare metal Amiga emulator for the Raspberry Pi
+========================================================
 
 Copy everything here to the root of a FAT32 SD card and boot a Raspberry
-Pi 5, 500, 4, 400, 3, Zero 2 W, 2, Zero or Zero W from it, with a USB
-keyboard or gamepad connected.
+Pi 5, 500, 4 or 400 from it, with a USB keyboard and mouse connected.
 
-First copy your Color Computer ROMs into the roms folder: bas13.rom and
-extbas11.rom for a CoCo 2, disk11.rom for disks, coco3.rom for a CoCo 3
-(see roms/ROMS.txt). They are copyrighted, so they are not included.
+First copy your Kickstart ROMs into the roms folder (see roms/ROMS.txt):
+Amiga Forever's amiga-os-*.rom files with their rom.key, or kick13.rom,
+kick31.rom and so on. They are copyrighted, so they are not included.
+Without them the Amiga starts with AROS, the free Kickstart replacement.
 
-It starts in Color BASIC. Press F12 for the menu: run a program, disks,
-hard disks, DriveWire, cassette, cartridge, machine, memory, joysticks,
-video, keyboard, sound, network.
+It starts as an Amiga 500. Press F12 for the menu: floppy drives DF0: to
+DF3:, the model (Amiga 500, 500+, 600, 1200, 4000, CD32, CDTV), warp,
+resets, video, sound, network.
 
-  F12           Menu                F10 / Shift+F10  Reset / hard reset
-  F11           Turbo               Esc              BREAK
-  Home          CLEAR               Alt, Caps Lock   CoCo 3 ALT, CTRL
+  F12               Menu                F11      Warp (as fast as it can)
+  Windows keys      Left, right Amiga   Page Down  Help
+  (or Insert, Home)
 
-Gamepads are the CoCo's joysticks: stick or D-pad to move, A to fire,
-X Space, Y Enter, Home (or Select+Start) for the menu.
+The mouse is the Amiga's mouse (port 1). A gamepad or GPIO joystick is
+the joystick (port 2): stick or D-pad to move, A to fire, Home (or
+Select+Start) for the menu.
 
-Put your files in the disks, tapes, carts and programs folders (or
-anywhere).
+Put your floppy images (.adf, .adz, .dms, .ipf, .zip) in the disks
+folder (or anywhere). Amiberry keeps what it saves in the saves folder.
 
-Video is 720p at 60 Hz for an NTSC CoCo. For a PAL CoCo, choose it under
-Machine in the menu; on a Pi Zero, 2 or 3 also set hdmi_mode=19 in
-config.txt (a Pi 4 or 5 switches to 50 Hz itself).
+Video locks to the display at the Amiga's own rate: 50 Hz for a PAL
+Amiga.
 
-Networking: choose Ethernet or Wi-Fi under Network in the menu (or add
-network=ethernet or network=wifi to cmdline.txt), then open the address
-shown on screen in a browser to manage the files on this card.
+Networking (for the web UI): choose Ethernet or Wi-Fi under Network in
+the menu (or add network=ethernet or network=wifi to cmdline.txt), then
+open the address shown on screen in a browser to manage the files on
+this card and start floppy images.
 
-Calling BBSes: turn on RS-232 Pak (Modem) under Cartridge in the menu; a
-terminal program's ATDT bbs.example.com:23 then calls a telnet BBS.
-NitrOS-9 reaches the internet through the built-in DriveWire server.
-
-Licences: BMCoco is under the GPL version 3 (LICENSE.txt); the licenses
+Licences: BMAmiga is under the GPL version 3 (LICENSE.txt); the licenses
 folder has the notices for other projects' code it includes, and the
 firmware folder the Raspberry Pi and Wi-Fi firmware's licences.
 
-Options are in cmdline.txt; see docs/USER_GUIDE.md in BMCoco's source for
+Options are in cmdline.txt; see docs/USER_GUIDE.md in BMAmiga's source for
 all of them.

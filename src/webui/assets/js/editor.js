@@ -25,7 +25,7 @@
 // Modified for BMAmiga.
 //
 // Overlay text editor for the device's config files (cmdline.txt,
-// config.txt, xroar.conf, bmamiga.cfg, wpa_supplicant.conf), which the device decides:
+// config.txt, bmamiga.cfg, wpa_supplicant.conf), which the device decides:
 // the file list marks them "edit".
 //
 

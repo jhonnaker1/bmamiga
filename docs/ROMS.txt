@@ -1,32 +1,26 @@
-Color Computer ROMs
-===================
+Amiga Kickstart ROMs
+====================
 
-BMCoco needs the ROMs of the machine it emulates. They are copyrighted by
-Tandy and Microsoft, so they are not included: copy your own ROM images
-into this folder. XRoar finds them by file name:
+The Amiga's Kickstart ROMs are copyrighted (by Cloanto today), so they
+are not included: copy your own into this folder. Without any, the Amiga
+starts with AROS, the free replacement Kickstart that comes with
+Amiberry; it runs much Amiga software, but not all of it.
 
-  CoCo 1/2 (the default)   bas13.rom      Color BASIC 1.3
-                           extbas11.rom   Extended Color BASIC 1.1
-  Disks (RS-DOS)           disk11.rom     Disk Extended Color BASIC 1.1
-                                          (or disk10.rom)
-  CoCo 3                   coco3.rom      Super Extended Color BASIC
-  MC-10                    mc10.rom
+Amiberry recognises a Kickstart by its contents, whatever its name, so
+the files from Amiga Forever (amiga-os-130.rom, amiga-os-310-a1200.rom
+and so on, with their rom.key, which must be here too) work as they are.
+It also looks for these names first, for each model (F12, Model):
 
-Older versions also work: bas10.rom - bas12.rom, extbas10.rom. Dragon
-ROMs (d32.rom, d64_1.rom, d64_2.rom, ddos12a.rom) work too, and the
-Prologica CP-400's: cp400bas.rom and cp400ext.rom (or cp400extbas.rom, as
-the Color Computer Archive's XRoar/CP400 folder has it).
+  Amiga 500 (Kickstart 1.3)     kick13.rom   (or kick.rom, kick12.rom)
+  Amiga 500 (Kickstart 1.2)     kick12.rom
+  Amiga 500+ (Kickstart 2.04)   kick20.rom   (or kick204.rom)
+  Amiga 600 (Kickstart 2.05)    kick205.rom  (or kick20.rom, kick31.rom)
+  Amiga 1200                    kick31.rom   (or kick40068.A1200)
+  Amiga 4000                    kick31.rom   (or kick40068.A4000)
+  CD32                          cd32.rom     (or amiga-os-310-cd32.rom),
+                                and cd32ext.rom (amiga-ext-310-cd32.rom)
+  CDTV                          cdtv.rom     (or kick34005.CDTV),
+                                and cdtvext.rom
 
-For hard disks (the IDE interface): hdblba.rom (HDB-DOS) or yados.rom.
-For the Becker port (DriveWire): hdbdw3bck.rom.
-
-BMCoco starts the first CoCo it has ROMs for: a CoCo 2 (NTSC), then a CoCo 3.
-Choose another in the menu (F12, Machine), or with machine= in cmdline.txt.
-
-All the CoCo ROMs can be downloaded from the Color Computer Archive, already
-named this way:
-
-  https://colorcomputerarchive.com/repo/ROMs/XRoar/CoCo/
-
-Copy the files from both its BASIC_OS folder (Color BASIC, Extended BASIC,
-CoCo 3) and its DOS folder (Disk BASIC) into this folder.
+Kickstarts can be bought with Amiga Forever (https://www.amigaforever.com)
+or copied from your own Amiga.

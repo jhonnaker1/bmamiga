@@ -15,7 +15,9 @@ Rossi. The emulator is replaced by Amiberry; the kernel, display, sound,
 network and web UI come from those projects.
 
 **BMAmiga is in development.** It runs in the PC simulator
-(`tools/hostsim`); the Raspberry Pi kernels come next.
+(`tools/hostsim`), and its Raspberry Pi 4 and 5 kernels build, but it
+hasn't been tried on a real Pi yet. See [the User Guide](docs/USER_GUIDE.md),
+[Installation](docs/INSTALLATION.md) and [the other documents](docs/README.md).
 
 ## How it works
 
@@ -50,11 +52,15 @@ tools/hostsim/run_tests.sh
 BMAMIGA_ROMS=/path/to/roms BMAMIGA_WORKBENCH=/path/to/workbench13.adf tools/hostsim/run_tests.sh
 ```
 
-The first build compiles Amiberry, which takes a few minutes. The tests
+The simulator builds on macOS. The first build compiles Amiberry, which
+takes a few minutes. The tests
 boot AROS, open the menu, choose disks and models and check the display
 lock and the sound; with a Kickstart 1.3 ROM and a Workbench 1.3 disk they
 boot Workbench, type at its CLI and move the mouse.
 
 ## License
 
-GPL 3 (see LICENSE). Amiberry is GPL 3 too.
+GPL 3 (see LICENSE). Amiberry is GPL 3 too; the code it and BMAmiga
+include from other projects is listed in
+[docs/THIRD_PARTY.md](docs/THIRD_PARTY.md), with its notices in
+`sdcard/licenses`.

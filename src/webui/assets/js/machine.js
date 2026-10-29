@@ -58,7 +58,7 @@ export const machineName = () => current.name;
 // Name for display.
 export const machineDisplayName = () => current.name || "machine";
 
-// The emulator's settings file, "/xroar.conf".
+// The emulator's settings file, "/bmamiga.cfg".
 export const mainSettingsFile = () => current.settings;
 
 // Whether Autostart accepts files with this extension.

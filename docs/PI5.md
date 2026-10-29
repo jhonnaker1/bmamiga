@@ -1,9 +1,9 @@
 # Raspberry Pi 5, Pi 500 and Pi 500+
 
-BMCoco runs on the Pi 5, Pi 500 and Pi 500+ as a 64-bit kernel,
+BMAmiga runs on the Pi 5, Pi 500 and Pi 500+ as a 64-bit kernel,
 `kernel_2712.img`. It shares the Pi 4's code (`src/av/`, `src/v3d/` and `src/kms/common/`, see
 [PI4.md](PI4.md)) wherever the hardware is the same; the emulator, menus,
-USB keyboards and gamepads, networking (Ethernet and Wi-Fi) and the web UI
+USB keyboards, mice and gamepads, networking (Ethernet and Wi-Fi) and the web UI
 work as on the other boards.
 
 The Pi 5's firmware is in its EEPROM, so the card only adds the Pi 5's
@@ -13,9 +13,9 @@ name Circle looks for on the Pi 5
 
 ## Picture
 
-BMCoco shows the picture through the Pi 5's HVS with its own display
+BMAmiga shows the picture through the Pi 5's HVS with its own display
 driver (`src/kms/pi5/`, from BMA800XL 1.3.0), and runs the display at the
-CoCo's frame rate, as
+Amiga's frame rate, as
 on the Pi 4 (see `video_driver` in [PI4.md](PI4.md)). The Pi 5's firmware
 ignores `hdmi_mode` and picks the display's own preferred resolution, so the
 *Resolution* setting (Video menu, or `resolution` in `cmdline.txt`) chooses
@@ -45,7 +45,7 @@ button or key starts it again.
 ## Fan
 
 The Pi 5's own fan (the Active Cooler, or the case fan on the fan
-connector) is run by BMCoco as Raspberry Pi OS runs it: off below 50 °C,
+connector) is run by BMAmiga as Raspberry Pi OS runs it: off below 50 °C,
 then faster in four steps at 50, 60, 67.5 and 75 °C, slowing again 5 °C
 below each. It runs at full speed for the first second. Without it, the
 fan would stay off. The log shows each change (`fan: 61.2 C, speed 2 of 4`).

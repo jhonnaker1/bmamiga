@@ -1,0 +1,453 @@
+Amiberry
+========
+
+BMAmiga's emulation is Amiberry 8.4.1 (https://github.com/BlitterStudio/amiberry),
+by Dimitris Panokostas and its contributors, built on WinUAE by Toni Wilen
+and UAE by Bernd Schmidt and others: its libretro core, built unmodified
+into the kernels with BMAmiga's platform layer (src/port/). Amiberry is
+under the GNU General Public License version 3 (LICENSE.txt in the root of
+the card); the parts of it from UAE and WinUAE under the GNU General Public
+License version 2 or later (GPL-2.0.txt).
+
+Amiberry includes code from other projects, which is in the kernels too.
+Their notices follow, as they are in Amiberry's source.
+
+------------------------------------------------------------------------------
+7-Zip / LZMA SDK, by Igor Pavlov
+(src/archivers/7z)
+------------------------------------------------------------------------------
+
+Public domain.
+
+------------------------------------------------------------------------------
+xDMS, by Andre Rodrigues de la Rocha
+(src/archivers/dms)
+------------------------------------------------------------------------------
+
+    xDMS  v1.3  -  Portable DMS archive unpacker  -  Public Domain
+    Written by     Andre Rodrigues de la Rocha  <adlroc@usa.net>
+
+------------------------------------------------------------------------------
+MAME: CHD hard disk images, TMS34010
+(src/archivers/chd, src/mame)
+------------------------------------------------------------------------------
+
+These files are from MAME (https://www.mamedev.org), under the BSD
+3-Clause license; their copyright holders are named at the top of each
+(Aaron Giles, Zsolt Vasvari, Alex Pasadyn and others):
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice,
+   this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+3. Neither the name of the copyright holder nor the names of its
+   contributors may be used to endorse or promote products derived from this
+   software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+
+------------------------------------------------------------------------------
+Slirp, by Danny Gasparovski
+(src/slirp)
+------------------------------------------------------------------------------
+
+Slirp was written by Danny Gasparovski.
+Copyright (c), 1995,1996 All Rights Reserved.
+
+Slirp is maintained by Kelly Price <tygris+slirp@erols.com>
+
+Slirp is free software; "free" as in you don't have to pay for it, and you
+are free to do whatever you want with it.  I do not accept any donations,
+monetary or otherwise, for Slirp.  Instead, I would ask you to pass this
+potential donation to your favorite charity.  In fact, I encourage
+*everyone* who finds Slirp useful to make a small donation to their
+favorite charity (for example, GreenPeace).  This is not a requirement, but
+a suggestion from someone who highly values the service they provide.
+
+The copyright terms and conditions:
+
+---BEGIN---
+
+ Copyright (c) 1995,1996 Danny Gasparovski.  All rights reserved.
+ 
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions
+ are met:
+ 1. Redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer.
+ 2. Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in the
+    documentation and/or other materials provided with the distribution.
+
+ THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+ AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL
+ DANNY GASPAROVSKI OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+---END---
+
+This basically means you can do anything you want with the software, except
+1) call it your own, and 2) claim warranty on it.  There is no warranty for
+this software.  None.  Nada.  If you lose a million dollars while using
+Slirp, that's your loss not mine.  So, ***USE AT YOUR OWN RISK!***.
+
+If these conditions cannot be met due to legal restrictions (E.g. where it
+is against the law to give out Software without warranty), you must cease
+using the software and delete all copies you have.
+
+Slirp uses code that is copyrighted by the following people/organizations:
+
+Juha Pirkola.
+Gregory M. Christy.
+The Regents of the University of California.
+Carnegie Mellon University.
+The Australian National University.
+RSA Data Security, Inc.
+
+Please read the top of each source file for the details on the various
+copyrights.
+
+(The University of California rescinded the advertising clause of its BSD
+license in 1999.)
+
+------------------------------------------------------------------------------
+QEMU VGA emulation, by Fabrice Bellard and others
+(src/qemuvga)
+------------------------------------------------------------------------------
+
+QEMU Cirrus CLGD 54xx VGA Emulator.
+
+Copyright (c) 2004 Fabrice Bellard
+Copyright (c) 2004 Makoto Suzuki (suzu)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+------------------------------------------------------------------------------
+SoftFloat, by John R. Hauser, as in QEMU
+(src/softfloat)
+------------------------------------------------------------------------------
+
+QEMU float support
+
+The code in this source file is derived from release 2a of the SoftFloat
+IEC/IEEE Floating-point Arithmetic Package. Those parts of the code (and
+some later contributions) are provided under that license, as detailed below.
+It has subsequently been modified by contributors to the QEMU Project,
+so some portions are provided under:
+ the SoftFloat-2a license
+ the BSD license
+ GPL-v2-or-later
+
+Any future contributions to this file after December 1st 2014 will be
+taken to be licensed under the Softfloat-2a license unless specifically
+indicated otherwise.
+
+===============================================================================
+This C source file is part of the SoftFloat IEC/IEEE Floating-point
+Arithmetic Package, Release 2a.
+
+Written by John R. Hauser.  This work was made possible in part by the
+International Computer Science Institute, located at Suite 600, 1947 Center
+Street, Berkeley, California 94704.  Funding was partially provided by the
+National Science Foundation under grant MIP-9311980.  The original version
+of this code was written as part of a project to build a fixed-point vector
+processor in collaboration with the University of California at Berkeley,
+overseen by Profs. Nelson Morgan and John Wawrzynek.  More information
+is available through the Web page `http://HTTP.CS.Berkeley.EDU/~jhauser/
+arithmetic/SoftFloat.html'.
+
+THIS SOFTWARE IS DISTRIBUTED AS IS, FOR FREE.  Although reasonable effort
+has been made to avoid it, THIS SOFTWARE MAY CONTAIN FAULTS THAT WILL AT
+TIMES RESULT IN INCORRECT BEHAVIOR.  USE OF THIS SOFTWARE IS RESTRICTED TO
+PERSONS AND ORGANIZATIONS WHO CAN AND WILL TAKE FULL RESPONSIBILITY FOR ANY
+AND ALL LOSSES, COSTS, OR OTHER PROBLEMS ARISING FROM ITS USE.
+
+Derivative works are acceptable, even for commercial purposes, so long as
+(1) they include prominent notice that the work is derivative, and (2) they
+include prominent notice akin to these four paragraphs for those parts of
+this code that are retained.
+
+===============================================================================
+
+ BSD licensing:
+Copyright (c) 2006, Fabrice Bellard
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice,
+this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+this list of conditions and the following disclaimer in the documentation
+and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its contributors
+may be used to endorse or promote products derived from this software without
+specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+THE POSSIBILITY OF SUCH DAMAGE.
+
+ Portions of this work are licensed under the terms of the GNU GPL,
+version 2 or later. See the COPYING file in the top-level directory.
+
+------------------------------------------------------------------------------
+8048 microcontroller core, by Avery Lee (Altirra)
+(src/kbmcu/8048)
+------------------------------------------------------------------------------
+
+	Altirra - Atari 800/800XL/5200 emulator
+	Coprocessor library - 65802 emulator
+	Copyright (C) 2009-2015 Avery Lee
+
+	This program is free software; you can redistribute it and/or modify
+	it under the terms of the GNU General Public License as published by
+	the Free Software Foundation; either version 2 of the License, or
+	(at your option) any later version.
+
+	This program is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
+
+	You should have received a copy of the GNU General Public License along
+	with this program. If not, see <http://www.gnu.org/licenses/>.
+
+------------------------------------------------------------------------------
+kjmp2, by Martin J. Fiedler
+(src/archivers/mp2)
+------------------------------------------------------------------------------
+
+ kjmp2 -- a minimal MPEG-1/2 Audio Layer II decoder library
+ version 1.1
+***************************************************************************
+ Copyright (C) 2006-2013 Martin J. Fiedler <martin.fiedler@gmx.net>
+
+ This software is provided 'as-is', without any express or implied
+ warranty. In no event will the authors be held liable for any damages
+ arising from the use of this software.
+
+ Permission is granted to anyone to use this software for any purpose,
+ including commercial applications, and to alter it and redistribute it
+ freely, subject to the following restrictions:
+   1. The origin of this software must not be misrepresented; you must not
+      claim that you wrote the original software. If you use this software
+      in a product, an acknowledgment in the product documentation would
+      be appreciated but is not required.
+   2. Altered source versions must be plainly marked as such, and must not
+      be misrepresented as being the original software.
+   3. This notice may not be removed or altered from any source
+      distribution.
+
+------------------------------------------------------------------------------
+unzip, by Gilles Vollant
+(src/archivers/zip)
+------------------------------------------------------------------------------
+
+ unzip.h -- IO for uncompress .zip files using zlib
+   Version 0.15 beta, Mar 19th, 1998,
+
+   Copyright (C) 1998 Gilles Vollant
+
+   This unzip package allow extract file from .ZIP file, compatible with PKZip 2.04g
+     WinZip, InfoZip tools and compatible.
+   Encryption and multi volume ZipFile (span) are not supported.
+   Old compressions used by old PKZip 1.x are not supported
+
+   THIS IS AN ALPHA VERSION. AT THIS STAGE OF DEVELOPPEMENT, SOMES API OR STRUCTURE
+   CAN CHANGE IN FUTURE VERSION !!
+   I WAIT FEEDBACK at mail info@winimage.com
+   Visit also http://www.winimage.com/zLibDll/unzip.htm for evolution
+
+   Condition of use and distribution are the same than zlib :
+
+  This software is provided 'as-is', without any express or implied
+  warranty.  In no event will the authors be held liable for any damages
+  arising from the use of this software.
+
+  Permission is granted to anyone to use this software for any purpose,
+  including commercial applications, and to alter it and redistribute it
+  freely, subject to the following restrictions:
+
+  1. The origin of this software must not be misrepresented; you must not
+     claim that you wrote the original software. If you use this software
+     in a product, an acknowledgment in the product documentation would be
+     appreciated but is not required.
+  2. Altered source versions must be plainly marked as such, and must not be
+     misrepresented as being the original software.
+  3. This notice may not be removed or altered from any source distribution.
+
+------------------------------------------------------------------------------
+FloppyBridge, by Robert Smith
+(external/floppybridge)
+------------------------------------------------------------------------------
+
+ DrawBridge (Arduino Reader/Writer) Bridge for *UAE
+
+Copyright (C) 2021-2024 Robert Smith (@RobSmithDev)
+https://amiga.robsmithdev.co.uk
+
+This file is multi-licensed under the terms of the Mozilla Public
+License Version 2.0 as published by Mozilla Corporation and the
+GNU General Public License, version 2 or later, as published by the
+Free Software Foundation.
+
+MPL2: https://www.mozilla.org/en-US/MPL/2.0/
+GPL2: https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html
+
+This file, along with currently active and supported interfaces
+are maintained from by GitHub repo at
+https://github.com/RobSmithDev/FloppyDriveBridge
+
+BMAmiga uses these files under the GNU General Public License version 2 or
+later (GPL-2.0.txt).
+
+------------------------------------------------------------------------------
+stb_image, by Sean Barrett
+(external/ImGuiFileDialog/stb)
+------------------------------------------------------------------------------
+
+This software is available under 2 licenses -- choose whichever you prefer.
+------------------------------------------------------------------------------
+ALTERNATIVE A - MIT License
+Copyright (c) 2017 Sean Barrett
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of the Software, and to permit persons to whom the Software is furnished to do
+so, subject to the following conditions:
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+------------------------------------------------------------------------------
+ALTERNATIVE B - Public Domain (www.unlicense.org)
+This is free and unencumbered software released into the public domain.
+Anyone is free to copy, modify, publish, use, compile, sell, or distribute this
+software, either in source code form or as a compiled binary, for any purpose,
+commercial or non-commercial, and by any means.
+In jurisdictions that recognize copyright laws, the author or authors of this
+software dedicate any and all copyright interest in the software to the public
+domain. We make this dedication for the benefit of the public at large and to
+the detriment of our heirs and successors. We intend this dedication to be an
+overt act of relinquishment in perpetuity of all present and future rights to
+this software under copyright law.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+------------------------------------------------------------------------------
+JSON for Modern C++, by Niels Lohmann
+(libretro/deps/nlohmann (fetched by Amiberry's build))
+------------------------------------------------------------------------------
+
+Copyright (c) 2013-2023 Niels Lohmann <https://nlohmann.me>
+SPDX-License-Identifier: MIT
+
+Permission is hereby granted, free of charge,
+to any person obtaining a copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+------------------------------------------------------------------------------
+libretro-common, by the RetroArch team
+(libretro/libretro-common)
+------------------------------------------------------------------------------
+
+Copyright (C) 2010-2020 The RetroArch team
+
+Permission is hereby granted, free of charge,
+to any person obtaining a copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+------------------------------------------------------------------------------
+libco, by byuu and the higan team
+(libretro/libco)
+------------------------------------------------------------------------------
+
+ISC License (ISC)
+
+Copyright byuu and the higan team
+
+Permission to use, copy, modify, and/or distribute this software for any purpose with or without fee is hereby granted, provided that the above copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+The above applies to all files in this project except valgrind.h which is licensed under a BSD-style license. See the license text and copyright notice contained within that file.

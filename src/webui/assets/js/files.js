@@ -56,10 +56,8 @@ function isRunnable(name) {
   return canRun(extOf(name));
 }
 
-// Disks, tapes and programs are autostarted, like the menu's Run a Program;
-// a cartridge image is plugged in (which resets the machine).
-const runVerb = (name) =>
-  ["ccc", "rom"].includes(extOf(name)) ? "Plug in cartridge" : "Autostart";
+// A floppy image goes in DF0: and the Amiga is reset.
+const runVerb = (name) => "Start in DF0:";
 
 function fileIcon(name, isDir) {
   if (isDir) return "▸";

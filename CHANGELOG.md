@@ -56,6 +56,15 @@
   - Every 10 s the log has the Amiga's speed, the ARM's clock and
     temperature, and where the time went
 
+- The documents and licences are BMAmiga's: the User Guide, Installation,
+  ROMS.txt (Kickstarts, Amiga Forever's included), the Pi 4 and 5 notes,
+  building, the simulator (macOS) and updating Amiberry rewritten for the
+  Amiga, and the card's README. The card's licences have Amiberry's and
+  the notices of the code it includes (amiberry.txt) and zlib's, in place
+  of XRoar's; THIRD_PARTY.md lists them. The card has disks and saves
+  folders, and only the Pi 4 and 5's firmware and config.txt sections.
+  The web UI says Amiga and starts floppy images in DF0:
+
 BMCoco's history, from which BMAmiga comes, follows.
 
 ## 0.5.5 – 2026-10-20

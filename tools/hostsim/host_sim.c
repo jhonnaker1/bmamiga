@@ -22,7 +22,8 @@
  * host_sim.c - runs the BMAmiga emulator port on a PC for testing.
  *
  * Implements src/host.h with a simulated display, sound output and input,
- * so XRoar and the port in src/port/ can be tested without a Raspberry Pi.
+ * so Amiberry's core and the port in src/port/ can be tested without a
+ * Raspberry Pi.
  * Time is virtual: each display refresh advances the clock by one frame of
  * a 60 Hz (or BMAMIGA_REFRESH Hz) display, so tests run as fast as the PC
  * allows.
@@ -42,8 +43,8 @@
  *   <frame> quit                   end the test
  *
  * BMAMIGA_SIM_FRAME_MS=N makes each frame's emulation take N ms of the
- * virtual time, as on a computer too slow for it (a Pi 3 with the most
- * accurate artifact colours, say).
+ * virtual time, as on a computer too slow for it (a Pi emulating a fast
+ * Amiga, say).
  *
  * BMAMIGA_SIM_WAV=FILE writes the sound output to FILE (16-bit WAV).
  *

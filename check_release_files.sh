@@ -67,10 +67,7 @@ PI5_FILES=(
 
 # Files that must be there and not empty.
 REQUIRED_FILES=(
-    # Raspberry Pi firmware
-    "bootcode.bin"
-    "start.elf"
-    "fixup.dat"
+    # Raspberry Pi settings (the Pi 4's and 5's firmware is checked below)
     "config.txt"
     "cmdline.txt"
 
@@ -78,8 +75,8 @@ REQUIRED_FILES=(
     "LICENSE.txt"
     "README.txt"
     "licenses/README.txt"
-    "licenses/xroar.txt"
-    "licenses/LGPL-3.0.txt"
+    "licenses/amiberry.txt"
+    "licenses/zlib.txt"
     "licenses/Apache-2.0.txt"
     "licenses/crt-pi.txt"
     "licenses/GPL-2.0.txt"
@@ -115,9 +112,7 @@ REQUIRED_FILES=(
 
     # User folders: the READMEs keep them in zip files
     "disks/README.txt"
-    "programs/README.txt"
-    "carts/README.txt"
-    "tapes/README.txt"
+    "saves/README.txt"
     "roms/ROMS.txt"
 )
 

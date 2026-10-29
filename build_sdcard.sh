@@ -183,10 +183,8 @@ folder_readme() {
     mkdir -p "$STAGING_DIR/$1"
     printf '%s\r\n' "$2" > "$STAGING_DIR/$1/README.txt"
 }
-folder_readme disks    "Disk images: .dsk .vdk .jvc .os9 .dmk (Disk Drives in the menu, F12)"
-folder_readme programs "Machine code programs: .bin .hex .s19 (Run a Program in the menu)"
-folder_readme carts    "Cartridge images: .ccc .rom (Cartridge in the menu)"
-folder_readme tapes    "Cassette images: .cas .c10 .k7 (Cassette in the menu)"
+folder_readme disks    "Floppy images: .adf .adz .dms .ipf .zip (Floppy Drives in the menu, F12)"
+folder_readme saves    "What Amiberry saves (written by BMAmiga)"
 mkdir -p "$STAGING_DIR/roms"
 cp "$SRC_DIR/docs/ROMS.txt" "$STAGING_DIR/roms/ROMS.txt"
 
