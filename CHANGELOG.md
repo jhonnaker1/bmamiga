@@ -31,6 +31,15 @@
   web UI starts floppy images (in DF0:) and edits bmamiga.cfg. XRoar's
   regular expressions (posix_extra.c) are gone
 
+- From BMCoco 0.5.6 to 0.5.8 (and BMA800XL 1.4.3 with it): the Pi 5's fan
+  run by its temperature, the Pi 5 power button's code in src/pi45, web
+  UI uploads about 5 times faster, network connections closed before a
+  reboot or shut down, Space ticking a [ ] item in the menu, and
+  BMA800XL's licence notices in the files that come from it (then
+  "Modified for BMCoco" and, where BMAmiga changed them, "Modified for
+  BMAmiga"). The CoCo's own changes are left out, and F11 keeps
+  Amiberry's name, Warp
+
 BMCoco's history, from which BMAmiga comes, follows.
 
 ## 0.5.5 – 2026-10-20

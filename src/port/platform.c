@@ -862,6 +862,9 @@ static void handle_requests(void)
 		request_power = -1;
 		LOG("%s\n", power_off ? "shutting down" : "rebooting");
 		sync_files();
+		/* Tell any server a connection is over (BMAmiga makes none yet;
+		   the web UI's own are the browser's to drop). */
+		host_tcp_close_all();
 		if (power_off)
 			host_power_off();
 		else

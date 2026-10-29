@@ -1,6 +1,26 @@
 //
 // cl.h
 //
+// BMA800XL - A bare metal Atari 800XL emulator for Raspberry Pi
+// Copyright (C) 2026 aminch <https://github.com/aminch>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+//
+// Modified for BMCoco.
+//
+// Modified for BMAmiga.
+//
 // Writes control list packets (an opcode byte, then the packet's fields at
 // their bit positions, little endian) and the records they point to, for
 // V3D 4.2 (the Pi 4) or V3D 7.1 (the Pi 5). Only the packets and records
@@ -12,9 +32,6 @@
 // V3D 7.1 render target and texture settings from
 // src/gallium/drivers/v3d/v3dx_rcl.c, v3dx_emit.c and v3dx_state.c, and
 // src/broadcom/common/v3d_util.c (tile size, render target stride).
-//
-// This file is part of BMAmiga, a bare metal Amiga emulator for
-// the Raspberry Pi. See LICENSE for licensing details.
 //
 
 #ifndef BMAMIGA_V3D_CL_H_

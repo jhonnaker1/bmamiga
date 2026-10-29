@@ -22,6 +22,8 @@ BMCoco uses the [circle-stdlib project](https://github.com/smuehlst/circle-stdli
 
 See [`third_party/circle-stdlib/`](https://github.com/smuehlst/circle-stdlib/tree/v21) for the version used by BMCoco and its accompanying copyright and license information. newlib's notices are in [`sdcard/licenses/newlib.txt`](../sdcard/licenses/newlib.txt) and [`sdcard/licenses/libgloss.txt`](../sdcard/licenses/libgloss.txt).
 
+The Raspberry Pi 4 and Pi 5 HDMI sound ([`src/av/hdmisound.cpp`](../src/av/hdmisound.cpp)) is adapted from Circle's HDMI sound driver, under Circle's GNU General Public License version 3 or later.
+
 ## GCC Runtime
 
 BMCoco links runtime code from the [Arm GNU Toolchain](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads) 15.2.rel1 (GCC), under the GNU General Public License version 3 with the GCC Runtime Library Exception 3.1. The toolchain's GCC licence section is in [`sdcard/licenses/GCC-Runtime.txt`](../sdcard/licenses/GCC-Runtime.txt).
@@ -32,13 +34,19 @@ BMCoco incorporates source code from the [BMC64 project](https://github.com/rand
 
 See [BMC64](https://github.com/randyrossi/bmc64) for its source and its accompanying copyright and license information.
 
-BMC64-derived files retain their original license and attribution notices. For files licensed under Apache-2.0, see [the included license](../sdcard/licenses/Apache-2.0.txt); modifications are identified in their headers.
+BMC64-derived files retain their original license and attribution notices: the Apache License 2.0 (see [the included license](../sdcard/licenses/Apache-2.0.txt)) or BMC64's GNU General Public License version 3. Modifications are identified in their headers.
 
 ## Raspberry Pi Firmware
 
 BMCoco includes the Raspberry Pi boot firmware (`bootcode.bin`, `start.elf`, `fixup.dat`, and for the Raspberry Pi 4 `start4.elf` and `fixup4.dat`) and the Raspberry Pi 4 and Pi 5 device trees from the [Raspberry Pi firmware repository](https://github.com/raspberrypi/firmware).
 
 Their licences are next to them, in [`sdcard/firmware/`](../sdcard/firmware/) and on the SD card: `LICENCE.broadcom` for the firmware and `COPYING.linux` for the device trees. See the [Raspberry Pi firmware repository](https://github.com/raspberrypi/firmware/tree/master/boot) for more.
+
+The Raspberry Pi 0 to 3 firmware is from firmware release 1.20260907. The
+Raspberry Pi 4 and 5 firmware, device trees and overlay are the ones Circle
+51.1.1 uses (see its `boot/Makefile`). The device trees and overlay are
+unmodified builds of the device tree sources in the
+[Raspberry Pi kernel](https://github.com/raspberrypi/linux) (Linux 6.12).
 
 ## crt-pi
 

@@ -51,8 +51,9 @@ into `roms`.
 
 **F12** (or a gamepad's **Home** button, or **Select+Start**) opens the
 menu; **Esc** goes back a page and F12 closes it. The arrow keys or D-pad
-move, **Enter** or **A** chooses. In a list, typing a letter jumps to the
-next item starting with it.
+move, **Enter** or **A** chooses; **Space** also ticks or clears a
+`[ ]` item. In a list, typing a letter jumps to the next item starting
+with it.
 
 | Item           | What it does |
 |----------------|--------------|
@@ -69,7 +70,7 @@ next item starting with it.
 | Keyboard       | Typed characters on or off, and the PC keyboard's layout |
 | Sound          | Volume, and HDMI or the headphone jack |
 | Network        | Ethernet or Wi-Fi, and the web UI (see below) |
-| Turbo          | Run as fast as the Pi can (also F11) |
+| Rate Limit     | The CoCo's own speed; off, as fast as the Pi can (also F11; XRoar's Shift+F12) |
 | Reset, Hard Reset | The reset button (F10), or power off and on (Shift+F10) |
 | About          | Versions, the machine, ROM status, display, load and network |
 | Reboot, Shut Down | Restart BMCoco, or halt the Pi. Shut Down also from a keyboard's power key (Fn+F10 on a Pi 400, which switches off; Fn+F10 starts it again) or the Pi 5's power button |
@@ -82,7 +83,7 @@ boot.
 | PC key                 | CoCo                                          |
 |------------------------|-----------------------------------------------|
 | F12                    | BMCoco menu                                   |
-| F11                    | Turbo on/off                                  |
+| F11                    | Rate limit off/on (XRoar's Shift+F12)         |
 | F10, Shift+F10         | Reset, hard reset                             |
 | Esc                    | BREAK                                         |
 | Home                   | CLEAR                                         |
@@ -93,6 +94,7 @@ boot.
 | Alt                    | CoCo 3 ALT                                    |
 | Caps Lock, Windows     | CoCo 3 CTRL                                   |
 | F1, F2                 | CoCo 3 F1, F2                                 |
+| Keypad digits, `.` `-` `/`, Enter | The same keys (the CoCo has no keypad) |
 
 By default keys type the characters printed on them, in the layout set with
 `keyboard=` in `cmdline.txt` (or *Keyboard* in the menu): Shift+' types `"`
@@ -100,6 +102,10 @@ and Shift+8 `*`, as you would expect. Some games read the keyboard matrix
 directly and want the keys where the CoCo had them: turn off *Typed
 Characters* in the menu, and the PC keys then sit in the CoCo's places
 (Shift+2 is `"`, the key right of 0 is `:`).
+
+F10 is the CoCo's reset button: the program in memory may catch it, as
+some games do (Shock Trooper freezes, others restart). Shift+F10 clears the
+memory first, as switching off and on does.
 
 ## Joysticks
 
@@ -118,9 +124,13 @@ one). Each takes its input from:
 |-----------------|----------------------------|
 | A               | Fire                       |
 | B               | Second fire button (CoCo 3)|
-| X               | Space                      |
-| Y               | Enter                      |
+| X               | Fire (as A)                |
+| Y               | Second fire button (as B)  |
 | Home, Select+Start | BMCoco menu             |
+
+The buttons type no keys, as a CoCo joystick's don't (a game asking
+"keyboard or joystick?" would otherwise see a key). `pad_keys=1` in
+`cmdline.txt` has X type Space and Y Enter instead, as before 0.5.6.
 
 In the menu's *Joysticks* page each port can also be given **Arrow keys**:
 the arrow keys then move that joystick and left Alt fires (the arrows then
@@ -308,7 +318,8 @@ online, `ATZ` to reset the modem, `ATE0` / `ATE1` echo off and on, `ATV0` /
 `ATV1` number or word replies, `ATQ1` no replies, `ATI` what it is. The
 settings terminal programs set modems up with (`AT&F`, `&C1`, `&D2`,
 `S0=0`, `X4` and so on) answer `OK`. Dropping DTR (as many programs do to
-hang up) hangs up too. The modem doesn't answer calls (`ATA` says `NO
+hang up) hangs up too, and so does a reset (F10), which drops it, or
+changing the machine. The modem doesn't answer calls (`ATA` says `NO
 CARRIER`).
 
 The Pak takes bytes as fast as the program reads them and sends them at
@@ -405,6 +416,7 @@ web UI.
 | `typed_keys`        | `0`, `1`                     | `1`      | Keys type the characters printed on them (see Keyboard) |
 | `joy_right`, `joy_left` | `joy0`, `joy1`, `kjoy0` (arrow keys), `mjoy0` (mouse), `hjoy0` (Hi-Res Mouse) | `joy0`, `joy1` | What is plugged into each joystick port |
 | `joy1_pad`, `joy2_pad` | `0` automatic, `1`-`4` a gamepad, `-1` none | `0` | Gamepad for Joystick 1 and 2 |
+| `pad_keys`          | `0`, `1`                     | `0`      | The gamepads' X and Y type Space and Enter rather than fire (see Joysticks) |
 | `mouse_speed`       | percent                      | `100`    | How far the mouse moves the pointer (see Joysticks) |
 | `hires_mouse_x`, `hires_mouse_y` | start,end (microseconds) | `629,5792`, `1257,4307` | The Hi-Res Mouse's timing for each axis (see Joysticks) |
 | `ram_NAME`          | K, e.g. `ram_coco3=2048`     | machine's | The RAM of machine NAME (the menu's *Memory*) |

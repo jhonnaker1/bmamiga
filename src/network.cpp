@@ -1,12 +1,6 @@
 //
 // network.cpp
 //
-// Modified for BMA800XL from BMC64's network start up (viceapp.cpp,
-// vice_network.cpp): rewritten to take its settings from cmdline.txt and
-// start the web UI and network time.
-// Changed for BMAmiga: the Becker port's connections (host_tcp_*), on
-// Circle's own sockets.
-//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -18,6 +12,17 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+//
+// Modifications Copyright (C) 2026 aminch <https://github.com/aminch>
+// Modified for BMA800XL from BMC64's network start up (viceapp.cpp,
+// vice_network.cpp): rewritten to take its settings from cmdline.txt and
+// start the web UI and network time.
+//
+// Modified for BMCoco: the Becker port's connections (host_tcp_*), on
+// Circle's own sockets.
+//
+// Modified for BMAmiga.
+//
 
 #include "network.h"
 
@@ -402,6 +407,7 @@ namespace {
 
 struct TcpConnection {
   CSocket *socket;  // 0 when the slot is free
+  bool connecting;  // Connect() is waiting, in a background task
   u8 buffer[FRAME_BUFFER_SIZE];
   unsigned pos, length;
 };
@@ -447,7 +453,10 @@ extern "C" int host_tcp_connect(const char *host, const char *port) {
   CSocket *socket = new CSocket(s_net, IPPROTO_TCP);
   s_tcp[connection].socket = socket;
   s_tcp[connection].pos = s_tcp[connection].length = 0;
-  if (socket->Connect(address, (u16)number) < 0) {
+  s_tcp[connection].connecting = true;
+  int result = socket->Connect(address, (u16)number);
+  s_tcp[connection].connecting = false;
+  if (result < 0) {
     s_tcp[connection].socket = 0;
     delete socket;
     return -1;
@@ -495,6 +504,22 @@ extern "C" void host_tcp_close(int connection) {
     CSocket *socket = c->socket;
     c->socket = 0;
     delete socket;
+  }
+}
+
+extern "C" void host_tcp_close_all(void) {
+  // Deleting a socket only queues its FIN: Circle's network task sends it
+  // (and retransmits it if need be), on this core, while we sleep.
+  int closed = 0;
+  for (int i = 0; i < kMaxTcpConnections; i++) {
+    if (s_tcp[i].socket != 0 && !s_tcp[i].connecting) {
+      host_tcp_close(i);
+      closed++;
+    }
+  }
+  if (closed > 0) {
+    CLogger::Get()->Write(FromNetwork, LogNotice, "Closed %d connection(s)", closed);
+    host_sleep_us(300000);
   }
 }
 

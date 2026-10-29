@@ -1,4 +1,24 @@
 /*
+ * BMA800XL - A bare metal Atari 800XL emulator for Raspberry Pi
+ * Copyright (C) 2026 aminch <https://github.com/aminch>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * Modified for BMCoco.
+ *
+ * Modified for BMAmiga.
+ *
  * host_sim.c - runs the BMAmiga emulator port on a PC for testing.
  *
  * Implements src/host.h with a simulated display, sound output and input,
@@ -37,9 +57,6 @@
  * With BMAMIGA_LIVE=PORT it runs in real time instead, with no script: the
  * screen, keyboard, gamepads and sound are in a web page at
  * http://127.0.0.1:PORT/ (live.c, live.html). tools/hostsim/live.sh starts it.
- *
- * This file is part of BMAmiga, a bare metal Amiga emulator for the
- * Raspberry Pi. See LICENSE for licensing details.
  */
 
 #include <pthread.h>
@@ -677,15 +694,22 @@ void host_video_present(int wait_vsync)
 
 /* ---- System ----------------------------------------------------------------- */
 
+/* TCP connections open (see host_tcp_connect() below). */
+#define SIM_TCP_MAX 16
+static int sim_tcp_open[SIM_TCP_MAX];
+static int sim_tcp_count;
+
 void host_reboot(void)
 {
-	fprintf(stderr, "[sim] reboot requested at frame %ld\n", frame);
+	fprintf(stderr, "[sim] %ld yields between frames\n", yields);
+	fprintf(stderr, "[sim] reboot requested at frame %ld, %d connection(s) open\n", frame, sim_tcp_count);
 	exit(0);
 }
 
 void host_power_off(void)
 {
-	fprintf(stderr, "[sim] power off requested at frame %ld\n", frame);
+	fprintf(stderr, "[sim] %ld yields between frames\n", yields);
+	fprintf(stderr, "[sim] power off requested at frame %ld, %d connection(s) open\n", frame, sim_tcp_count);
 	exit(0);
 }
 
@@ -716,7 +740,33 @@ static void *background_thread(void *p)
 }
 
 /* TCP connections (host.h): the PC's own sockets; a connection is the
-   socket. */
+   socket. Those open are counted (sim_tcp_count, above), for the log at
+   a reboot; connections are made in background threads. */
+static pthread_mutex_t sim_tcp_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static void sim_tcp_opened(int fd)
+{
+	pthread_mutex_lock(&sim_tcp_lock);
+	if (sim_tcp_count < SIM_TCP_MAX)
+		sim_tcp_open[sim_tcp_count++] = fd;
+	pthread_mutex_unlock(&sim_tcp_lock);
+}
+
+/* FALSE if FD wasn't open. */
+static int sim_tcp_closed(int fd)
+{
+	int i, found = 0;
+	pthread_mutex_lock(&sim_tcp_lock);
+	for (i = 0; i < sim_tcp_count; i++)
+		if (sim_tcp_open[i] == fd) {
+			sim_tcp_open[i] = sim_tcp_open[--sim_tcp_count];
+			found = 1;
+			break;
+		}
+	pthread_mutex_unlock(&sim_tcp_lock);
+	return found;
+}
+
 int host_tcp_connect(const char *host, const char *port)
 {
 	struct addrinfo hints, *info = NULL;
@@ -732,6 +782,8 @@ int host_tcp_connect(const char *host, const char *port)
 		fd = -1;
 	}
 	freeaddrinfo(info);
+	if (fd >= 0)
+		sim_tcp_opened(fd);
 	return fd < 0 ? -1 : fd;
 }
 
@@ -762,8 +814,24 @@ int host_tcp_send(int connection, const void *buffer, unsigned size)
 
 void host_tcp_close(int connection)
 {
-	if (connection >= 0)
+	if (connection >= 0) {
+		sim_tcp_closed(connection);
 		close(connection);
+	}
+}
+
+void host_tcp_close_all(void)
+{
+	int fd;
+	fprintf(stderr, "[sim] closing all connections: %d open\n", sim_tcp_count);
+	for (;;) {
+		pthread_mutex_lock(&sim_tcp_lock);
+		fd = sim_tcp_count > 0 ? sim_tcp_open[0] : -1;
+		pthread_mutex_unlock(&sim_tcp_lock);
+		if (fd < 0)
+			break;
+		host_tcp_close(fd);
+	}
 }
 
 int host_run_in_background(void (*fn)(void *arg), void *arg)

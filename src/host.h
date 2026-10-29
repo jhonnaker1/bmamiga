@@ -1,12 +1,29 @@
 /*
+ * BMA800XL - A bare metal Atari 800XL emulator for Raspberry Pi
+ * Copyright (C) 2026 aminch <https://github.com/aminch>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * Modified for BMCoco.
+ *
+ * Modified for BMAmiga.
+ *
  * host.h - services the Circle kernel provides to the emulator.
  *
  * The emulator (XRoar and the port in src/port/) is C and runs on core 1.
  * Everything it needs from the hardware goes through these functions, which
  * are implemented in src/kernel.cpp.
- *
- * This file is part of BMAmiga, a bare metal Amiga emulator for the
- * Raspberry Pi. See LICENSE for licensing details.
  */
 
 #ifndef BMAMIGA_HOST_H_
@@ -136,6 +153,11 @@ int host_tcp_connect(const char *host, const char *port);
 int host_tcp_recv(int connection, void *buffer, unsigned size);
 int host_tcp_send(int connection, const void *buffer, unsigned size);
 void host_tcp_close(int connection);
+/* Closes every connection (but those still being made), and waits a
+   moment for the far ends to be told: before a reboot or shut down, so
+   that a server isn't left holding a connection nobody will use (a
+   DriveWire server would for hours). */
+void host_tcp_close_all(void);
 /* A Wi-Fi network found by host_wifi_scan(). signal is in dBm. */
 struct host_wifi_ap {
 	char ssid[33];
