@@ -43,7 +43,9 @@ To move to a newer Amiberry:
      others by name) and Kickstart names (in `docs/ROMS.txt`).
    - Changes to the functions `bridge.cpp` calls.
    - A new version of `json.hpp` (`NLOHMANN_JSON_VERSION` in
-     `libretro/Makefile`): `THIRD_PARTY.md` and the card's licences name it.
+     `libretro/Makefile`): replace `third_party/nlohmann-json/nlohmann/json.hpp`
+     with that release's, and its version in that folder's README,
+     `THIRD_PARTY.md` and the card's licences.
 
 3. Check that the core still builds and links for the Pi, needing nothing
    Circle lacks:

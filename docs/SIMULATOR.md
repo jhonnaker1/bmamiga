@@ -54,8 +54,7 @@ Build and run the tests:
 tools/hostsim/run_tests.sh
 ```
 
-The first build compiles Amiberry, which takes a few minutes, and fetches
-one header Amiberry's build needs (nlohmann's `json.hpp`). Kickstart ROMs
+The first build compiles Amiberry, which takes a few minutes. Kickstart ROMs
 can't be distributed, so without any the tests start the Amiga with AROS.
 To boot Workbench, point them at a Kickstart 1.3 and a Workbench 1.3 disk
 (copies: the tests read them, but it's safest not to hand them the

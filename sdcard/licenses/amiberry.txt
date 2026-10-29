@@ -394,7 +394,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ------------------------------------------------------------------------------
 JSON for Modern C++, by Niels Lohmann
-(libretro/deps/nlohmann (fetched by Amiberry's build))
+(nlohmann/json.hpp, 3.11.3, kept in BMAmiga's third_party/nlohmann-json)
 ------------------------------------------------------------------------------
 
 Copyright (c) 2013-2023 Niels Lohmann <https://nlohmann.me>

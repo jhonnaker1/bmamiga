@@ -52,7 +52,7 @@ export async function loadMachine() {
   }
 }
 
-// Machine name, e.g. "Tandy CoCo 3 (NTSC)".
+// Machine name, e.g. "Amiga 500 (Kickstart 1.3)".
 export const machineName = () => current.name;
 
 // Name for display.

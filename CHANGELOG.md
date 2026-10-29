@@ -65,6 +65,13 @@
   folders, and only the Pi 4 and 5's firmware and config.txt sections.
   The web UI says Amiga and starts floppy images in DF0:
 
+- A build needs no download of Amiberry's json.hpp: nlohmann/json 3.11.3,
+  the version Amiberry pins, is kept in third_party/nlohmann-json, and
+  amiberry.mk points Amiberry's build at it
+- The web UI in Workbench 1.3's colours: its blue, white and orange, the
+  boing ball's red, and the Amiga logo's rainbow, in place of the CoCo's
+  green
+
 BMCoco's history, from which BMAmiga comes, follows.
 
 ## 0.5.5 – 2026-10-20

@@ -36,6 +36,12 @@ BMA_OBJECTS := $(filter-out $(addprefix $(BMA_OBJDIR)/,$(BMA_EXCLUDE)),$(call bm
 # in BMA_EXTRA (relative to src/port, without .cpp), built with the core's
 # flags so that they can use its headers.
 BMA_PORT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
+
+# nlohmann's json.hpp: BMAmiga's copy (third_party/nlohmann-json), first on
+# the include path, so that the Makefile's rule that fetches it from GitHub
+# into libretro/deps is never needed.
+NLOHMANN_JSON_HEADER := $(abspath $(BMA_PORT)/../../third_party/nlohmann-json/nlohmann/json.hpp)
+INCFLAGS := -I$(dir $(NLOHMANN_JSON_HEADER)).. $(INCFLAGS)
 BMA_OBJECTS += $(BMA_OBJDIR)/bmamiga/bridge.o $(addprefix $(BMA_OBJDIR)/bmamiga/,$(addsuffix .o,$(BMA_EXTRA)))
 
 $(BMA_OBJDIR)/bmamiga/%.o: $(BMA_PORT)/%.cpp | $(NLOHMANN_JSON_HEADER)

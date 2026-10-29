@@ -33,8 +33,9 @@ The Arm GNU Toolchain 15.2.rel1 is downloaded into
 `BMAMIGA_ALLOW_ANY_TOOLCHAIN=1` lets the build use whatever
 `aarch64-none-elf-gcc` is on the PATH.
 
-Amiberry's build fetches one header, nlohmann's `json.hpp`, from GitHub
-the first time (into `third_party/amiberry/libretro/deps`).
+A build needs no download beyond the toolchain and the Wi-Fi firmware:
+nlohmann's `json.hpp`, which Amiberry's own build would fetch from GitHub,
+is kept in `third_party/nlohmann-json`.
 
 ## Downloading the files
 
