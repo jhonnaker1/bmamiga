@@ -20,6 +20,17 @@
   networking, crash handlers and the JIT left out for now. zlib 1.3.1 is a
   submodule. make -C tools/picore builds it and checks the link
 
+- The Pi 4 and Pi 5 kernels (step 3; not yet run on a Pi): kernel8-rpi4.img
+  and kernel_2712.img, with Amiberry's core, BMAmiga's Circle layer and
+  zlib in place of XRoar. Only the 64-bit Pi 4 and 5 are built. The kernel
+  is about 63 MB with its BSS (Amiberry's 68000 interpreter is 24 MB of
+  code): KERNEL_MAX_SIZE is 80 MB, and build_sdcard.sh stops if a kernel
+  doesn't fit, since Circle halts without a word then. Thread-local storage
+  is set up before Amiberry starts; a Circle patch puts its two sections
+  together, as the linker needs; usleep() and sleep() for libstdc++. The
+  web UI starts floppy images (in DF0:) and edits bmamiga.cfg. XRoar's
+  regular expressions (posix_extra.c) are gone
+
 BMCoco's history, from which BMAmiga comes, follows.
 
 ## 0.5.5 – 2026-10-20

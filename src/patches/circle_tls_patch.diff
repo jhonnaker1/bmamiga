@@ -1,0 +1,33 @@
+diff --git a/circle.ld b/circle.ld
+index 717486c8..bc284376 100644
+--- a/circle.ld
++++ b/circle.ld
+@@ -64,6 +64,14 @@ SECTIONS
+ 		__tdata_end = .;
+ 	}
+ 
++	.tbss (NOLOAD) : ALIGN(8) {
++		__tbss_start = .;
++
++		*(.tbss .tbss.*)
++
++		__tbss_end = .;
++	}
++
+ 	.bss : {
+ 		__bss_start = .;
+ 
+@@ -73,13 +81,5 @@ SECTIONS
+ 		__bss_end = .;
+ 	}
+ 
+-	.tbss (NOLOAD) : ALIGN(8) {
+-		__tbss_start = .;
+-
+-		*(.tbss .tbss.*)
+-
+-		__tbss_end = .;
+-	}
+-
+ 	_end = .;
+ }

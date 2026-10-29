@@ -30,15 +30,14 @@ extern "C" const char *bmamiga_machine_description(void);
 
 namespace {
 
-// What XRoar can start directly (xroar_load_file_by_type): disk images,
-// tapes, cartridges and machine code programs.
+// What the web UI can start: floppy images, put in DF0: (as the menu's
+// floppy page takes them), the Amiga reset.
 const char *const kRunTypes[] = {
-    "dsk", "vdk", "jvc", "os9", "dmk", "cas", "c10", "k7", "ccc", "rom",
-    "bin", "hex", "s19", 0,
+    "adf", "adz", "dms", "ipf", "zip", 0,
 };
 
 const WebUiMachine kMachine = {
-    "/xroar.conf", kRunTypes,
+    "/bmamiga.cfg", kRunTypes,
 };
 
 char Lower(char c) {

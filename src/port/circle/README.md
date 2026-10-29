@@ -39,7 +39,8 @@ before Amiberry starts, gives it one block.
   JIT), and tries smaller sizes until one is given: reservations over
   320 MB fail. The JIT is left out (`LIBRETRO_NO_JIT`).
 - `iconv()` between UTF-8 and ISO-8859-1 (the Amiga's file names),
-  `timegm()`, `pread()`, `pwrite()`, `access()`.
+  `timegm()`, `pread()`, `pwrite()`, `access()`, and `usleep()` and
+  `sleep()` for libstdc++'s `std::this_thread::sleep_for()`.
 - What there is none of fails: processes, shared libraries, shared
   memory, terminals, `ioctl()`; `sigaction()` does nothing.
 

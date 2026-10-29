@@ -3,15 +3,14 @@
 # Builds the third party libraries (circle-stdlib: Circle and newlib, and the
 # Circle addons) and then the BMAmiga kernel for one board:
 #
-#   ./make_all.sh [pi0|pi2|pi3|pi4|pi5] [--skip-patches]
+#   ./make_all.sh [pi4|pi5] [--skip-patches]
 #
-#   pi3 (default)  kernel8-32.img: Pi 3 and Pi Zero 2 W
-#   pi2            kernel7.img: Pi 2
-#   pi0            kernel.img: Pi Zero and Zero W (one core)
-#   pi4            kernel8-rpi4.img: Pi 4 B and Pi 400, 64-bit, with
+#   pi4 (default)  kernel8-rpi4.img: Pi 4 B and Pi 400, 64-bit, with
 #                  armstub8-rpi4.bin (see docs/PI4.md)
 #   pi5            kernel_2712.img: Pi 5, Pi 500 and Pi 500+, 64-bit (see
 #                  docs/PI5.md)
+#
+# BMAmiga needs a 64-bit Pi (Amiberry's core is 64-bit only here).
 #
 # --skip-patches leaves Circle as it is instead of resetting it and applying
 # src/patches/ again.
@@ -31,12 +30,12 @@ SKIP_PATCHES=0
 for arg in "$@"
 do
     case "$arg" in
-        pi0|pi2|pi3|pi4|pi5) BOARD=$arg ;;
+        pi4|pi5) BOARD=$arg ;;
         --skip-patches) SKIP_PATCHES=1 ;;
-        *) echo "Usage: $0 [pi0|pi2|pi3|pi4|pi5] [--skip-patches]" >&2; exit 1 ;;
+        *) echo "Usage: $0 [pi4|pi5] [--skip-patches]" >&2; exit 1 ;;
     esac
 done
-BOARD=${BOARD:-pi3}
+BOARD=${BOARD:-pi4}
 RASPI=${BOARD#pi}
 # The Pi Zero is Circle's (and the firmware's) Raspberry Pi 1.
 if [ "$RASPI" = "0" ]
@@ -161,7 +160,10 @@ echo "BUILD CIRCLE-STDLIB for Raspberry Pi $RASPI"
 echo "=============================================================="
 cd "$CIRCLE_STDLIB"
 find . -name config.cache -delete
-bash ./configure --raspberrypi=$RASPI --kernel-max-size 16 "${CONFIGURE_PREFIX[@]}"
+# The kernel, its BSS included, must fit in KERNEL_MAX_SIZE, or Circle halts
+# at start without a word: Amiberry's core makes it about 63 MB (its 68000
+# interpreter alone is 24 MB of code).
+bash ./configure --raspberrypi=$RASPI --kernel-max-size 80 "${CONFIGURE_PREFIX[@]}"
 make -C libs/circle clean >/dev/null 2>&1 || true
 make -j"$(nproc)"
 

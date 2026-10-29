@@ -3,9 +3,12 @@
 #
 # Run ./make_all.sh once first; it builds circle-stdlib and then this.
 # After that "make" rebuilds the kernel image for the board circle-stdlib is
-# built for: kernel7.img (Pi 2), kernel8-32.img (Pi 3), kernel8-rpi4.img
-# (Pi 4, 64-bit) or kernel_2712.img (Pi 5, 64-bit).
+# built for: kernel8-rpi4.img (Pi 4) or kernel_2712.img (Pi 5). BMAmiga
+# needs a 64-bit Pi 4 or 5.
 # ./build_sdcard.sh stages everything for the SD card in build/sdcard.
+#
+# Amiberry's core, BMAmiga's Circle layer (src/port/circle) and zlib are
+# built by src/port/circle/circle.mk into build/pi4 or build/pi5.
 #
 
 ROOT := $(CURDIR)
@@ -20,30 +23,30 @@ include third_party/circle-stdlib/Config.mk
 # pick the board's display and sound code.
 include $(CIRCLEHOME)/Config.mk
 
+ifneq ($(filter 4 5,$(RASPPI))-$(AARCH),$(RASPPI)-64)
+$(error BMAmiga needs a 64-bit Pi 4 or 5: ./make_all.sh pi4 or pi5)
+endif
+
 BMAMIGA_VERSION ?= $(shell tools/version.sh --semver)
 BMAMIGA_GIT ?= $(shell tools/version.sh --git)
-XROAR := third_party/xroar
-XROAR_VERSION := $(shell tools/xroar_version.sh)
+AMIBERRY := third_party/amiberry
+AMIBERRY_VERSION := $(shell tools/amiberry_version.sh)
 
-include src/port/xroar.mk
-
-BUILD := build
-XROAR_OBJS := $(addprefix $(BUILD)/portalib/,$(XROAR_PORTALIB_SRCS:.c=.o)) \
-              $(addprefix $(BUILD)/xroar/,$(XROAR_SRCS:.c=.o))
-XROAR_LIB := $(BUILD)/libxroar.a
+# circle.mk's settings: where to build, and the toolchain's folder (for
+# its C++ headers).
+CIRCLE_BUILD := $(ROOT)/build/pi$(RASPPI)
+TOOLCHAIN := $(abspath $(dir $(shell command -v $(PREFIX64)gcc))/..)
 
 OBJS = src/main.o src/kernel.o src/logging.o src/options.o \
-       src/port/platform.o src/port/joystick.o src/port/menu.o src/port/osd.o \
-       src/port/activity.o src/port/becker.o src/port/cartbus.o src/port/dwserver.o src/port/hires.o src/port/rs232.o src/port/netcall.o src/port/posix_extra.o src/port/fswrap.o \
+       src/port/platform.o src/port/keys.o src/port/menu.o src/port/osd.o \
+       src/port/fswrap.o \
        src/network.o src/network_time_sync.o \
        src/webui/webui.o src/webui/webui_http.o src/webui/webui_fs.o \
        src/webui/webui_machine.o src/webui/webui_assets.o \
        src/sdcard/sd_fs_fatfs.o src/sdcard/sd_fs_file.o
 
-# Display and sound. The Pi 2 and 3 use the VideoCore through VCHIQ
-# (dispmanx, from BMC64); the Pi 4 and 5 use Circle's framebuffer and HDMI
-# sound drivers (src/av/, shared by both; see docs/PI4.md and docs/PI5.md).
-ifneq ($(filter 4 5,$(RASPPI)),)
+# Display and sound: Circle's framebuffer and HDMI sound drivers (src/av/,
+# see docs/PI4.md and docs/PI5.md), and the 3D GPU's CRT effect.
 OBJS += src/av/video.o src/av/sound.o src/av/hdmisound.o src/av/scaler.o \
         src/kms/common/filter.o src/kms/common/modes.o \
         src/v3d/gpu.o src/v3d/draw.o src/v3d/crt.o \
@@ -60,12 +63,9 @@ endif
 # Smooth scaling and the CRT shader are drawn by the ARM: -O3 lets GCC turn
 # their per-pixel loops into NEON code (tools/pi4scaler tests the same).
 src/av/scaler.o: OPTIMIZE = -O3
-else
-OBJS += src/fbl.o src/crt_pi_idx.o src/crt_pi_rgb.o src/vchiqsound.o \
-        src/vchiqsoundbasedevice.o
-endif
 
 include $(CIRCLEHOME)/Rules.mk
+include src/port/circle/circle.mk
 
 INCLUDE := $(CIRCLE_STDLIB_INCLUDES) $(INCLUDE) -I $(CIRCLEHOME)/addon/fatfs
 
@@ -73,38 +73,14 @@ INCLUDE := $(CIRCLE_STDLIB_INCLUDES) $(INCLUDE) -I $(CIRCLEHOME)/addon/fatfs
 LDFLAGS += --wrap=stat
 
 VERSION_DEFINES = -DBMAMIGA_VERSION=\"$(BMAMIGA_VERSION)\" \
-                  -DBMAMIGA_GIT=\"$(BMAMIGA_GIT)\" -DXROAR_VERSION=\"$(XROAR_VERSION)\"
+                  -DBMAMIGA_GIT=\"$(BMAMIGA_GIT)\" -DAMIBERRY_VERSION=\"$(AMIBERRY_VERSION)\"
 CFLAGS += $(VERSION_DEFINES)
 CPPFLAGS += $(VERSION_DEFINES)
 
-# The port's C files include XRoar headers, and src/port/config.h must be
-# found before anything else called config.h.
-#
-# XRoar's serialisation code (serialise.h) picks a type with _Generic and
-# expects int32_t to be int, as on most hosts. arm-none-eabi makes it long,
-# also 32 bits; making it int for XRoar's code changes nothing else.
-XROAR_INCLUDE = -DHAVE_CONFIG_H -I src/port -I $(XROAR) -I $(XROAR)/src -I $(XROAR)/portalib \
-                -U__INT32_TYPE__ -D__INT32_TYPE__=int \
-                -U__UINT32_TYPE__ '-D__UINT32_TYPE__=unsigned int'
-src/port/%.o src/port/%.d: CFLAGS += $(XROAR_INCLUDE) -std=gnu11
-
-# XRoar itself: compiled into build/ so the submodule stays clean.
-XROAR_CFLAGS = $(XROAR_INCLUDE) -std=gnu11 -w
-
-$(BUILD)/xroar/%.o: $(XROAR)/src/%.c src/port/config.h
-	@mkdir -p $(dir $@)
-	@echo "  CC    $<"
-	@$(CC) $(CFLAGS) $(XROAR_CFLAGS) -c -o $@ $<
-
-$(BUILD)/portalib/%.o: $(XROAR)/portalib/%.c src/port/config.h
-	@mkdir -p $(dir $@)
-	@echo "  CC    $<"
-	@$(CC) $(CFLAGS) $(XROAR_CFLAGS) -c -o $@ $<
-
-$(XROAR_LIB): $(XROAR_OBJS)
-	@echo "  AR    $@"
-	@rm -f $@
-	@$(AR) cr $@ $(XROAR_OBJS)
+# The port's C files talk to Amiberry through libretro.h, and the menu uses
+# Amiberry's on-screen keyboard font (osdep/imgui_osk_font.h).
+src/port/%.o src/port/%.d: CFLAGS += -I src/port -I $(AMIBERRY)/libretro \
+	-I $(AMIBERRY)/libretro/libretro-common/include -I $(AMIBERRY)/src -std=gnu11
 
 # The web UI's pages are compiled in. Regenerate them when they change.
 WEBUI_ASSETS = $(shell find src/webui/assets -type f)
@@ -112,29 +88,11 @@ src/webui/webui_assets.c: $(WEBUI_ASSETS) tools/gen_webui_assets.py
 	@echo "  GEN   $@"
 	@python3 tools/gen_webui_assets.py
 
-# XRoar's configure writes config.h at its top level, which would be picked
-# up instead of src/port/config.h. It must not exist in the submodule.
-check-submodule:
-	@if [ -f $(XROAR)/config.h ]; then \
-		echo "Remove $(XROAR)/config.h (generated by XRoar's configure)"; \
-		exit 1; \
-	fi
+$(TARGET).img: $(CIRCLE_LIBS)
 
-$(TARGET).img: check-submodule $(XROAR_LIB)
-
-ifneq ($(filter 4 5,$(RASPPI)),)
-VIDEOCORE_LIBS :=
-else
-VIDEOCORE_LIBS := \
-	$(CIRCLEHOME)/addon/vc4/vchiq/libvchiq.a \
-	$(CIRCLEHOME)/addon/vc4/interface/bcm_host/libbcm_host.a \
-	$(CIRCLEHOME)/addon/vc4/interface/khronos/libkhrn_client.a \
-	$(CIRCLEHOME)/addon/vc4/interface/vmcs_host/libvmcs_host.a \
-	$(CIRCLEHOME)/addon/vc4/interface/vcos/libvcos.a \
-	$(CIRCLEHOME)/addon/linux/liblinuxemu.a
-endif
-
-LIBS := $(XROAR_LIB) \
+# Amiberry's core first: BMAmiga's Circle layer and zlib give it what
+# newlib and Circle don't, and must come before them.
+LIBS := $(CIRCLE_LIBS) \
 	$(CIRCLE_STDLIB_INSTALL_DIR)/lib/libm.a \
 	$(CIRCLE_STDLIB_INSTALL_DIR)/lib/libc.a \
 	$(CIRCLE_STDLIB_INSTALL_DIR)/lib/libcirclenewlib.a \
@@ -146,7 +104,6 @@ LIBS := $(XROAR_LIB) \
 	$(CIRCLEHOME)/lib/net/libnet.a \
 	$(CIRCLEHOME)/addon/wlan/hostap/wpa_supplicant/libwpa_supplicant.a \
 	$(CIRCLEHOME)/addon/wlan/libwlan.a \
-	$(VIDEOCORE_LIBS) \
 	$(CIRCLEHOME)/lib/sound/libsound.a \
 	$(CIRCLEHOME)/lib/sched/libsched.a \
 	$(CIRCLEHOME)/lib/libcircle.a
@@ -155,9 +112,9 @@ EXTRACLEAN += $(OBJS) src/*.o src/port/*.d src/*.d src/webui/*.d src/sdcard/*.d 
               src/av/*.o src/av/*.d src/kms/common/*.o src/kms/common/*.d \
               src/kms/pi4/*.o src/kms/pi4/*.d \
               src/kms/pi5/*.o src/kms/pi5/*.d src/v3d/*.o src/v3d/*.d
-.PHONY: check-submodule distclean
+.PHONY: distclean
 
 distclean: clean
-	rm -rf $(BUILD)
+	rm -rf build/pi4 build/pi5
 
 -include $(DEPS)

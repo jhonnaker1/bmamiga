@@ -34,6 +34,9 @@ extern "C" {
 // 1, and its Reboot / Shut Down request.
 void bmamiga_main(void);
 void bmamiga_request_power(int power_off);
+// From src/port/circle/tls.c: gives the core it runs on a block for
+// Amiberry's thread_local variables (Circle sets no thread pointer).
+int bma_tls_init(void);
 }
 
 static const char FromKernel[] = "bmamiga";
@@ -85,6 +88,7 @@ void CEmulatorCore::Run(unsigned nCore) {
     while (!m_bLaunch) {
       DataMemBarrier();
     }
+    bma_tls_init();
     bmamiga_main();
   }
 #if RASPPI >= 4
@@ -184,7 +188,7 @@ bool CKernel::Initialize(void) {
   }
   mLogger.RegisterPanicHandler(PanicHandler);
   mLogger.Write(FromKernel, LogNotice, "BMAmiga " BMAMIGA_VERSION " (" BMAMIGA_GIT
-                ", XRoar " XROAR_VERSION ")");
+                ", Amiberry " AMIBERRY_VERSION ")");
 
   if (!mTimer.Initialize()) {
     return false;
@@ -314,6 +318,7 @@ TShutdownMode CKernel::Run(void) {
   // One core (the Pi Zero): the emulator runs here and yields once a frame,
   // which lets the USB task and Circle's other tasks run.
   new CUSBPlugAndPlayTask;
+  bma_tls_init();
   bmamiga_main();
   return ShutdownHalt;
 #else

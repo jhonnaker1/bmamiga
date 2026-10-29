@@ -4,14 +4,11 @@
 # build/sdcard. Copy the contents of that folder to the root of a FAT32
 # formatted SD card.
 #
-#   ./build_sdcard.sh [pi0|pi2|pi3|pi4|pi5 ...] [--skip-patches] [--skip-tests]
+#   ./build_sdcard.sh [pi4|pi5 ...] [--skip-patches] [--skip-tests]
 #
-#   pi3     kernel8-32.img: Pi 3 and Pi Zero 2 W
-#   pi2     kernel7.img: Pi 2
-#   pi0     kernel.img: Pi Zero and Zero W
 #   pi4     kernel8-rpi4.img and armstub8-rpi4.bin: Pi 4 B and Pi 400
 #   pi5     kernel_2712.img: Pi 5, Pi 500 and Pi 500+
-#   (none)  all of them, as a release has
+#   (none)  both, as a release has (BMAmiga needs a 64-bit Pi)
 #
 # Several boards can be given, e.g. ./build_sdcard.sh pi4 pi5.
 #
@@ -34,7 +31,7 @@ BUILD_DIR="$SRC_DIR/build"
 STAGING_DIR="$BUILD_DIR/sdcard"
 # circle-stdlib's configure writes the board (RASPPI) into Circle's Config.mk.
 CIRCLE_CONFIG="$SRC_DIR/third_party/circle-stdlib/libs/circle/Config.mk"
-ALL_BOARDS=(pi0 pi2 pi3 pi4 pi5)
+ALL_BOARDS=(pi4 pi5)
 BOARDS=()
 SKIP_PATCHES=0
 SKIP_TESTS=0
@@ -42,7 +39,7 @@ SKIP_TESTS=0
 for arg in "$@"
 do
     case "$arg" in
-        pi0|pi2|pi3|pi4|pi5)
+        pi4|pi5)
             if [[ " ${BOARDS[*]:-} " != *" $arg "* ]]
             then
                 BOARDS+=("$arg")
@@ -50,11 +47,17 @@ do
             ;;
         --skip-patches) SKIP_PATCHES=1 ;;
         --skip-tests) SKIP_TESTS=1 ;;
-        *) echo "Usage: $0 [pi0|pi2|pi3|pi4|pi5 ...] [--skip-patches] [--skip-tests]" >&2; exit 1 ;;
+        *) echo "Usage: $0 [pi4|pi5 ...] [--skip-patches] [--skip-tests]" >&2; exit 1 ;;
     esac
 done
 
 cd "$SRC_DIR"
+
+# nproc is GNU; macOS has sysctl.
+if ! command -v nproc >/dev/null 2>&1
+then
+    nproc() { sysctl -n hw.ncpu; }
+fi
 
 # The board circle-stdlib is built for (pi0, pi2, pi3, pi4, pi5), if any.
 # Circle calls the Pi Zero the Pi 1.
@@ -188,6 +191,22 @@ do
         echo "Expected kernel was not created: $kernel" >&2
         exit 1
     fi
+    # Circle halts at start, without a word, if the kernel (its BSS
+    # included) ends past KERNEL_MAX_SIZE (make_all.sh's --kernel-max-size).
+    if ! command -v aarch64-none-elf-nm >/dev/null 2>&1
+    then
+        export BMAMIGA_AARCH=64
+        source "$SRC_DIR/get_gnu_toolchain.sh"
+    fi
+    elf=$SRC_DIR/${kernel%.img}.elf
+    max=$(sed -n 's/.*-DKERNEL_MAX_SIZE=\(0x[0-9A-Fa-f]*\).*/\1/p' "$SRC_DIR/third_party/circle-stdlib/Config.mk" | head -1)
+    end=$(aarch64-none-elf-nm "$elf" | awk '$3 == "_end" {print $1}')
+    if [ -z "$max" ] || [ -z "$end" ] || [ $(( 0x$end - 0x80000 )) -gt $(( max )) ]
+    then
+        echo "$kernel is too big for KERNEL_MAX_SIZE (${max:-unknown}): raise --kernel-max-size in make_all.sh" >&2
+        exit 1
+    fi
+    echo "$kernel: $(( (0x$end - 0x80000) / 1048576 )) MB of $(( max / 1048576 )) MB"
     cp "$SRC_DIR/$kernel" "$STAGING_DIR/"
     if [ "$board" = "pi4" ]
     then

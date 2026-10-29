@@ -1,5 +1,5 @@
 /*
- * fswrap.c - file system fixes for XRoar on Circle's FatFs.
+ * fswrap.c - file system fixes for Circle's FatFs.
  *
  * FatFs cannot stat() the root directory of a volume, so BMAmiga's file
  * browser would think "/" doesn't exist and refuse to go up to it. The

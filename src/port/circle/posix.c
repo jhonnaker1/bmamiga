@@ -323,6 +323,23 @@ time_t timegm(struct tm *tm)
 	return (time_t) (((days * 24 + tm->tm_hour) * 60 + tm->tm_min) * 60 + tm->tm_sec);
 }
 
+/* libstdc++'s std::this_thread::sleep_for() (built without nanosleep())
+   calls these, which newlib hasn't: BMAmiga's sleep (src/port/clock.c),
+   which lets the other threads run. */
+int bma_usleep(useconds_t us);
+
+int usleep(useconds_t us)
+{
+	return bma_usleep(us);
+}
+
+unsigned sleep(unsigned seconds)
+{
+	while (seconds-- > 0)
+		bma_usleep(1000000);
+	return 0;
+}
+
 /* ---- What there is none of ----------------------------------------------- */
 
 FILE *popen(const char *command, const char *type)
