@@ -50,13 +50,12 @@ do too.
    made for a fast JIT; the menu's speed line and the log's every 10 s
    say how close it gets.
 3. **Copying AmiKit to the card**: 2.9 GB, 68,666 files (the `.uaem` files
-   keep the Amiga's protection bits and comments). Five names end in a dot
-   or a space, which FAT32 can't hold as they are (`Libs/xad/R.A.W.`,
-   `Demos/Relic/Relic `, `Utilities/Eagleplayer/Eagleplayers/M.O.N.`,
-   `Utilities/GMPlay/Tones/Synth pad etc.`,
-   `Utilities/GMPlay/Tones/Guitar/Distortion Gt.`): Amiberry's escaping of
-   names, or exFAT, if Circle's FatFs has it on. A folder that size on the
-   Pi wants a speed test too.
+   keep the Amiga's protection bits and comments), with
+   `tools/copy_amiga_folder.py` (0.2.3), which gives the five names FAT32
+   can't hold (`Libs/xad/R.A.W.`, `Demos/Relic/Relic ` and three more,
+   ending in a dot or a space) Amiberry's `%xx` names, and the 186 with
+   accents macOS keeps decomposed the form Amiberry needs: 228 names in
+   all. A folder that size on the Pi wants a speed test.
 4. **The JIT**, only if 2. says so: Amiberry's ARM64 JIT reserves 4 GB of
    address space for the Amiga's memory (`LIBRETRO_NO_JIT` leaves it out
    now). On a Pi 5 with 8 GB that could be possible; a project of its own.

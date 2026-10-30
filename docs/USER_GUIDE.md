@@ -152,6 +152,25 @@ A hard drive is either:
   and comments) in small `.uaem` files beside them; leave those where
   they are.
 
+A hard disk image can be up to 4 GB, the most a file on FAT32 can be.
+
+**Copying an Amiga folder to the card.** The Amiga allows characters in
+file names that FAT32 doesn't (`\ * ? " < > |`, and a name ending in a dot
+or a space). Amiberry stores those characters as `%xx` and gives the Amiga
+the names back as they were, so files the Amiga saves are fine. A folder
+made on a Mac or Linux PC (an Amiga distribution, or AmiKit's), whose
+files never went through Amiberry, can still have such names, and copying
+it to the card loses them. Copy it with `tools/copy_amiga_folder.py`
+(Python 3; macOS, Linux or Windows), which names them as Amiberry would:
+
+```
+python3 tools/copy_amiga_folder.py /path/to/MyAmigaFolder /Volumes/BMAMIGA/disks/MyAmigaFolder
+```
+
+`--dry-run` lists the names it would change, copying nothing. Accented
+letters (ä, é, ß) in names show on the Amiga as they are, and on a Mac or
+PC too.
+
 A change to the hard drives takes effect at a **Hard Reset**, which the
 menu offers. The Amiga boots from DH0: when DF0: is empty; a floppy in
 DF0: comes first. Amiga Forever's `workbench-135.hdf` (with Kickstart 1.3)

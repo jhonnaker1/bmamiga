@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.2.3 – 2026-10-30
+
+- Disk images past 2 GB: Circle's C library cut a file position to 32
+  bits (`lseek()`'s `int`), so an image's data past 2 GB couldn't be
+  reached, though FAT32's files go to 4 GB. 64 bits now
+  (newlib_seek64_patch.diff)
+- File names in UTF-8 on the SD card (circle_fatfs_utf8_patch.diff):
+  FatFs used code page 850, while Amiberry gives and expects UTF-8, so a
+  name with an accented letter was garbled on the card, for a Mac or PC,
+  and one made on a Mac didn't reach the Amiga as it was
+- tools/copy_amiga_folder.py: copies an Amiga folder (a folder drive, such
+  as AmiKit's) to the card with the names Amiberry would have given it:
+  the Amiga's characters FAT32 can't hold as %xx, a file's .uaem with it,
+  accented letters as Amiberry needs them. All of AmiKit's 78,647 names
+  come out safe for FAT32 and back to the Amiga as they were
+
 ## 0.2.2 – 2026-10-30
 
 From the Pi 5 test of 0.2.1 (the CD32 with Battle Chess):
