@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.2 – 2026-10-30
 
 From the Pi 5 test of 0.2.1 (the CD32 with Battle Chess):
 
