@@ -27,7 +27,7 @@
 
 #include <stddef.h>
 
-int sd_stat(const char *path, uint32_t *size, int *is_dir) {
+int sd_stat(const char *path, uint64_t *size, int *is_dir) {
   sd_info info;
   int rc = sd_stat_info(path, &info);
   if (rc == SD_OK) {
@@ -66,7 +66,7 @@ int sd_read_file(const char *path, char *buf, int size) {
   }
   int result = SD_ERROR;
   unsigned got = 0;
-  if (sd_size(f) < (uint32_t)size &&
+  if (sd_size(f) < (uint64_t)size &&
       sd_read(f, buf, (unsigned)size - 1, &got) == SD_OK) {
     buf[got] = '\0';
     result = (int)got;

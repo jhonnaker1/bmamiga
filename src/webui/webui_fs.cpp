@@ -45,6 +45,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "../host.h"
 #include "../sdcard/sd_fs.h"
 
 // Implemented in src/vice_network.cpp.
@@ -56,6 +57,29 @@ extern "C" void emu_autostart_interrupt(const char *path);
 using webhttp::CChunkedResponse;
 
 namespace {
+
+// The volume a request is for (ResolveTarget()): "" for the card's own
+// (circle_get_disk_volume()), or "SD2", the card's second partition
+// (host_volume2()), whose paths go to sd_fs with its name ("SD2:/x").
+char g_volume[8] = "";
+
+// PATH (a sandboxed path, "/x") on the request's volume, for sd_fs. Four
+// at a time (a rename has two).
+const char *V(const char *path) {
+  static char paths[4][600];
+  static unsigned next;
+  if (g_volume[0] == '\0') {
+    return path;
+  }
+  char *out = paths[next++ % 4];
+  snprintf(out, sizeof(paths[0]), "%s:%s", g_volume, path);
+  return out;
+}
+
+// The request's volume, as the client names it.
+const char *VolumeName(void) {
+  return g_volume[0] != '\0' ? g_volume : circle_get_disk_volume();
+}
 
 const unsigned WEBUI_FS_MAX_ENTRIES = 6000;
 // Matches Circle's TCP receive window (see circle_tcp_window_patch.diff), so
@@ -69,45 +93,9 @@ const unsigned WEBUI_FS_EDIT_MAX = 256 * 1024;
 // scratch buffer is safe and keeps it off the task stack.
 u8 s_io_buffer[WEBUI_FS_IO_CHUNK];
 
-// CP850 (the FatFs OEM code page in this build) 0x80..0xFF -> Unicode.
-const unsigned short kCp850High[128] = {
-    0x00C7, 0x00FC, 0x00E9, 0x00E2, 0x00E4, 0x00E0, 0x00E5, 0x00E7,
-    0x00EA, 0x00EB, 0x00E8, 0x00EF, 0x00EE, 0x00EC, 0x00C4, 0x00C5,
-    0x00C9, 0x00E6, 0x00C6, 0x00F4, 0x00F6, 0x00F2, 0x00FB, 0x00F9,
-    0x00FF, 0x00D6, 0x00DC, 0x00F8, 0x00A3, 0x00D8, 0x00D7, 0x0192,
-    0x00E1, 0x00ED, 0x00F3, 0x00FA, 0x00F1, 0x00D1, 0x00AA, 0x00BA,
-    0x00BF, 0x00AE, 0x00AC, 0x00BD, 0x00BC, 0x00A1, 0x00AB, 0x00BB,
-    0x2591, 0x2592, 0x2593, 0x2502, 0x2524, 0x00C1, 0x00C2, 0x00C0,
-    0x00A9, 0x2563, 0x2551, 0x2557, 0x255D, 0x00A2, 0x00A5, 0x2510,
-    0x2514, 0x2534, 0x252C, 0x251C, 0x2500, 0x253C, 0x00E3, 0x00C3,
-    0x255A, 0x2554, 0x2569, 0x2566, 0x2560, 0x2550, 0x256C, 0x00A4,
-    0x00F0, 0x00D0, 0x00CA, 0x00CB, 0x00C8, 0x0131, 0x00CD, 0x00CE,
-    0x00CF, 0x2518, 0x250C, 0x2588, 0x2584, 0x00A6, 0x00CC, 0x2580,
-    0x00D3, 0x00DF, 0x00D4, 0x00D2, 0x00F5, 0x00D5, 0x00B5, 0x00FE,
-    0x00DE, 0x00DA, 0x00DB, 0x00D9, 0x00FD, 0x00DD, 0x00AF, 0x00B4,
-    0x00AD, 0x00B1, 0x2017, 0x00BE, 0x00B6, 0x00A7, 0x00F7, 0x00B8,
-    0x00B0, 0x00A8, 0x00B7, 0x00B9, 0x00B3, 0x00B2, 0x25A0, 0x00A0,
-};
-
-void EmitUtf8(CChunkedResponse *r, unsigned cp) {
-  char out[3];
-  if (cp < 0x80) {
-    out[0] = (char) cp;
-    r->WriteN(out, 1);
-  } else if (cp < 0x800) {
-    out[0] = (char) (0xC0 | (cp >> 6));
-    out[1] = (char) (0x80 | (cp & 0x3F));
-    r->WriteN(out, 2);
-  } else {
-    out[0] = (char) (0xE0 | (cp >> 12));
-    out[1] = (char) (0x80 | ((cp >> 6) & 0x3F));
-    out[2] = (char) (0x80 | (cp & 0x3F));
-    r->WriteN(out, 3);
-  }
-}
-
 // Write s as a JSON string literal (with surrounding quotes), escaping
-// control characters and translating the OEM high range to UTF-8.
+// control characters. Names are UTF-8 on the card (FatFs's API is UTF-8,
+// src/patches/circle_fatfs_utf8_patch.diff), as JSON wants them.
 void JsonString(CChunkedResponse *r, const char *s) {
   r->Write("\"");
   for (const unsigned char *p = (const unsigned char *) s; *p != '\0'; p++) {
@@ -123,11 +111,9 @@ void JsonString(CChunkedResponse *r, const char *s) {
       r->Write("\\t");
     } else if (c < 0x20) {
       r->Printf("\\u%04x", c);
-    } else if (c < 0x80) {
+    } else {
       char ch = (char) c;
       r->WriteN(&ch, 1);
-    } else {
-      EmitUtf8(r, kCp850High[c - 0x80]);
     }
   }
   r->Write("\"");
@@ -237,7 +223,11 @@ int ResolveTarget(CSocket *socket, const char *query, char *clean,
     strncpy(vol, disk, sizeof(vol) - 1);
     vol[sizeof(vol) - 1] = '\0';
   }
-  if (strcmp(vol, disk) != 0) {
+  if (strcmp(vol, disk) == 0) {
+    g_volume[0] = '\0';
+  } else if (strcmp(vol, "SD2") == 0 && host_volume2() != 0) {
+    strcpy(g_volume, "SD2");
+  } else {
     webhttp::SendText(socket, 404, "Not Found", "unknown volume\n");
     return -1;
   }
@@ -304,7 +294,7 @@ boolean IsEditableName(const char *name) {
 
 // The config files are editable only in the volume root.
 boolean IsEditablePath(const char *clean) {
-  if (clean[0] != '/') return FALSE;
+  if (clean[0] != '/' || g_volume[0] != '\0') return FALSE;
   const char *base = strrchr(clean, '/') + 1;
   return base == clean + 1 && IsEditableName(base);
 }
@@ -312,6 +302,8 @@ boolean IsEditablePath(const char *clean) {
 // Uploads must not clobber the boot configuration or the Wi-Fi firmware
 // directory.
 boolean IsProtectedPath(const char *clean) {
+  // The boot files are the card's own volume's (not the second partition's).
+  if (g_volume[0] != '\0') return FALSE;
   const char *seg = clean;
   while (*seg == '/') seg++;
   const char *seg_end = seg;
@@ -331,11 +323,9 @@ boolean IsProtectedPath(const char *clean) {
 }
 
 // A name typed into New folder / Rename: one path segment that FAT stores
-// exactly as written. Printable ASCII only, because paths reach FatFs
-// unconverted (its OEM code page is CP850, and only the listing translates
-// to UTF-8), so a UTF-8 name would be stored garbled. FatFs would also
-// silently trim a trailing dot or space, so those are refused rather than
-// creating a different name than the one asked for.
+// exactly as written (in UTF-8, as FatFs's API is). FatFs would silently
+// trim a trailing dot or space, so those are refused rather than creating
+// a different name than the one asked for.
 boolean IsValidEntryName(const char *name) {
   size_t length = strlen(name);
   if (length == 0 || length > SD_MAX_NAME_LEN) return FALSE;
@@ -344,7 +334,7 @@ boolean IsValidEntryName(const char *name) {
   }
   for (const char *p = name; *p != '\0'; p++) {
     unsigned char c = (unsigned char) *p;
-    if (c < 0x20 || c >= 0x7F || c == '/' || c == '\\' || c == ':' ||
+    if (c < 0x20 || c == 0x7F || c == '/' || c == '\\' || c == ':' ||
         c == '*' || c == '?' || c == '"' || c == '<' || c == '>' ||
         c == '|') {
       return FALSE;
@@ -354,7 +344,7 @@ boolean IsValidEntryName(const char *name) {
 }
 
 const char *const kBadNameText =
-    "invalid name: use plain ASCII without / \\ : * ? \" < > |, and no "
+    "invalid name: no / \\ : * ? \" < > |, and no "
     "leading space or trailing space or dot\n";
 
 enum BodyResult {
@@ -372,7 +362,7 @@ BodyResult ReceiveBodyToFile(CSocket *socket, const char *temppath,
                              const unsigned char *prefetched,
                              unsigned prefetched_len, unsigned long total,
                              boolean reject_nul) {
-  sd_file *file = sd_open(temppath, SD_WRITE);
+  sd_file *file = sd_open(V(temppath), SD_WRITE);
   if (file == 0) {
     return BODY_CREATE_FAILED;
   }
@@ -464,7 +454,7 @@ BodyResult ReceiveBodyToFile(CSocket *socket, const char *temppath,
     result = BODY_WRITE_FAILED;
   }
   if (result != BODY_OK) {
-    sd_unlink(temppath);
+    sd_unlink(V(temppath));
   }
   return result;
 }
@@ -519,8 +509,8 @@ int ListEntry(void *ctx, const sd_info *info) {
 
   r->Write("{\"name\":");
   JsonString(r, info->name);
-  r->Printf(",\"size\":%lu,\"dir\":%s,\"mtime\":\"",
-            (unsigned long) info->size, info->is_dir ? "true" : "false");
+  r->Printf(",\"size\":%llu,\"dir\":%s,\"mtime\":\"",
+            (unsigned long long) info->size, info->is_dir ? "true" : "false");
   WriteDateTime(r, &info->mtime);
   r->Write("\"");
   char child[560];
@@ -562,6 +552,13 @@ void WebUiFsVolumes(CSocket *socket) {
     r.Printf(",\"kind\":\"sdcard\",\"total_kb\":%lu,\"free_kb\":%lu}",
              (unsigned long) total_kb, (unsigned long) free_kb);
   }
+  // The card's second partition (an exFAT one for big disk images).
+  if (host_volume2() != 0 &&
+      sd_volume_space_kb("SD2", &total_kb, &free_kb) == SD_OK) {
+    r.Write(rc == SD_OK ? ",{\"id\":\"SD2\"" : "{\"id\":\"SD2\"");
+    r.Printf(",\"kind\":\"partition\",\"total_kb\":%lu,\"free_kb\":%lu}",
+             (unsigned long) total_kb, (unsigned long) free_kb);
+  }
   r.Write("]}");
   r.Finish();
 }
@@ -575,7 +572,7 @@ void WebUiFsList(CSocket *socket, const char *query) {
   // The root always exists; anything else must be a folder.
   if (strcmp(clean, "/") != 0) {
     sd_info info;
-    int rc = sd_stat_info(clean, &info);
+    int rc = sd_stat_info(V(clean), &info);
     if (rc == SD_NOT_FOUND || rc == SD_INVALID || (rc == SD_OK && !info.is_dir)) {
       webhttp::SendText(socket, 404, "Not Found", "no such directory\n");
       return;
@@ -589,7 +586,7 @@ void WebUiFsList(CSocket *socket, const char *query) {
 
   CChunkedResponse r(socket, 200, "OK", "application/json");
   r.Write("{\"vol\":");
-  JsonString(&r, circle_get_disk_volume());
+  JsonString(&r, VolumeName());
   r.Write(",\"path\":");
   JsonString(&r, clean);
   r.Write(",\"entries\":[");
@@ -601,7 +598,7 @@ void WebUiFsList(CSocket *socket, const char *query) {
   state.first = TRUE;
   state.truncated = FALSE;
   state.count = 0;
-  sd_list_info(clean, ListEntry, &state);
+  sd_list_info(V(clean), ListEntry, &state);
 
   r.Printf("],\"truncated\":%s}", state.truncated ? "true" : "false");
   r.Finish();
@@ -613,12 +610,12 @@ void WebUiFsDownload(CSocket *socket, const char *query) {
     return;
   }
 
-  sd_file *file = sd_open(clean, SD_READ);
+  sd_file *file = sd_open(V(clean), SD_READ);
   if (file == 0) {
     webhttp::SendText(socket, 404, "Not Found", "cannot open file\n");
     return;
   }
-  uint32_t size = sd_size(file);
+  uint64_t size = sd_size(file);
 
   const char *base = clean;
   for (const char *p = clean; *p != '\0'; p++) {
@@ -644,12 +641,12 @@ void WebUiFsDownload(CSocket *socket, const char *query) {
   int hn = snprintf(header, sizeof(header),
                     "HTTP/1.1 200 OK\r\n"
                     "Content-Type: application/octet-stream\r\n"
-                    "Content-Length: %lu\r\n"
+                    "Content-Length: %llu\r\n"
                     "Content-Disposition: attachment; filename=\"%s\"\r\n"
                     "Connection: close\r\n"
                     "Cache-Control: no-store\r\n"
                     "\r\n",
-                    (unsigned long) size, safe_name);
+                    (unsigned long long) size, safe_name);
   if (hn <= 0 || (unsigned) hn >= sizeof(header) ||
       !webhttp::SendAll(socket, header, (unsigned) hn)) {
     sd_close(file);
@@ -695,7 +692,7 @@ void WebUiFsUpload(CSocket *socket, const char *query,
       overwrite[0] == '1';
 
   sd_info existing;
-  if (sd_stat_info(clean, &existing) == SD_OK) {
+  if (sd_stat_info(V(clean), &existing) == SD_OK) {
     if (existing.is_dir) {
       webhttp::SendText(socket, 409, "Conflict", "target is a directory\n");
       return;
@@ -723,9 +720,9 @@ void WebUiFsUpload(CSocket *socket, const char *query,
     return;
   }
 
-  sd_unlink(clean);  // ignore result: file may not exist
-  if (sd_rename(temppath, clean) != SD_OK) {
-    sd_unlink(temppath);
+  sd_unlink(V(clean));  // ignore result: file may not exist
+  if (sd_rename(V(temppath), V(clean)) != SD_OK) {
+    sd_unlink(V(temppath));
     webhttp::SendText(socket, 500, "Internal Server Error",
                       "cannot finalise upload\n");
     return;
@@ -737,7 +734,7 @@ void WebUiFsUpload(CSocket *socket, const char *query,
   sd_time stamp;
   if (webhttp::QueryParam(query, "mtime", mtime, sizeof(mtime)) &&
       ParseDateTime(mtime, &stamp)) {
-    sd_set_mtime(clean, &stamp);
+    sd_set_mtime(V(clean), &stamp);
   }
 
   char body[64];
@@ -769,7 +766,7 @@ void WebUiFsSave(CSocket *socket, const char *query,
   }
 
   sd_info existing;
-  boolean exists = sd_stat_info(clean, &existing) == SD_OK;
+  boolean exists = sd_stat_info(V(clean), &existing) == SD_OK;
   if (exists && existing.is_dir) {
     webhttp::SendText(socket, 409, "Conflict", "target is a directory\n");
     return;
@@ -799,19 +796,19 @@ void WebUiFsSave(CSocket *socket, const char *query,
   // aside once the new one is fully written, and is put back if the final
   // rename fails, so a failed save never leaves a config file missing.
   if (exists) {
-    sd_unlink(bakpath);  // ignore result: an older backup may not exist
-    if (sd_rename(clean, bakpath) != SD_OK) {
-      sd_unlink(temppath);
+    sd_unlink(V(bakpath));  // ignore result: an older backup may not exist
+    if (sd_rename(V(clean), V(bakpath)) != SD_OK) {
+      sd_unlink(V(temppath));
       webhttp::SendText(socket, 500, "Internal Server Error",
                         "cannot back up the existing file\n");
       return;
     }
   }
-  if (sd_rename(temppath, clean) != SD_OK) {
+  if (sd_rename(V(temppath), V(clean)) != SD_OK) {
     if (exists) {
-      sd_rename(bakpath, clean);
+      sd_rename(V(bakpath), V(clean));
     }
-    sd_unlink(temppath);
+    sd_unlink(V(temppath));
     webhttp::SendText(socket, 500, "Internal Server Error",
                       "cannot finalise save\n");
     return;
@@ -838,10 +835,10 @@ void WebUiFsDelete(CSocket *socket, const char *query) {
   char recursive[4];
   sd_info stat;
   if (webhttp::QueryParam(query, "recursive", recursive, sizeof(recursive)) &&
-      recursive[0] == '1' && sd_stat_info(clean, &stat) == SD_OK &&
+      recursive[0] == '1' && sd_stat_info(V(clean), &stat) == SD_OK &&
       stat.is_dir) {
     unsigned removed = 0;
-    if (sd_remove_tree(clean, &removed, YieldWhileDeleting, 0) == SD_OK) {
+    if (sd_remove_tree(V(clean), &removed, YieldWhileDeleting, 0) == SD_OK) {
       const char *ok = "{\"ok\":true}";
       webhttp::SendResponse(socket, 200, "OK", "application/json", ok,
                             (unsigned) strlen(ok));
@@ -856,7 +853,7 @@ void WebUiFsDelete(CSocket *socket, const char *query) {
     return;
   }
 
-  int rc = sd_unlink(clean);
+  int rc = sd_unlink(V(clean));
   if (rc == SD_NOT_FOUND || rc == SD_INVALID) {
     webhttp::SendText(socket, 404, "Not Found", "no such file\n");
     return;
@@ -892,12 +889,12 @@ void WebUiFsMkdir(CSocket *socket, const char *query) {
     return;
   }
 
-  if (sd_stat_info(clean, 0) == SD_OK) {
+  if (sd_stat_info(V(clean), 0) == SD_OK) {
     webhttp::SendText(socket, 409, "Conflict", "already exists\n");
     return;
   }
 
-  int rc = sd_mkdir(clean);
+  int rc = sd_mkdir(V(clean));
   if (rc == SD_EXISTS) {
     webhttp::SendText(socket, 409, "Conflict", "already exists\n");
     return;
@@ -948,19 +945,19 @@ void WebUiFsRename(CSocket *socket, const char *query) {
     return;
   }
 
-  if (sd_stat_info(clean, 0) != SD_OK) {
+  if (sd_stat_info(V(clean), 0) != SD_OK) {
     webhttp::SendText(socket, 404, "Not Found", "no such file\n");
     return;
   }
 
   boolean unchanged = strcmp(old_name, new_name) == 0;
   boolean case_only = !unchanged && CiEqual(old_name, new_name);
-  if (!unchanged && !case_only && sd_stat_info(new_clean, 0) == SD_OK) {
+  if (!unchanged && !case_only && sd_stat_info(V(new_clean), 0) == SD_OK) {
     webhttp::SendText(socket, 409, "Conflict", "already exists\n");
     return;
   }
 
-  int rc = unchanged ? SD_OK : sd_rename(clean, new_clean);
+  int rc = unchanged ? SD_OK : sd_rename(V(clean), V(new_clean));
   if (rc == SD_EXISTS) {
     webhttp::SendText(socket, 409, "Conflict", "already exists\n");
     return;
@@ -994,16 +991,16 @@ void WebUiFsAutostart(CSocket *socket, const char *query) {
   }
 
   sd_info info;
-  if (sd_stat_info(clean, &info) != SD_OK || info.is_dir) {
+  if (sd_stat_info(V(clean), &info) != SD_OK || info.is_dir) {
     webhttp::SendText(socket, 404, "Not Found", "no such file\n");
     return;
   }
 
   // Runs later on the emulator core, through stdio, so it gets the path
-  // with the card's volume ("SD:/disks/x.dsk").
+  // with its volume ("SD:/disks/x.dsk", "SD2:/hd/big.hdf").
   char volume_path[600];
   if ((unsigned) snprintf(volume_path, sizeof(volume_path), "%s:%s",
-                          circle_get_disk_volume(), clean) >=
+                          VolumeName(), clean) >=
       sizeof(volume_path)) {
     webhttp::SendText(socket, 400, "Bad Request", "path too long\n");
     return;

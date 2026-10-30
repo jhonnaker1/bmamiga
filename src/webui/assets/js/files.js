@@ -36,8 +36,11 @@ import { openEditor } from "./editor.js";
 import { toggleMenu } from "./menu.js";
 import { canRun } from "./machine.js";
 
-// current location (set by loadDir)
-let fbVol = "SD";
+// current location (set by loadDir); "SD" is the card, "SD2" its second
+// partition (if it has one)
+const CARD = "SD";
+let fbVol = CARD;
+let fbVolumes = []; // the device's volumes, when it has more than one
 let fbPath = "/";
 let fbNames = new Set(); // file names in the current folder (for overwrite checks)
 
@@ -71,14 +74,37 @@ function fileIcon(name, isDir) {
   return FILE_ICONS[ext] || "•";
 }
 
-export function filesHash(path) {
+// "#/files/disks" on the card, "#/files:SD2/hd" on another volume.
+export function filesHash(path, vol = fbVol) {
   path = normPath(path);
-  if (path === "/") return "#/files";
-  return "#/files" + path.split("/").map(encodeURIComponent).join("/");
+  const base = vol && vol !== CARD ? "#/files:" + encodeURIComponent(vol) : "#/files";
+  if (path === "/") return base;
+  return base + path.split("/").map(encodeURIComponent).join("/");
+}
+
+// The hash after "#/files", without its volume.
+function hashRest() {
+  let raw = (location.hash || "").slice("#/files".length);
+  if (raw.startsWith(":")) {
+    const slash = raw.indexOf("/");
+    raw = slash < 0 ? "" : raw.slice(slash);
+  }
+  return raw;
+}
+
+export function volFromHash() {
+  const raw = (location.hash || "").slice("#/files".length);
+  if (!raw.startsWith(":")) return CARD;
+  const slash = raw.indexOf("/");
+  try {
+    return decodeURIComponent(slash < 0 ? raw.slice(1) : raw.slice(1, slash)) || CARD;
+  } catch (e) {
+    return CARD;
+  }
 }
 
 export function pathFromHash() {
-  const raw = (location.hash || "").slice("#/files".length);
+  const raw = hashRest();
   if (!raw) return "/";
   try {
     return normPath(raw.split("/").map(decodeURIComponent).join("/"));
@@ -90,10 +116,21 @@ export function pathFromHash() {
 function renderCrumbs(vol, path) {
   const box = $("fb-crumbs");
   box.textContent = "";
-  const root = document.createElement("a");
-  root.href = filesHash("/");
-  root.textContent = vol || "SD";
-  box.appendChild(root);
+  // With a second partition, each volume's top, to go between them.
+  const vols = fbVolumes.length > 1 ? fbVolumes : [vol || CARD];
+  vols.forEach((v, i) => {
+    if (i > 0) {
+      const bar = document.createElement("span");
+      bar.className = "sep";
+      bar.textContent = " | ";
+      box.appendChild(bar);
+    }
+    const root = document.createElement("a");
+    root.href = filesHash("/", v);
+    root.textContent = v + ":";
+    if (v === vol) root.className = "cur-vol";
+    box.appendChild(root);
+  });
 
   const parts = normPath(path).split("/").filter(Boolean);
   let acc = "";
@@ -168,8 +205,15 @@ function actionsButton(e, path) {
 // room for the seconds).
 const shortTime = (mtime) => mtime.slice(0, 16).replace("T", " ");
 
-export async function loadDir(path) {
+export async function loadDir(path, vol = fbVol) {
   path = normPath(path);
+  if (!fbVolumes.length) {
+    try {
+      fbVolumes = ((await api.getVolumes()).volumes || []).map((v) => v.id);
+    } catch (e) {
+      fbVolumes = [];
+    }
+  }
   $("fb-up").disabled = path === "/";
   $("fb-status").className = "msg";
   $("fb-status").textContent = "Loading…";
@@ -177,17 +221,17 @@ export async function loadDir(path) {
 
   let data;
   try {
-    data = await api.listDir(path);
+    data = await api.listDir(path, vol);
   } catch (e) {
     $("fb-status").className = "msg err";
     $("fb-status").textContent = "Could not list " + path + " — " + e.message;
     return;
   }
 
-  const vol = data.vol || "SD";
-  fbVol = vol;
+  const listed = data.vol || vol || CARD;
+  fbVol = listed;
   fbPath = data.path || path;
-  renderCrumbs(vol, fbPath);
+  renderCrumbs(listed, fbPath);
   $("fb-drop-dest").textContent = fbPath;
 
   const entries = (data.entries || []).slice().sort((a, b) => {

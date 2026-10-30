@@ -72,7 +72,8 @@ sudo mkfs.exfat -n AMIGA /dev/sdX2
 
 Then copy BMAmiga's files to the first partition as above, and big disk
 images to the second. BMAmiga's log says `Second partition mounted as SD2:
-(exFAT)` when it finds it. The web UI shows only the first partition.
+(exFAT)` when it finds it. The web UI's Files shows both, *SD:* and *SD2:*
+at the top, to go between them.
 
 ## Kickstart ROMs
 

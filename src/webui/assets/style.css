@@ -400,6 +400,7 @@ a:hover { text-decoration: underline; }
 .crumbs a { color: var(--blue); }
 .crumbs .sep { color: var(--dim); }
 .crumbs .cur { color: var(--fg); font-weight: 600; }
+.crumbs .cur-vol { font-weight: 600; }
 
 /* the table keeps its natural width; on a narrow screen it scrolls instead of widening the page */
 .fb-scroll { overflow-x: auto; }

@@ -171,8 +171,11 @@ export async function refreshVolumes() {
     const usedKb = sd.total_kb - sd.free_kb;
     const pct = Math.min(100, Math.round((usedKb / sd.total_kb) * 100));
     $("d-storage-bar").style.width = pct + "%";
+    // The card's second partition (if it has one) too.
+    const sd2 = v.find((x) => x.id === "SD2");
     $("d-storage-txt").textContent =
-      fmtKB(sd.free_kb) + " free of " + fmtKB(sd.total_kb);
+      fmtKB(sd.free_kb) + " free of " + fmtKB(sd.total_kb) +
+      (sd2 ? " · SD2: " + fmtKB(sd2.free_kb) + " free of " + fmtKB(sd2.total_kb) : "");
     $("d-storage").hidden = false;
   } catch (e) {
     $("d-storage").hidden = true;

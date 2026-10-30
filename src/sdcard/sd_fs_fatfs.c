@@ -47,7 +47,12 @@ struct sd_file {
 };
 
 static int fat_path(const char *path, char *out, unsigned size) {
-  int n = snprintf(out, size, "%s:%s", circle_get_disk_volume(), path);
+  // A path with its own volume ("SD2:/x"): as it is.
+  const char *colon = strchr(path, ':');
+  const char *slash = strchr(path, '/');
+  int n = colon != NULL && (slash == NULL || colon < slash)
+              ? snprintf(out, size, "%s", path)
+              : snprintf(out, size, "%s:%s", circle_get_disk_volume(), path);
   return (n > 0 && (unsigned)n < size) ? 0 : -1;
 }
 
@@ -73,7 +78,7 @@ static int result(FRESULT fr) {
 
 static void to_info(const FILINFO *fi, sd_info *info) {
   snprintf(info->name, sizeof(info->name), "%s", fi->fname);
-  info->size = (uint32_t)fi->fsize;
+  info->size = (uint64_t)fi->fsize;
   info->is_dir = (fi->fattrib & AM_DIR) != 0;
   memset(&info->mtime, 0, sizeof(info->mtime));
   if (fi->fdate != 0) {
@@ -124,11 +129,11 @@ int sd_write(sd_file *f, const void *buf, unsigned len) {
   return n == len ? SD_OK : SD_ERROR;  // a short write: the card is full
 }
 
-int sd_seek(sd_file *f, uint32_t pos) {
-  return result(f_lseek(&f->fil, pos));
+int sd_seek(sd_file *f, uint64_t pos) {
+  return result(f_lseek(&f->fil, (FSIZE_t)pos));
 }
 
-uint32_t sd_size(sd_file *f) { return (uint32_t)f_size(&f->fil); }
+uint64_t sd_size(sd_file *f) { return (uint64_t)f_size(&f->fil); }
 
 int sd_sync(sd_file *f) { return result(f_sync(&f->fil)); }
 
@@ -312,10 +317,15 @@ int sd_remove_tree(const char *path, unsigned *removed,
 }
 
 int sd_space_kb(uint32_t *total_kb, uint32_t *free_kb) {
+  return sd_volume_space_kb(circle_get_disk_volume(), total_kb, free_kb);
+}
+
+int sd_volume_space_kb(const char *volume, uint32_t *total_kb, uint32_t *free_kb) {
   char p[32];
   DWORD clusters = 0;
   FATFS *fs = NULL;
-  if (fat_path("", p, sizeof(p)) != 0) {
+  int n = snprintf(p, sizeof(p), "%s:", volume);
+  if (n <= 0 || (unsigned)n >= sizeof(p)) {
     return SD_INVALID;
   }
   FRESULT fr = f_getfree(p, &clusters, &fs);

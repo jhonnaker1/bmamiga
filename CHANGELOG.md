@@ -16,6 +16,14 @@
   for BMAmiga and an exFAT one holds disk images over 4 GB. The menu's
   file browser shows SD2: at the card's top; Installation says how to
   partition a card on macOS, Windows and Linux
+- The web UI has SD2: too: Files shows *SD:* and *SD2:* at the top to go
+  between them (its requests' vol=SD2), and the dashboard both volumes'
+  space. Its sizes are 64 bits (an exFAT partition's files can be over
+  4 GB), as are sd_fs's (sd_info.size, sd_seek(), sd_size()); sd_fs takes
+  a path with its own volume ("SD2:/x") as it is
+- The web UI showed names with accents garbled once FatFs's names were
+  UTF-8 (it still converted code page 850), and refused them in New folder
+  and Rename; it passes UTF-8 through now
 - A setting longer than 71 characters (a disk's path in folders) was
   refused, so bmamiga.cfg lost the drive: 255 now, and 64 settings, not 48
 - tools/copy_amiga_folder.py: copies an Amiga folder (a folder drive, such

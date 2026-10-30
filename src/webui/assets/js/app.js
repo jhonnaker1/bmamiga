@@ -35,7 +35,7 @@
 
 import { $ } from "./util.js";
 import { initDashboard, refreshVolumes, startStatusPolling } from "./dashboard.js";
-import { initFiles, loadDir, filesHash, pathFromHash } from "./files.js";
+import { initFiles, loadDir, filesHash, pathFromHash, volFromHash } from "./files.js";
 import { initEditor } from "./editor.js";
 import { loadMachine } from "./machine.js";
 
@@ -51,7 +51,7 @@ function route() {
   });
 
   if (view === "files") {
-    loadDir(pathFromHash());
+    loadDir(pathFromHash(), volFromHash());
   } else {
     refreshVolumes();
   }
@@ -61,7 +61,7 @@ initDashboard();
 initFiles();
 initEditor();
 
-$("qa-files").addEventListener("click", () => { location.hash = filesHash("/"); });
+$("qa-files").addEventListener("click", () => { location.hash = filesHash("/", "SD"); });
 window.addEventListener("hashchange", route);
 
 // The file actions depend on the machine, so know it before the first view.

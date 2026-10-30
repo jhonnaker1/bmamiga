@@ -62,11 +62,11 @@ typedef struct {
   uint8_t month, day, hour, minute, second;
 } sd_time;
 
-// One file or folder. name is as stored on the card (CP850 for characters
-// outside ASCII).
+// One file or folder. name is as stored on the card, in UTF-8. size is 64
+// bits: an exFAT partition's files can be over 4 GB.
 typedef struct {
   char name[SD_MAX_NAME_LEN + 1];
-  uint32_t size;
+  uint64_t size;
   int is_dir;
   sd_time mtime;
 } sd_info;
@@ -80,12 +80,14 @@ enum {
   SD_APPEND = 2,  // create the file if needed, and write at its end
 };
 
+// Paths are on the card ("/disks/x.adf"), or on another volume when they
+// start with its name ("SD2:/hd/big.hdf").
 sd_file *sd_open(const char *path, int mode);
 // Returns 0 on success. *got is 0 at end of file.
 int sd_read(sd_file *f, void *buf, unsigned len, unsigned *got);
 int sd_write(sd_file *f, const void *buf, unsigned len);
-int sd_seek(sd_file *f, uint32_t pos);
-uint32_t sd_size(sd_file *f);
+int sd_seek(sd_file *f, uint64_t pos);
+uint64_t sd_size(sd_file *f);
 // Pushes what has been written so far to the card.
 int sd_sync(sd_file *f);
 // Returns 0 when everything written reached the card.
@@ -116,11 +118,13 @@ int sd_remove_tree(const char *path, unsigned *removed,
 
 // The card's size and free space, in KB.
 int sd_space_kb(uint32_t *total_kb, uint32_t *free_kb);
+// The same for VOLUME ("SD2", the card's second partition).
+int sd_volume_space_kb(const char *volume, uint32_t *total_kb, uint32_t *free_kb);
 
 // ---- Shorter forms (sd_fs_file.c) ----
 
 // Returns 0 if the path exists; size and is_dir are optional.
-int sd_stat(const char *path, uint32_t *size, int *is_dir);
+int sd_stat(const char *path, uint64_t *size, int *is_dir);
 
 // Like sd_list_info, with just the name.
 typedef int (*sd_dir_cb)(void *ctx, const char *name, int is_dir);
