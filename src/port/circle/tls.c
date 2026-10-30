@@ -57,8 +57,9 @@ int bma_tls_init(void)
 		memcpy(block + offset, __tdata_start, tdata);
 		set_thread_pointer(block);
 		if (read_probe() == 0x4c69736aU) {
-			printf("BMAmiga: thread-local storage %zu + %zu bytes, aligned to %zu\n",
-			       tdata, tbss, align);
+			/* newlib's printf has no %zu (it prints "zu") */
+			printf("BMAmiga: thread-local storage %lu + %lu bytes, aligned to %lu\n",
+			       (unsigned long) tdata, (unsigned long) tbss, (unsigned long) align);
 			return 1;
 		}
 		set_thread_pointer(NULL);

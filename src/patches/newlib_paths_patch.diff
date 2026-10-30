@@ -1,0 +1,56 @@
+--- a/libgloss/circle/io.cpp
++++ b/libgloss/circle/io.cpp
+@@ -257,11 +257,11 @@
+                         break;
+ 
+                     case FR_NO_FILE:
++                    case FR_NO_PATH:
+                     case FR_INVALID_NAME:
+                         errno = ENOENT;
+                         break;
+ 
+-                    case FR_NO_PATH:
+                     case FR_INVALID_DRIVE:
+                         errno = ENOTDIR;
+                         break;
+@@ -840,11 +840,11 @@
+         switch (open_result)
+         {
+             case FR_NO_FILE:
++            case FR_NO_PATH:
+             case FR_INVALID_NAME:
+                 errno = ENOENT;
+                 break;
+ 
+-            case FR_NO_PATH:
+             case FR_INVALID_DRIVE:
+                 errno = ENOTDIR;
+                 break;
+--- a/libgloss/circle/stat.cpp
++++ b/libgloss/circle/stat.cpp
+@@ -34,12 +34,9 @@
+ 		switch (fr)
+ 		{
+ 		case FR_NO_FILE:
++		case FR_NO_PATH:
+ 		case FR_INVALID_NAME:
+ 			errno = ENOENT;
+-			break;
+-
+-		case FR_NO_PATH:
+-			errno = ENOTDIR;
+ 			break;
+ 
+ 		default:
+--- a/libgloss/circle/unlink.cpp
++++ b/libgloss/circle/unlink.cpp
+@@ -24,9 +24,6 @@
+             switch (fresult)
+             {
+                 case FR_NO_PATH:
+-                    errno = ENOTDIR;
+-                    break;
+-
+                 case FR_NO_FILE:
+                 case FR_INVALID_NAME:
+                 case FR_INVALID_DRIVE:

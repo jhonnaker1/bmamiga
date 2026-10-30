@@ -27,5 +27,7 @@ library), reset first in the same way.
 | Patch | Description |
 | --- | --- |
 | `newlib_fastseek_patch.diff` | Fast seek for files of 1 MB or more opened as they are (disk images): their cluster map is made when they are opened, so a seek back no longer follows the cluster chain from the file's start, a read from the SD card for every 128 clusters (hundreds a seek in a big image). A file in fast seek mode can't grow, so the map is let go before a write or seek past its end, and before truncating. From BMNeXT. |
+| `newlib_open_files_patch.diff` | Raises circle-newlib's open files from 20 to 32 (the most its `select()` allows: `fd_set` is one 32-bit `int`, `FD_SETSIZE` 32) and open directories from 20 to 64. A CD image with a `.cue` keeps every track's file open (Battle Chess has 20: its tracks from 17 on failed to open on the Pi; about 28 now fit), and a folder drive has a file open for each one the Amiga has, and a directory for each it is reading. |
+| `newlib_paths_patch.diff` | A path whose folder doesn't exist (FatFs's `FR_NO_PATH`) is `ENOENT`, as POSIX has it, in `open()`, `stat()`, `unlink()` and `truncate()`, not `ENOTDIR`. With `ENOTDIR`, C++'s `std::filesystem::create_directories()` gave up instead of making the folder, so Amiberry never made `saves/NVRAM` (the CD32's saved games) and its other folders. |
 
 Amiberry is not patched: what it needs on Circle is in `src/port/circle`.

@@ -1,0 +1,15 @@
+diff --git a/libgloss/circle/filetable.h b/libgloss/circle/filetable.h
+index 390050dd6..764a84c32 100644
+--- a/libgloss/circle/filetable.h
++++ b/libgloss/circle/filetable.h
+@@ -100,8 +100,8 @@ namespace _CircleStdlib
+             DirTableLock() : SpinLockHolder(dirTabLock) {}
+         };
+ 
+-        static constexpr unsigned int MAX_OPEN_FILES = 20;
+-        static constexpr unsigned int MAX_OPEN_DIRS = 20;
++        static constexpr unsigned int MAX_OPEN_FILES = 32;
++        static constexpr unsigned int MAX_OPEN_DIRS = 64;
+ 
+     private:
+         static CircleFile fileTab[MAX_OPEN_FILES];

@@ -134,6 +134,53 @@ static void draw_frame(const char *title, const char *hint)
 		put_centred(OSD_ROWS - 1, hint, C_DKGREEN, C_BLACK);
 }
 
+/* ---- The start-up screen ------------------------------------------------------ */
+
+/* A glyph of the font, each pixel drawn SCALE x SCALE, in FG only. */
+static void draw_big_char(uint16_t *fb, int pitch, int x, int y, unsigned char c,
+                          int scale, uint16_t fg)
+{
+	const uint8_t *glyph;
+	int row, col, i, j;
+	if (c < OSK_FONT_FIRST_CHAR || c - OSK_FONT_FIRST_CHAR >= OSK_FONT_GLYPHS)
+		return;
+	glyph = &osk_font_8x8[(c - OSK_FONT_FIRST_CHAR) * 8];
+	for (row = 0; row < 8; row++)
+		for (col = 0; col < 8; col++)
+			if (glyph[row] & (1u << col))
+				for (i = 0; i < scale; i++)
+					for (j = 0; j < scale; j++)
+						fb[(y + row * scale + i) * pitch + x + col * scale + j] = fg;
+}
+
+static void draw_big_text(int y, const char *text, int scale, uint16_t fg)
+{
+	int pitch, x = (OSD_W - (int) strlen(text) * 8 * scale) / 2;
+	uint16_t *fb = osd_fb(&pitch);
+	for (; *text != '\0'; text++, x += 8 * scale)
+		draw_big_char(fb, pitch, x, y, (unsigned char) *text, scale, fg);
+}
+
+void osd_splash(const char *version, const char *status)
+{
+	/* The Amiga logo's rainbow, under the name. */
+	static const uint16_t rainbow[] = {0xf800, 0xfc40, 0xffe0, 0x07e0, 0x041f, 0x801f};
+	int pitch, i, x, y;
+	uint16_t *fb = osd_fb(&pitch);
+	char line[OSD_COLS + 1];
+	clear_screen();
+	draw_big_text(150, "BMAmiga", 7, C_GREEN);
+	for (i = 0; i < 6; i++)
+		for (y = 214 + i * 4; y < 218 + i * 4; y++)
+			for (x = 124; x < 516; x++)
+				fb[y * pitch + x] = rainbow[i];
+	fit(line, sizeof line, version, OSD_COLS);
+	draw_big_text(262, line, 2, C_GREEN);
+	fit(line, sizeof line, status, OSD_COLS);
+	draw_big_text(330, line, 2, C_ORANGE);
+	bmamiga_osd_view(TRUE);
+}
+
 /* ---- Opening and closing ------------------------------------------------------ */
 
 void osd_open(void)

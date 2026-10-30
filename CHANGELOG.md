@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+From the Pi 5 test of 0.2.1 (the CD32 with Battle Chess):
+
+- A CD image's tracks from 17 on failed to open (`[FILE ERROR]`): Circle's
+  C library had room for 20 open files, and a `.cue` keeps each track's
+  file open. Now 32 files (the most its select() allows; about 28 tracks)
+  and 64 open directories, which folder drives use too
+  (newlib_open_files_patch.diff)
+- Amiberry couldn't make its folders in saves (saves/NVRAM, where a CD32
+  keeps its games' saves): Circle's C library said "not a directory" for a
+  path whose folder didn't exist, and C++'s create_directories() gave up
+  on that. It says "no such file" now, as POSIX has it
+  (newlib_paths_patch.diff)
+- A start-up screen while Amiberry starts (BMAmiga, its version and
+  "Starting the Amiga..."), in place of a black screen for the seconds it
+  takes to read the Kickstarts
+- The log's thread-local storage line has its numbers (newlib's printf
+  has no %zu)
+
 ## 0.2.1 – 2026-10-29
 
 - A CD32 or CDTV started without its disc when the Amiga Setup had

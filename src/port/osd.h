@@ -91,6 +91,11 @@ int osd_browse(const char *title, char *dir, size_t dir_size,
    and only folders are listed. Returns 1 with its path in PATH. */
 int osd_browse_dir(const char *title, char *dir, size_t dir_size, char *path, size_t path_size);
 
+/* The screen shown while Amiberry starts (reading the Kickstarts can take
+   seconds): BMAmiga's name, VERSION and STATUS. The Amiga's first picture
+   replaces it. */
+void osd_splash(const char *version, const char *status);
+
 /* Draws a one line message over the emulator's picture, for a few seconds. */
 void osd_notify(const char *text);
 /* Called by the video output each frame: draws the notification, if any. */

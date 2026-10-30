@@ -41,6 +41,10 @@
 #include "bmamiga.h"
 #include "osd.h"
 
+#ifndef BMAMIGA_VERSION
+#define BMAMIGA_VERSION "dev"
+#endif
+
 /* bridge.cpp */
 int bmamiga_core_insert_floppy(int drive, const char *path);
 void bmamiga_core_eject_floppy(int drive);
@@ -1233,6 +1237,13 @@ void bmamiga_main(void)
 	}
 	snprintf(cd_image, sizeof cd_image, "%s", host_option("cd0", ""));
 
+	{
+		char version[64];
+		snprintf(version, sizeof version, "Version %s", BMAMIGA_VERSION);
+		osd_splash(version, "Starting the Amiga...");
+		host_video_present(TRUE);
+	}
+
 	retro_set_environment(core_environment);
 	retro_set_video_refresh(core_video);
 	retro_set_audio_sample(core_audio_sample);
@@ -1283,6 +1294,7 @@ void bmamiga_main(void)
 			feed_silence();
 		if (!core_running) {
 			core_running = TRUE;
+			bmamiga_osd_view(FALSE);   /* the start-up screen goes */
 			insert_saved_media();
 		}
 		follow_frame_rate();
