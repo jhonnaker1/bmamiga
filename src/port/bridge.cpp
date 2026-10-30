@@ -62,6 +62,14 @@ void bmamiga_core_eject_floppy(int drive)
 	disk_eject(drive);
 }
 
+/* The drives' speed: 100 is a real drive's, 200 to 800 faster, 0 turbo
+   (as fast as the Amiga reads). DISK_check_change() in disk.cpp takes it
+   from changed_prefs. */
+void bmamiga_core_set_floppy_speed(int speed)
+{
+	changed_prefs.floppy_speed = speed;
+}
+
 /* ---- Hard drives and the CD -------------------------------------------- */
 
 /* True if the image at PATH has a Rigid Disk Block (a partitioned disk,
@@ -165,6 +173,96 @@ void bmamiga_core_cd32_pad(void)
 void bmamiga_core_reset(int hard)
 {
 	uae_reset(hard ? 1 : 0, hard ? 0 : 1);
+}
+
+/* ---- The Amiga's setup ------------------------------------------------------ */
+
+/* The settings the menu's Amiga Setup changes, as the model's preset made
+   them (taken once the core has started), so that "Model default" puts
+   them back. */
+static struct {
+	bool taken;
+	TCHAR romfile[MAX_DPATH];
+	int cpu_model, fpu_model, m68k_speed;
+	bool address_space_24, cpu_cycle_exact, cpu_memory_cycle_exact, blitter_cycle_exact;
+	unsigned int chipset_mask;
+	uae_u32 chipmem, bogomem, fastmem;
+	int sound_filter, sound_stereo_separation;
+} preset;
+
+static void take_preset(void)
+{
+	preset.taken = true;
+	uae_tcslcpy(preset.romfile, changed_prefs.romfile, MAX_DPATH);
+	preset.cpu_model = changed_prefs.cpu_model;
+	preset.fpu_model = changed_prefs.fpu_model;
+	preset.m68k_speed = changed_prefs.m68k_speed;
+	preset.address_space_24 = changed_prefs.address_space_24;
+	preset.cpu_cycle_exact = changed_prefs.cpu_cycle_exact;
+	preset.cpu_memory_cycle_exact = changed_prefs.cpu_memory_cycle_exact;
+	preset.blitter_cycle_exact = changed_prefs.blitter_cycle_exact;
+	preset.chipset_mask = changed_prefs.chipset_mask;
+	preset.chipmem = changed_prefs.chipmem.size;
+	preset.bogomem = changed_prefs.bogomem.size;
+	preset.fastmem = changed_prefs.fastmem[0].size;
+	preset.sound_filter = changed_prefs.sound_filter;
+	preset.sound_stereo_separation = changed_prefs.sound_stereo_separation;
+}
+
+static void put_back_preset(void)
+{
+	uae_tcslcpy(changed_prefs.romfile, preset.romfile, MAX_DPATH);
+	changed_prefs.cpu_model = preset.cpu_model;
+	changed_prefs.fpu_model = preset.fpu_model;
+	changed_prefs.m68k_speed = preset.m68k_speed;
+	changed_prefs.address_space_24 = preset.address_space_24;
+	changed_prefs.cpu_cycle_exact = preset.cpu_cycle_exact;
+	changed_prefs.cpu_memory_cycle_exact = preset.cpu_memory_cycle_exact;
+	changed_prefs.blitter_cycle_exact = preset.blitter_cycle_exact;
+	changed_prefs.chipset_mask = preset.chipset_mask;
+	changed_prefs.chipmem.size = preset.chipmem;
+	changed_prefs.bogomem.size = preset.bogomem;
+	changed_prefs.fastmem[0].size = preset.fastmem;
+	changed_prefs.sound_filter = preset.sound_filter;
+	changed_prefs.sound_stereo_separation = preset.sound_stereo_separation;
+}
+
+/* LINES: Amiberry's own settings, as in a .uae file, one a line ("#" or ";"
+   starts a comment): the menu's Amiga Setup, then bmamiga.uae's. They go
+   over the model's preset (put back first) into changed_prefs, which a
+   hard reset then uses, as Amiberry's own settings window does. Returns
+   how many lines Amiberry took. */
+int bmamiga_core_set_config(const char *lines)
+{
+	TCHAR line[MAX_DPATH * 2];
+	const char *p = lines;
+	int taken = 0;
+	if (!preset.taken)
+		take_preset();
+	put_back_preset();
+	while (p != nullptr && *p != '\0') {
+		const char *end = strchr(p, '\n');
+		size_t n = end != nullptr ? (size_t) (end - p) : strlen(p);
+		if (n >= sizeof line / sizeof line[0])
+			n = sizeof line / sizeof line[0] - 1;
+		memcpy(line, p, n);
+		line[n] = 0;
+		p = end != nullptr ? end + 1 : nullptr;
+		/* Trim, and drop comments. */
+		TCHAR *s = line;
+		while (*s == ' ' || *s == '\t')
+			s++;
+		size_t len = _tcslen(s);
+		while (len > 0 && (s[len - 1] == '\r' || s[len - 1] == ' ' || s[len - 1] == '\t'))
+			s[--len] = 0;
+		if (*s == 0 || *s == '#' || *s == ';' || _tcschr(s, '=') == nullptr)
+			continue;
+		cfgfile_parse_line(&changed_prefs, s, 0);
+		taken++;
+	}
+	fixup_prefs(&changed_prefs, true);
+	set_config_changed();
+	return taken;
 }
 
 void bmamiga_core_warp(int on)

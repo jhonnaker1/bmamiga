@@ -175,7 +175,8 @@ then
     exit 1
 fi
 cp "$SRC_DIR/sdcard/config.txt" "$SRC_DIR/sdcard/cmdline.txt" \
-   "$SRC_DIR/sdcard/wpa_supplicant.conf.example" "$STAGING_DIR/"
+   "$SRC_DIR/sdcard/wpa_supplicant.conf.example" \
+   "$SRC_DIR/sdcard/bmamiga.uae.example" "$STAGING_DIR/"
 cp "$SRC_DIR/LICENSE" "$STAGING_DIR/LICENSE.txt"
 # The notices and licences of other projects' code in the kernels
 # (docs/THIRD_PARTY.md).

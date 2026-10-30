@@ -44,6 +44,8 @@
 /* bridge.cpp */
 int bmamiga_core_insert_floppy(int drive, const char *path);
 void bmamiga_core_eject_floppy(int drive);
+void bmamiga_core_set_floppy_speed(int speed);
+int bmamiga_core_set_config(const char *lines);
 int bmamiga_core_set_hard_drives(const char *const paths[4], const char *const names[4]);
 void bmamiga_core_set_cd(const char *path, int builtin);
 void bmamiga_core_cd32_pad(void);
@@ -549,6 +551,22 @@ void bmamiga_eject_floppy(int drive)
 		bmamiga_core_eject_floppy(drive);
 }
 
+/* floppy_speed: 100 (a real drive), 200, 400, 800, or 0 (turbo). */
+int bmamiga_floppy_speed(void)
+{
+	int speed = host_option_int("floppy_speed", 100);
+	return speed == 0 || speed == 200 || speed == 400 || speed == 800 ? speed : 100;
+}
+
+void bmamiga_set_floppy_speed(int speed)
+{
+	char text[8];
+	snprintf(text, sizeof text, "%d", speed);
+	save_setting("floppy_speed", text);
+	if (core_running)
+		bmamiga_core_set_floppy_speed(bmamiga_floppy_speed());
+}
+
 /* ---- Hard drives and the CD -------------------------------------------- */
 
 /* DH0: to DH3: and the CD, kept in bmamiga.cfg (dh0 to dh3, cd0). */
@@ -629,13 +647,86 @@ void bmamiga_set_cd(const char *path)
 	}
 }
 
+/* ---- The Amiga's setup ---------------------------------------------------- */
+
+/* The menu's Amiga Setup (bmamiga.cfg; empty or missing is the model's own
+   setting) as Amiberry's settings, one a line, then bmamiga.uae's lines on
+   the card (any of Amiberry's .uae settings), which win. */
+static void setup_lines(char *out, size_t size)
+{
+	static const struct {
+		const char *key, *format;
+		int divide;
+	} numbers[] = {
+		{"chip_ram", "chipmem_size=%d\n", 512},   /* KB, in 512K */
+		{"slow_ram", "bogomem_size=%d\n", 256},   /* KB, in 256K */
+		{"fast_ram", "fastmem_size=%d\n", 1},     /* MB */
+		{"stereo_separation", "sound_stereo_separation=%d\n", 1},   /* 0-10 */
+	};
+	static const struct {
+		const char *key, *format;
+	} words[] = {
+		{"kickstart", "kickstart_rom_file=%s\n"},
+		{"cpu", "cpu_model=%s\n"},
+		{"chipset", "chipset=%s\n"},
+		{"sound_filter", "sound_filter=%s\n"},
+	};
+	char path[512];
+	size_t len = 0;
+	unsigned i;
+	FILE *f;
+	out[0] = '\0';
+#define ADD(...) do { if (len < size) len += (size_t) snprintf(out + len, size - len, __VA_ARGS__); } while (0)
+	for (i = 0; i < sizeof words / sizeof words[0]; i++) {
+		const char *value = host_option(words[i].key, "");
+		if (value[0] != '\0')
+			ADD(words[i].format, value);
+	}
+	for (i = 0; i < sizeof numbers / sizeof numbers[0]; i++) {
+		const char *value = host_option(numbers[i].key, "");
+		if (value[0] != '\0')
+			ADD(numbers[i].format, atoi(value) / numbers[i].divide);
+	}
+	/* The fastest: as fast as the Pi can, which isn't cycle-exact. */
+	if (strcmp(host_option("cpu_speed", ""), "max") == 0)
+		ADD("cpu_speed=max\ncycle_exact=false\n");
+	sd_path(path, sizeof path, "bmamiga.uae");
+	f = fopen(path, "r");
+	if (f != NULL) {
+		if (len < size - 1)
+			len += fread(out + len, 1, size - 1 - len, f);
+		out[len] = '\0';
+		fclose(f);
+	}
+#undef ADD
+}
+
+/* Gives Amiberry the setup; a hard reset then uses it (the sound's
+   settings it takes at once). Returns how many settings there are. */
+static int apply_setup(void)
+{
+	static char lines[8192];
+	int n;
+	setup_lines(lines, sizeof lines);
+	n = bmamiga_core_set_config(lines);
+	if (n > 0)
+		LOG("Amiga setup: %d setting(s)\n", n);
+	return n;
+}
+
+void bmamiga_setup_changed(void)
+{
+	if (core_running)
+		apply_setup();
+}
+
 /* The disks kept in bmamiga.cfg, put in once the Amiga is running: the
    floppies, and a CD32's or CDTV's disc, at once; the hard drives and
    another Amiga's CD with a hard reset, from which the Amiga starts with
    them (it has run only a frame). */
 static void insert_saved_media(void)
 {
-	int d, drives;
+	int d, drives, setup = apply_setup();
 	for (d = 0; d < BMAMIGA_FLOPPIES; d++) {
 		if (floppy[d][0] != '\0' && access(floppy[d], R_OK) == 0) {
 			bmamiga_core_insert_floppy(d, floppy[d]);
@@ -647,8 +738,9 @@ static void insert_saved_media(void)
 		bmamiga_core_set_cd(cd_image, bmamiga_model_has_cd());
 		LOG("CD: %s\n", cd_image);
 	}
-	/* A CD32's or CDTV's own drive takes a disc as it runs. */
-	if (drives > 0 || (cd_image[0] != '\0' && !bmamiga_model_has_cd()))
+	/* A CD32's or CDTV's own drive takes a disc as it runs. The setup's
+	   memory, CPU and Kickstart are for a hard reset too. */
+	if (drives > 0 || setup > 0 || (cd_image[0] != '\0' && !bmamiga_model_has_cd()))
 		bmamiga_hard_reset();
 }
 
@@ -805,6 +897,11 @@ static const char *core_option(const char *key)
 		return display_paces() ? "standard" : "disabled";
 	if (strcmp(key, "amiberry_video_standard") == 0)
 		return host_option("video_standard", "auto");
+	if (strcmp(key, "amiberry_floppy_speed") == 0) {
+		static char speed[8];
+		snprintf(speed, sizeof speed, "%d", bmamiga_floppy_speed());
+		return speed;
+	}
 	if (strcmp(key, "amiberry_statusline") == 0)
 		return option_on("statusline", FALSE) ? "enabled" : "disabled";
 	return NULL;
@@ -894,8 +991,12 @@ void bmamiga_reset(void)
 	bmamiga_core_reset(FALSE);
 }
 
+/* With the Amiga Setup as it is now (a hard reset is when Amiberry takes
+   the memory, CPU, chipset and Kickstart). */
 void bmamiga_hard_reset(void)
 {
+	if (core_running)
+		apply_setup();
 	bmamiga_core_reset(TRUE);
 }
 

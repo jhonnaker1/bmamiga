@@ -1,0 +1,25 @@
+# BMAmiga: Amiberry's own settings, for anything the menu's Amiga Setup
+# doesn't have. Rename this file bmamiga.uae to use it. One setting a line,
+# as in an Amiberry or WinUAE .uae file; "#" or ";" starts a comment.
+# They go over the model and the Amiga Setup at each start and hard reset.
+#
+# Some examples (remove the "#" to use one):
+
+# Zorro III RAM, in MB (needs a 68020 or later, and 32-bit addressing)
+#cpu_24bit_addressing=false
+#z3mem_size=16
+
+# Blits at once rather than at the real blitter's speed
+#immediate_blits=true
+
+# NTSC rather than PAL
+#ntsc=true
+
+# A 68881 maths coprocessor
+#fpu_model=68881
+
+# The A1200's and A4000's low-pass filter (the A500's is "standard")
+#sound_filter_type=enhanced
+
+# A second floppy drive's type: 3.5" DD (0), 3.5" HD (1), 5.25" (2)
+#floppy1type=0

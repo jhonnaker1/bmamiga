@@ -86,6 +86,7 @@ REQUIRED_FILES=(
     "licenses/libgloss.txt"
     "licenses/GCC-Runtime.txt"
     "wpa_supplicant.conf.example"
+    "bmamiga.uae.example"
 
     # Wi-Fi firmware and redistribution licences (build_sdcard.sh only
     # warns if these could not be fetched)

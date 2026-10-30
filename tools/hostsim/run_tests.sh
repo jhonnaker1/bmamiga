@@ -209,6 +209,32 @@ check_log drives "BMAmiga: DH0: disks/work" "DH0: from bmamiga.cfg"
 check_log drives "Z2 0x00e90000 .*Filesystem autoconfig" "Amiberry's file system board, for the folder and CD0:"
 check_log drives "uaescsi.device:0 = IMAGE:.*test\.iso" "the ISO in uaescsi.device's unit 0"
 
+echo "Amiga Setup"
+# A 68020 with 2M of chip RAM from bmamiga.cfg, and 4M of fast RAM from
+# bmamiga.uae (with a comment), all from the hard reset as the Amiga starts.
+mkdir -p "$OUT/setup"
+printf 'cpu=68020\nchip_ram=2048\n' > "$OUT/setup/bmamiga.cfg"
+printf '# more of Amiberry\x27s settings\nfastmem_size=4\n' > "$OUT/setup/bmamiga.uae"
+run setup 50 "$OUT/aros" "" '400 quit\n'
+check_log setup "Amiga setup: 3 setting" "bmamiga.cfg's and bmamiga.uae's settings taken"
+check_log setup "CPU=68020" "the 68020 from the CPU setting"
+check_log setup "2048K/[0-9]+ = +2048K .*Chip memory" "2M of chip RAM"
+check_log setup "Fast memory" "fast RAM from bmamiga.uae"
+# The menu: down to Amiga Setup (past Floppy Drives, Hard Drives and CD,
+# Model), Enter, down to Sound Filter (past Kickstart and six more), Enter,
+# down to Off, Enter.
+script='200 key 0x45 1\n201 key 0x45 0\n'
+f=220
+for i in 1 2 3; do script="$script$f key 0x51 1\n$((f + 1)) key 0x51 0\n"; f=$((f + 10)); done
+script="$script$f key 0x28 1\n$((f + 1)) key 0x28 0\n"; f=$((f + 20))
+for i in 1 2 3 4 5 6 7; do script="$script$f key 0x51 1\n$((f + 1)) key 0x51 0\n"; f=$((f + 10)); done
+script="$script$f key 0x28 1\n$((f + 1)) key 0x28 0\n"; f=$((f + 20))
+script="$script$f key 0x51 1\n$((f + 1)) key 0x51 0\n"; f=$((f + 10))
+script="$script$f key 0x28 1\n$((f + 1)) key 0x28 0\n$((f + 30)) quit\n"
+run setupmenu 50 "$OUT/aros" "" "$script"
+check_cfg setupmenu "^sound_filter=off" "Sound Filter Off kept in bmamiga.cfg"
+check_log setupmenu "Amiga setup: 1 setting" "and given to Amiberry at once"
+
 if [ -n "${BMAMIGA_ROMS:-}" ] && [ -n "${BMAMIGA_WORKBENCH:-}" ]; then
     echo "Workbench 1.3 (Kickstart from $BMAMIGA_ROMS)"
     mkdir -p "$OUT/wb/disks"

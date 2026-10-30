@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+From the first test on a real Pi 5:
+
+- The Pi stayed black, with no log: one of Amiberry's static objects reads
+  the clock (std::chrono) while Circle starts, before its timer exists, and
+  Circle's assert stopped every core before the serial port and the log
+  were set up. gettimeofday() gives 0 until the kernel has its timer
+  (wrapped, src/port/circle/posix.c). Found by running the Pi 4 kernel in
+  QEMU's raspi4b, which stopped the same way
+- No Kickstart was found, so the Amiga started AROS as an A500 and crashed
+  (a black screen): Amiberry only scans a folder that realpath() resolves,
+  and circle-newlib's realpath() always fails. BMAmiga has its own now
+- Floppy Drives, Speed: a real drive's, 2x, 4x, 8x or turbo
+  (`floppy_speed`)
+- Amiga Setup in the menu: the Kickstart, CPU, CPU speed, chipset, chip,
+  slow and fast RAM, sound filter and stereo separation over the model's,
+  from a hard reset (src/port/bridge.cpp puts them in Amiberry's
+  changed_prefs, as its own settings window does)
+- bmamiga.uae on the card: any of Amiberry's .uae settings, one a line
+
 ## 0.1.0 – 2026-10-29
 
 The first release: not yet tried on a real Pi.

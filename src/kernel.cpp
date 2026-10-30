@@ -67,6 +67,9 @@ static const unsigned kJoyGpio[2][5] = {
 
 CKernel *CKernel::s_pThis = 0;
 
+// gettimeofday() reads Circle's timer from here on (src/port/circle/posix.c).
+extern "C" volatile int bma_timer_ready;
+
 // Core 1 counts up s_Core1Beat while it makes progress and names what it is
 // doing in s_Core1Stage, so core 0 can log where it got stuck if it stops.
 static volatile unsigned s_Core1Beat = 0;
@@ -160,6 +163,7 @@ CKernel::CKernel(void)
       m_KeyQueueHead(0), m_KeyQueueTail(0), m_pMouse(0), m_MouseDx(0),
       m_MouseDy(0), m_MouseButtons(0), m_bGPIOJoysticks(false) {
   s_pThis = this;
+  bma_timer_ready = 1; // mTimer exists
   for (unsigned i = 0; i < MAX_KEYBOARDS; i++) {
     m_pKeyboard[i] = 0;
     m_KeyboardIndex[i] = i;

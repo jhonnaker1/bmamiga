@@ -10,11 +10,11 @@
  *    nothing; munmap() frees a whole mapping. posix_memalign() with
  *    more than Circle's memalign() can align (see below), with free()
  *    wrapped (--wrap=free) to give the right block back.
- *  - Files: access(), pread(), pwrite(); chmod() and chown() do nothing
- *    (FAT has no owners and no modes).
+ *  - Files: access(), pread(), pwrite(), realpath() (wrapped); chmod()
+ *    and chown() do nothing (FAT has no owners and no modes).
  *  - Text: iconv() between UTF-8 and ISO-8859-1, the conversion Amiberry
  *    uses for the Amiga's file names (osdep/amiberry_filesys.cpp).
- *  - timegm().
+ *  - timegm(); gettimeofday() before Circle's timer exists (wrapped).
  *  - What there is none of, which fails: processes (popen(), execvp(),
  *    forkpty(), waitpid()), shared libraries (dlopen()), shared memory,
  *    terminals, signals (sigaction() does nothing), ioctl().
@@ -28,6 +28,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <iconv.h>
+#include <limits.h>
 #include <pty.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -42,6 +43,7 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 
@@ -261,6 +263,85 @@ ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset)
 	return r;
 }
 
+/* realpath() (wrapped, --wrap=realpath): circle-newlib's always fails
+   (ENOSYS), and Amiberry only scans a folder for Kickstarts if realpath()
+   gives it one, so it found none on the Pi and started AROS. FAT has no
+   links, so this only makes the path absolute (from the current folder)
+   and takes out ".", ".." and repeated '/', then checks that it exists. */
+char *__wrap_realpath(const char *path, char *resolved)
+{
+	char full[PATH_MAX], out[PATH_MAX];
+	const char *p;
+	size_t len = 0;
+	struct stat st;
+
+	if (path == NULL || *path == '\0') {
+		errno = path == NULL ? EINVAL : ENOENT;
+		return NULL;
+	}
+	if (*path == '/') {
+		full[0] = '\0';
+	} else if (getcwd(full, sizeof full) == NULL) {
+		return NULL;
+	}
+	if (strlen(full) + 1 + strlen(path) >= sizeof full) {
+		errno = ENAMETOOLONG;
+		return NULL;
+	}
+	strcat(full, "/");
+	strcat(full, path);
+
+	/* Keep a volume name ("SD:") as it is. */
+	p = full;
+	if (strchr(full, ':') != NULL && strchr(full, ':') < strchr(full, '/')) {
+		len = (size_t) (strchr(full, ':') + 1 - full);
+		memcpy(out, full, len);
+		p = full + len;
+	}
+	while (*p != '\0') {
+		const char *end;
+		size_t n;
+		while (*p == '/')
+			p++;
+		end = p;
+		while (*end != '\0' && *end != '/')
+			end++;
+		n = (size_t) (end - p);
+		if (n == 0 || (n == 1 && p[0] == '.')) {
+			/* nothing */
+		} else if (n == 2 && p[0] == '.' && p[1] == '.') {
+			while (len > 0 && out[len - 1] != '/' && out[len - 1] != ':')
+				len--;
+			if (len > 0 && out[len - 1] == '/')
+				len--;
+		} else {
+			if (len + 1 + n >= sizeof out) {
+				errno = ENAMETOOLONG;
+				return NULL;
+			}
+			out[len++] = '/';
+			memcpy(out + len, p, n);
+			len += n;
+		}
+		p = end;
+	}
+	if (len == 0 || out[len - 1] == ':')
+		out[len++] = '/';
+	out[len] = '\0';
+
+	if (stat(out, &st) != 0)
+		return NULL;
+	if (resolved == NULL) {
+		resolved = malloc(len + 1);
+		if (resolved == NULL) {
+			errno = ENOMEM;
+			return NULL;
+		}
+	}
+	memcpy(resolved, out, len + 1);
+	return resolved;
+}
+
 /* ---- Text ------------------------------------------------------------------ */
 
 enum { TO_LATIN1 = 1, TO_UTF8 = 2 };
@@ -374,6 +455,30 @@ time_t timegm(struct tm *tm)
 	if (month > 1 && ((year % 4 == 0 && year % 100 != 0) || year % 400 == 0))
 		days++;
 	return (time_t) (((days * 24 + tm->tm_hour) * 60 + tm->tm_min) * 60 + tm->tm_sec);
+}
+
+/* gettimeofday() (wrapped, --wrap=gettimeofday) is Circle's timer, which
+   asserts if it doesn't exist yet, and it doesn't while Circle runs the
+   constructors of static objects: one of Amiberry's (amiberry_gfx.cpp's
+   gui_geometry_state) reads std::chrono::steady_clock, which libstdc++
+   reads with gettimeofday(). That assert stopped every core before the
+   serial port or the log were set up, so the Pi stayed black. Until the
+   kernel has its timer (bma_timer_ready, set in CKernel's constructor)
+   the time is 0. */
+volatile int bma_timer_ready;
+
+int __real_gettimeofday(struct timeval *tv, void *tz);
+
+int __wrap_gettimeofday(struct timeval *tv, void *tz)
+{
+	if (!bma_timer_ready) {
+		if (tv != NULL) {
+			tv->tv_sec = 0;
+			tv->tv_usec = 0;
+		}
+		return 0;
+	}
+	return __real_gettimeofday(tv, tz);
 }
 
 /* libstdc++'s std::this_thread::sleep_for() (built without nanosleep())

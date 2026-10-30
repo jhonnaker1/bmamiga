@@ -496,19 +496,34 @@ static void floppy_menu(void)
 	static char names[BMAMIGA_FLOPPIES][48];
 	static const char *const labels[BMAMIGA_FLOPPIES] = {"DF0:", "DF1:", "DF2:", "DF3:"};
 	static const char *const choices[] = {"Insert Disk...", "Eject", NULL};
+	static const int speeds[] = {100, 200, 400, 800, 0};
+	static const char *const speed_names[] = {
+		"Real (as an Amiga)", "2x", "4x", "8x", "Turbo", NULL
+	};
+	enum { F_SPEED = BMAMIGA_FLOPPIES };
 	int sel = 0;
 	for (;;) {
-		struct osd_item items[BMAMIGA_FLOPPIES + 3];
-		int n = 0, d, chosen;
+		struct osd_item items[BMAMIGA_FLOPPIES + 4];
+		int n = 0, d, chosen, speed = 0, i;
 		char path[512];
 		for (d = 0; d < BMAMIGA_FLOPPIES; d++) {
 			const char *disk = bmamiga_floppy(d);
 			snprintf(names[d], sizeof names[d], "%s", disk ? base_name(disk) : "(empty)");
 			items[n++] = (struct osd_item){labels[d], names[d], OSD_ITEM_SUBMENU, d};
 		}
+		for (i = 0; i < 5; i++)
+			if (speeds[i] == bmamiga_floppy_speed())
+				speed = i;
+		items[n++] = (struct osd_item){"Speed", speed_names[speed], OSD_ITEM_SUBMENU, F_SPEED};
 		items[n++] = (struct osd_item){"", NULL, OSD_ITEM_LABEL, -1};
 		items[n++] = (struct osd_item){"ADF, ADZ, DMS, IPF or ZIP.", NULL, OSD_ITEM_LABEL, -1};
 		chosen = osd_menu("Floppy Drives", items, n, &sel);
+		if (chosen == F_SPEED) {
+			i = osd_choose("Floppy Speed", speed_names, speed);
+			if (i >= 0)
+				bmamiga_set_floppy_speed(speeds[i]);
+			continue;
+		}
 		if (chosen < 0 || chosen >= BMAMIGA_FLOPPIES)
 			return;
 		d = chosen;
@@ -633,11 +648,123 @@ static void model_menu(void)
 	reboot_needed = TRUE;
 }
 
+/* ---- Amiga Setup ------------------------------------------------------------ */
+
+/* Settings over the model's own ("" in VALUES; bmamiga.cfg then has none),
+   which Amiberry takes at a hard reset (HARD) or at once. Anything else of
+   Amiberry's goes in bmamiga.uae on the card. */
+static const struct {
+	const char *label, *key;
+	const char *const *names, *const *values;
+	int hard;
+} setups[] = {
+	{"CPU", "cpu",
+	 (const char *const[]){"Model's", "68000", "68010", "68020", "68030", "68040", NULL},
+	 (const char *const[]){"", "68000", "68010", "68020", "68030", "68040", NULL}, TRUE},
+	{"CPU Speed", "cpu_speed",
+	 (const char *const[]){"Model's (real)", "Fastest", NULL},
+	 (const char *const[]){"", "max", NULL}, TRUE},
+	{"Chipset", "chipset",
+	 (const char *const[]){"Model's", "OCS", "ECS", "AGA", NULL},
+	 (const char *const[]){"", "ocs", "ecs", "aga", NULL}, TRUE},
+	{"Chip RAM", "chip_ram",
+	 (const char *const[]){"Model's", "512K", "1M", "2M", NULL},
+	 (const char *const[]){"", "512", "1024", "2048", NULL}, TRUE},
+	{"Slow RAM", "slow_ram",
+	 (const char *const[]){"Model's", "None", "512K", "1M", "1.5M", "1.8M", NULL},
+	 (const char *const[]){"", "0", "512", "1024", "1536", "1792", NULL}, TRUE},
+	{"Fast RAM", "fast_ram",
+	 (const char *const[]){"Model's", "None", "1M", "2M", "4M", "8M", NULL},
+	 (const char *const[]){"", "0", "1", "2", "4", "8", NULL}, TRUE},
+	{"Sound Filter", "sound_filter",
+	 (const char *const[]){"Model's", "Off", "Emulated", "On", NULL},
+	 (const char *const[]){"", "off", "emulated", "on", NULL}, FALSE},
+	{"Stereo Separation", "stereo_separation",
+	 (const char *const[]){"Model's", "Mono", "30%", "50%", "70%", "100%", NULL},
+	 (const char *const[]){"", "0", "3", "5", "7", "10", NULL}, FALSE},
+};
+#define N_SETUPS ((int) (sizeof setups / sizeof setups[0]))
+
+static const char *const rom_exts[] = {"rom", "bin", "a500", "a1200", "a3000", "a4000", "cdtv", NULL};
+
+static int setup_index(int s)
+{
+	const char *value = host_option(setups[s].key, "");
+	int i;
+	for (i = 0; setups[s].values[i] != NULL; i++)
+		if (strcmp(value, setups[s].values[i]) == 0)
+			return i;
+	return 0;
+}
+
+/* Kickstart: the model's, or a file in roms (Amiga Forever's with its
+   rom.key beside it). */
+static int kickstart_setup(void)
+{
+	static const char *const choices[] = {"Model's", "Choose a File...", NULL};
+	static char dir[512];
+	char path[512];
+	int i = osd_choose("Kickstart", choices, host_option("kickstart", "")[0] != '\0');
+	if (i < 0)
+		return FALSE;
+	if (i == 0) {
+		save_setting("kickstart", "");
+	} else {
+		if (dir[0] == '\0') {
+			const char *root = bmamiga_sd_root();
+			size_t len = strlen(root);
+			snprintf(dir, sizeof dir, "%s%sroms", root, len > 0 && root[len - 1] == '/' ? "" : "/");
+		}
+		if (!osd_browse("Kickstart", dir, sizeof dir, rom_exts, path, sizeof path))
+			return FALSE;
+		save_setting("kickstart", path);
+	}
+	return TRUE;
+}
+
+/* Returns TRUE if the Amiga was reset (back to it). */
+static int setup_menu(void)
+{
+	enum { S_KICKSTART = N_SETUPS };
+	static char kick_name[48];
+	int sel = 0;
+	for (;;) {
+		struct osd_item items[N_SETUPS + 5];
+		const char *kick = host_option("kickstart", "");
+		int n = 0, s, i, chosen;
+		snprintf(kick_name, sizeof kick_name, "%s", kick[0] != '\0' ? base_name(kick) : "Model's");
+		items[n++] = (struct osd_item){"Kickstart", kick_name, OSD_ITEM_SUBMENU, S_KICKSTART};
+		for (s = 0; s < N_SETUPS; s++)
+			items[n++] = (struct osd_item){setups[s].label, setups[s].names[setup_index(s)],
+			                               OSD_ITEM_SUBMENU, s};
+		items[n++] = (struct osd_item){"", NULL, OSD_ITEM_LABEL, -1};
+		items[n++] = (struct osd_item){"Used from a Hard Reset; more of", NULL, OSD_ITEM_LABEL, -1};
+		items[n++] = (struct osd_item){"Amiberry's settings: bmamiga.uae.", NULL, OSD_ITEM_LABEL, -1};
+		chosen = osd_menu("Amiga Setup", items, n, &sel);
+		if (chosen < 0)
+			return FALSE;
+		if (chosen == S_KICKSTART) {
+			if (kickstart_setup() && offer_hard_reset())
+				return TRUE;
+			continue;
+		}
+		s = chosen;
+		i = osd_choose(setups[s].label, setups[s].names, setup_index(s));
+		if (i < 0 || i == setup_index(s))
+			continue;
+		save_setting(setups[s].key, setups[s].values[i]);
+		if (!setups[s].hard)
+			bmamiga_setup_changed();
+		else if (offer_hard_reset())
+			return TRUE;
+	}
+}
+
 /* ---- Main menu ---------------------------------------------------------------- */
 
 void bmamiga_menu(void)
 {
-	enum { M_FLOPPY, M_HARD_DRIVES, M_MODEL, M_WARP, M_RESET, M_HARD_RESET, M_VIDEO, M_SOUND, M_NETWORK,
+	enum { M_FLOPPY, M_HARD_DRIVES, M_MODEL, M_SETUP, M_WARP, M_RESET, M_HARD_RESET, M_VIDEO, M_SOUND, M_NETWORK,
 	       M_ABOUT, M_REBOOT, M_OFF };
 	static int sel = 0;
 	char title[48];
@@ -650,6 +777,7 @@ void bmamiga_menu(void)
 			{"Floppy Drives", NULL, OSD_ITEM_SUBMENU, M_FLOPPY},
 			{"Hard Drives and CD", NULL, OSD_ITEM_SUBMENU, M_HARD_DRIVES},
 			{"Model (reboot)", bmamiga_model_id(bmamiga_model()), OSD_ITEM_SUBMENU, M_MODEL},
+			{"Amiga Setup", NULL, OSD_ITEM_SUBMENU, M_SETUP},
 			{"Warp (F11)", NULL, check(bmamiga_warp()), M_WARP},
 			{"Reset", NULL, 0, M_RESET},
 			{"Hard Reset", NULL, 0, M_HARD_RESET},
@@ -674,6 +802,7 @@ void bmamiga_menu(void)
 			leave = hard_drive_menu();
 			break;
 		case M_MODEL: model_menu(); break;
+		case M_SETUP: leave = setup_menu(); break;
 		case M_WARP: bmamiga_set_warp(!bmamiga_warp()); leave = TRUE; break;
 		case M_RESET: bmamiga_reset(); leave = TRUE; break;
 		case M_HARD_RESET: bmamiga_hard_reset(); leave = TRUE; break;

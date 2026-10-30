@@ -52,6 +52,7 @@ item. In a list, typing a letter jumps to the next item starting with it.
 | Floppy Drives  | Insert a floppy image in DF0: to DF3:, or eject one (see Floppy disks) |
 | Hard Drives and CD | Hard disk images or folders as DH0: to DH3:, and a CD image (see Hard drives and CD) |
 | Model          | Amiga 500 (Kickstart 1.3 or 1.2), 500+, 600, 1200 (2 MB, or with 8 MB Fast RAM), 4000/030, 4000/040, CD32, CDTV. Takes effect after a reboot |
+| Amiga Setup    | The Kickstart, CPU, CPU speed, chipset, chip, slow and fast RAM, sound filter and stereo separation, over the model's own (see Amiga Setup) |
 | Warp (F11)     | Run as fast as the Pi can, for loading and long waits; F11 turns it on and off |
 | Reset, Hard Reset | The Amiga's reset (as Ctrl+Amiga+Amiga), or power off and on |
 | Video          | The frame lock, the resolution (Pi 5), the CRT effect and its curvature, smooth scaling |
@@ -61,6 +62,45 @@ item. In a list, typing a letter jumps to the next item starting with it.
 | Reboot, Shut Down | Restart BMAmiga, or halt the Pi. Shut Down also from a keyboard's power key (Fn+F10 on a Pi 400) or the Pi 5's power button |
 
 The menu's settings are kept in `bmamiga.cfg`.
+
+## Amiga Setup
+
+*Amiga Setup* changes the model's hardware. Each item starts at *Model's*,
+what the chosen model has, and choosing anything else is kept in
+`bmamiga.cfg`:
+
+| Item              | Choices | `bmamiga.cfg` |
+|-------------------|---------|---------------|
+| Kickstart         | the model's, or a file in `roms` | `kickstart` (a path) |
+| CPU               | 68000, 68010, 68020, 68030, 68040 | `cpu` |
+| CPU Speed         | real (cycle-exact), or *Fastest*: as fast as the Pi can | `cpu_speed` (`max`) |
+| Chipset           | OCS, ECS, AGA | `chipset` (`ocs`, `ecs`, `aga`) |
+| Chip RAM          | 512K, 1M, 2M | `chip_ram` (in KB) |
+| Slow RAM          | none, 512K, 1M, 1.5M, 1.8M | `slow_ram` (in KB) |
+| Fast RAM          | none, 1M, 2M, 4M, 8M | `fast_ram` (in MB) |
+| Sound Filter      | off, emulated, on (the Amiga's low-pass filter) | `sound_filter` |
+| Stereo Separation | mono, 30%, 50%, 70%, 100% | `stereo_separation` (0 to 10) |
+
+The hardware changes take effect from a hard reset, which the menu offers
+at once (as switching a real Amiga off and on); the sound's at once. Not
+every mix works: an AGA chipset wants a Kickstart 3.x, and a 68030 or
+68040 wants a Kickstart 2.04 or later.
+
+### bmamiga.uae: the rest of Amiberry's settings
+
+Any of Amiberry's (and WinUAE's) settings can go in `bmamiga.uae` in the
+card's root, one a line as in a `.uae` configuration file, for example:
+
+```
+# 8 MB of Zorro III RAM and a faster blitter
+z3mem_size=8
+immediate_blits=true
+```
+
+They go over the model and the Amiga Setup, at each start and hard reset;
+lines starting with `#` or `;` are comments. `bmamiga.uae.example` on the
+card has more. A wrong name or value is ignored (with
+`enable_logging=file`, the log says which).
 
 ## Floppy disks
 
@@ -73,6 +113,12 @@ the Amiga, which reads it at once.
 
 The disks in the drives are remembered in `bmamiga.cfg` (`df0` to `df3`)
 and put back in at the next start.
+
+*Speed* sets how fast the drives read: *Real* is a real Amiga drive's
+speed (Workbench 1.3 takes about a minute to start from a floppy, as it
+did), 2x, 4x and 8x are faster, and *Turbo* as fast as the Amiga takes
+the data. Some copy-protected games need *Real*. It is `floppy_speed` in
+`bmamiga.cfg`, and changes at once.
 
 From the web UI, clicking a floppy image puts it in DF0: and resets the
 Amiga, to start a game or a boot disk from a browser.
@@ -239,10 +285,12 @@ the web UI.
 | Option              | Values                       | Default  | What it does |
 |---------------------|------------------------------|----------|--------------|
 | `model`             | `A500`, `A500OG`, `A500+`, `A600`, `A1200OG`, `A1200`, `A4030`, `A4040`, `CD32`, `CDTV` | `A500` | The Amiga to emulate (the menu's *Model*) |
+| `kickstart`, `cpu`, `cpu_speed`, `chipset`, `chip_ram`, `slow_ram`, `fast_ram`, `sound_filter`, `stereo_separation` | see Amiga Setup | the model's | The menu's Amiga Setup |
 | `df0` ... `df3`     | paths                        | none     | The floppy images in the drives (the menu's *Floppy Drives*) |
 | `dh0` ... `dh3`     | paths                        | none     | The hard drives: hard disk images or folders (the menu's *Hard Drives and CD*) |
 | `cd0`               | path                         | none     | The CD image in the CD drive |
 | `video_standard`    | `auto`, `pal`, `ntsc`        | `auto`   | The Amiga's video standard |
+| `floppy_speed`      | `100`, `200`, `400`, `800`, `0` | `100` | The floppy drives' speed: a real drive's, faster, or `0` turbo |
 | `statusline`        | `0`, `1`                     | `0`      | Amiberry's status line: drive lights and speed |
 | `aspect`            | number                       | `1.0`    | Multiplies the width of the picture |
 | `scale`             | 0.1 to 1.0                   | `1.0`    | Height of the picture as a fraction of the screen (less for a TV that cuts off the edges) |
