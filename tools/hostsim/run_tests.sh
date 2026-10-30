@@ -242,6 +242,16 @@ run setupmenu 50 "$OUT/aros" "" "$script"
 check_cfg setupmenu "^sound_filter=off" "Sound Filter Off kept in bmamiga.cfg"
 check_log setupmenu "Amiga setup: 1 setting" "and given to Amiberry at once"
 
+echo "A CD32's disc with the Amiga Setup"
+# The setup's hard reset as the Amiga starts empties a CD32's own drive; the
+# disc must go back in after it (0.2.0's Pi 5 started without its disc).
+mkdir -p "$OUT/cd32/disks"
+cp "$OUT/drives/disks/test.iso" "$OUT/cd32/disks/"
+printf 'model=CD32\namiga_network=bsdsocket\ncd0=disks/test.iso\n' > "$OUT/cd32/bmamiga.cfg"
+run cd32 50 "$OUT/aros" "" '300 quit\n'
+check_log cd32 "hardreset" "the setup's hard reset"
+check_log cd32 "CD32: media changed = 1" "the disc in the CD32's drive after it"
+
 echo "Drives from bmamiga.uae"
 # bmamiga.uae's drive (as AmiKit's: a device name and volume name of its
 # own) after the menu's DH0:, once each, and again once after a hard reset.

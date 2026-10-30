@@ -739,7 +739,7 @@ void bmamiga_setup_changed(void)
    them (it has run only a frame). */
 static void insert_saved_media(void)
 {
-	int d, drives, setup = apply_setup();
+	int d, drives, reset, setup = apply_setup();
 	for (d = 0; d < BMAMIGA_FLOPPIES; d++) {
 		if (floppy[d][0] != '\0' && access(floppy[d], R_OK) == 0) {
 			bmamiga_core_insert_floppy(d, floppy[d]);
@@ -747,13 +747,16 @@ static void insert_saved_media(void)
 		}
 	}
 	drives = apply_hard_drives();
-	if (cd_image[0] != '\0') {
+	/* The setup's memory, CPU and Kickstart are for a hard reset too. A
+	   CD32's or CDTV's own drive takes a disc as it runs: after the reset,
+	   if there is one (bmamiga_hard_reset() puts it back); another
+	   Amiga's CD drive is there from a hard reset. */
+	reset = drives > 0 || setup > 0 || (cd_image[0] != '\0' && !bmamiga_model_has_cd());
+	if (cd_image[0] != '\0' && !(reset && bmamiga_model_has_cd())) {
 		bmamiga_core_set_cd(cd_image, bmamiga_model_has_cd());
 		LOG("CD: %s\n", cd_image);
 	}
-	/* A CD32's or CDTV's own drive takes a disc as it runs. The setup's
-	   memory, CPU and Kickstart are for a hard reset too. */
-	if (drives > 0 || setup > 0 || (cd_image[0] != '\0' && !bmamiga_model_has_cd()))
+	if (reset)
 		bmamiga_hard_reset();
 }
 
@@ -1006,14 +1009,34 @@ void bmamiga_reset(void)
 
 /* With the Amiga Setup and the drives as they are now (a hard reset is
    when Amiberry takes the memory, CPU, chipset, Kickstart and drives). */
+/* A CD32's or CDTV's disc goes back in this many frames after a hard
+   reset: the reset (which comes at the next frame) empties its drive,
+   before Amiberry has seen a disc put in just before it (0.2.0's CD32
+   started without Battle Chess this way). */
+#define CD_BACK_FRAMES 50
+static int cd_back;
+
 void bmamiga_hard_reset(void)
 {
 	if (core_running) {
 		apply_setup();
 		/* The drives after the setup, which has bmamiga.uae's. */
 		apply_hard_drives();
+		if (cd_image[0] != '\0' && bmamiga_model_has_cd()) {
+			bmamiga_core_set_cd(NULL, TRUE);
+			cd_back = CD_BACK_FRAMES;
+		}
 	}
 	bmamiga_core_reset(TRUE);
+}
+
+/* Each frame: a CD32's or CDTV's disc back after a hard reset. */
+static void cd_back_in(void)
+{
+	if (cd_back > 0 && --cd_back == 0 && cd_image[0] != '\0') {
+		bmamiga_core_set_cd(cd_image, TRUE);
+		LOG("CD: %s\n", cd_image);
+	}
 }
 
 /* ---- Files ------------------------------------------------------------------- */
@@ -1251,6 +1274,7 @@ void bmamiga_main(void)
 		   once a frame. */
 		bma_threads_yield();
 		bmamiga_core_cd32_pad();
+		cd_back_in();
 		speed_amiga += host_time() - amiga_start;
 		speed_frames++;
 		/* Frames without sound (the Amiga starting): silence instead,

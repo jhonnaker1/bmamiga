@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.1 – 2026-10-29
+
+- A CD32 or CDTV started without its disc when the Amiga Setup had
+  anything set (Battle Chess on the first Pi 5 test of 0.2.0): the setup's
+  hard reset, as the Amiga starts, emptied the drive before Amiberry had
+  seen the disc. The disc now goes back in after every hard reset
+  (src/port/platform.c, cd_back_in()); a simulator test for it
+
 ## 0.2.0 – 2026-10-29
 
 From the first test on a real Pi 5:
