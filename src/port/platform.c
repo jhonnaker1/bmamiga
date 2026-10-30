@@ -687,12 +687,15 @@ static void setup_lines(char *out, size_t size)
 		if (value[0] != '\0')
 			ADD(numbers[i].format, atoi(value) / numbers[i].divide);
 	}
-	/* The Amiga's network: SLiRP (NAT through the Pi's network, src/port/
-	   bmnet.c), on uaenet.device (a SANA-II device, on any Amiga) or an
-	   A2065 card. */
+	/* The Amiga's network, through the Pi's (src/port/bmnet.c): Amiberry's
+	   bsdsocket.library, for programs without a TCP/IP stack on the Amiga
+	   (as AmiKit has it); or SLiRP (NAT), for one, on uaenet.device (a
+	   SANA-II device, on any Amiga) or an A2065 card. */
 	{
 		const char *net = host_option("amiga_network", "");
-		if (strcmp(net, "uaenet") == 0)
+		if (strcmp(net, "bsdsocket") == 0)
+			ADD("bsdsocket_emu=true\n");
+		else if (strcmp(net, "uaenet") == 0)
 			ADD("sana2=true\n");
 		else if (strcmp(net, "a2065") == 0)
 			ADD("a2065=slirp\n");
@@ -1001,12 +1004,15 @@ void bmamiga_reset(void)
 	bmamiga_core_reset(FALSE);
 }
 
-/* With the Amiga Setup as it is now (a hard reset is when Amiberry takes
-   the memory, CPU, chipset and Kickstart). */
+/* With the Amiga Setup and the drives as they are now (a hard reset is
+   when Amiberry takes the memory, CPU, chipset, Kickstart and drives). */
 void bmamiga_hard_reset(void)
 {
-	if (core_running)
+	if (core_running) {
 		apply_setup();
+		/* The drives after the setup, which has bmamiga.uae's. */
+		apply_hard_drives();
+	}
 	bmamiga_core_reset(TRUE);
 }
 

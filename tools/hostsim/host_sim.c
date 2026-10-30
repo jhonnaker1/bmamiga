@@ -856,6 +856,22 @@ void host_tcp_close_all(void)
 	}
 }
 
+/* Large blocks (host.h): the PC's malloc(), up to 2 GB, as the Pi gives. */
+void *host_large_alloc(size_t size)
+{
+	return malloc(size);
+}
+
+void host_large_free(void *block)
+{
+	free(block);
+}
+
+size_t host_large_limit(void)
+{
+	return (size_t) 2 << 30;
+}
+
 /* UDP (host.h, from BMNeXT): the PC's own sockets, as for TCP; a handle is
    the socket. */
 int host_udp_open(void)

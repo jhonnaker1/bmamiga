@@ -80,7 +80,7 @@ what the chosen model has, and choosing anything else is kept in
 | Fast RAM          | none, 1M, 2M, 4M, 8M | `fast_ram` (in MB) |
 | Sound Filter      | off, emulated, on (the Amiga's low-pass filter) | `sound_filter` |
 | Stereo Separation | mono, 30%, 50%, 70%, 100% | `stereo_separation` (0 to 10) |
-| Network           | none, uaenet.device, an A2065 card (see The Amiga's network) | `amiga_network` (`uaenet`, `a2065`) |
+| Network           | none, bsdsocket.library, uaenet.device, an A2065 card (see The Amiga's network) | `amiga_network` (`bsdsocket`, `uaenet`, `a2065`) |
 
 The hardware changes take effect from a hard reset, which the menu offers
 at once (as switching a real Amiga off and on); the sound's at once. Not
@@ -99,7 +99,17 @@ immediate_blits=true
 ```
 
 They go over the model and the Amiga Setup, at each start and hard reset;
-lines starting with `#` or `;` are comments. `bmamiga.uae.example` on the
+lines starting with `#` or `;` are comments. Drives can be added this way
+too, after the menu's DH0: to DH3:, with names of their own, for example a
+folder on the card as `AK0:`, called `AmiKit`, that the Amiga boots from:
+
+```
+filesystem2=rw,AK0:AmiKit:disks/AmiKit,0
+```
+
+(paths are from the card's root). The Amiga's memory can be up to 2 GB in
+all, on a Pi with the memory for it (a Pi 4 or 5 with 4 GB or more), as
+for 512 MB of Zorro III RAM (`z3mem_size=512`) and an RTG card. `bmamiga.uae.example` on the
 card has more. A wrong name or value is ignored (with
 `enable_logging=file`, the log says which).
 
@@ -279,9 +289,17 @@ example `timezone=600` for UTC+10.
 ## The Amiga's network
 
 The Amiga can share the Pi's network (Ethernet or Wi-Fi, set up in the
-menu's *Network*): the Pi is a router for it, which hands its connections
-on as its own (NAT, through SLiRP, as in Amiberry). In *Amiga Setup*, set
-*Network* to:
+menu's *Network*). In *Amiga Setup*, set *Network* to:
+
+- **bsdsocket.library**: Amiberry's emulation of the Amiga's socket
+  library, for Amiga programs (web browsers, mail, IRC, FTP) without a
+  TCP/IP stack on the Amiga: their connections are the Pi's, and their
+  names are looked up with the Pi's DNS server. This is how AmiKit is set
+  up. The Amiga can't listen for connections from other computers this
+  way, and `ping` doesn't work.
+
+or, for an Amiga with its own TCP/IP stack, SLiRP: the Pi is a router for
+it, which hands its connections on as its own (NAT):
 
 - **uaenet.device**: a SANA-II network device, for any Amiga model. Point
   the Amiga's TCP/IP stack (Roadshow, AmiTCP, Miami) at `uaenet.device`,
@@ -289,7 +307,7 @@ on as its own (NAT, through SLiRP, as in Amiberry). In *Amiga Setup*, set
 - **A2065 Card**: Commodore's Zorro II Ethernet card, for software that
   wants real hardware; its driver is `a2065.device`.
 
-Then hard reset. The Amiga gets its address by DHCP: 10.0.2.15, with the
+Then hard reset. With SLiRP, the Amiga gets its address by DHCP: 10.0.2.15, with the
 router 10.0.2.2 and the DNS server 10.0.2.3 (to set by hand if the stack
 has no DHCP; the netmask is 255.255.255.0). It can reach the Internet and
 your network (web, mail, FTP, the Amiga's own clients), but nothing can
@@ -297,10 +315,9 @@ connect to it from outside, and `ping` to the Internet doesn't work (as
 in SLiRP everywhere). The Pi's
 network must be up before the Amiga's stack starts.
 
-The Amiga needs a TCP/IP stack of its own, such as Roadshow (whose demo is
-on Aminet), AmiTCP or Miami. Amiberry's other way, its
-bsdsocket.library emulation (programs use the host's network without a
-stack, as AmiKit does), isn't in BMAmiga yet.
+For SLiRP the Amiga needs a TCP/IP stack of its own, such as Roadshow
+(whose demo is on Aminet), AmiTCP or Miami; with bsdsocket.library it
+needs none (and none should be started).
 
 ## Options
 

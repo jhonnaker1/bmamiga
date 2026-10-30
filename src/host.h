@@ -29,6 +29,7 @@
 #ifndef BMAMIGA_HOST_H_
 #define BMAMIGA_HOST_H_
 
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -172,6 +173,14 @@ void host_udp_close(int handle);
 /* The DNS server the network's DHCP gave (network byte order). Returns 0
    if there is none (no network). */
 int host_dns_server(uint32_t *ip);
+/* Large blocks: the Amiga's memory (src/port/circle/posix.c's mmap()). On
+   the Pi they come from all its memory, above 1 GB too, which malloc()
+   doesn't reach (Circle keeps that below 1 GB, where its drivers' DMA can
+   reach it). host_large_limit() is the largest block it gives now, which
+   leaves some memory over. */
+void *host_large_alloc(size_t size);
+void host_large_free(void *block);
+size_t host_large_limit(void);
 /* The ARM's clock now, in MHz, and the chip's temperature, in degrees C
    (0 if unknown). */
 void host_cpu_status(unsigned *mhz, unsigned *celsius);

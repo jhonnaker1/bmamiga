@@ -47,14 +47,14 @@ CIRCLE_FORCED := -include $(ROOT)/src/port/circle/include/bma_circle.h
 # memory).
 CIRCLE_AMIBERRY_FLAGS := -Dclock_gettime=bma_clock_gettime -Dclock_gettime_nsec_np=bma_clock_gettime_nsec_np \
 	-Dnanosleep=bma_nanosleep -Dusleep=bma_usleep \
-	$(CIRCLE_CXX_INCLUDES) $(CIRCLE_TARGET) -DLIBRETRO_NO_JIT -DBMAMIGA_BMNET $(CIRCLE_FORCED)
+	$(CIRCLE_CXX_INCLUDES) $(CIRCLE_TARGET) -DLIBRETRO_NO_JIT -DBMAMIGA_BMNET=3 $(CIRCLE_FORCED)
 
 # Amiberry's files that need what Circle hasn't, and BMAmiga's in their
 # place (relative to src/port).
 CIRCLE_AMIBERRY_EXCLUDE := src/zz9000_sdk_media_av.o src/archivers/chd/osdsync.o \
-	src/osdep/bsdsocket_host.o src/osdep/sigsegv_handler.o \
+	src/osdep/sigsegv_handler.o \
 	src/archivers/chd/posixsocket.o src/archivers/chd/posixptty.o
-CIRCLE_AMIBERRY_EXTRA := circle/osdsync circle/zz9000_media circle/nosockets \
+CIRCLE_AMIBERRY_EXTRA := circle/osdsync circle/zz9000_media \
 	circle/nosignals circle/chd_nofiles
 
 CIRCLE_AMIBERRY_LIB := $(CIRCLE_BUILD)/libamiberry.a

@@ -2,8 +2,9 @@
  * bmnet.h - the sockets of the Amiga's network, BMAmiga's (src/port/bmnet.c,
  * from BMNeXT).
  *
- * Included before every file of Amiberry's SLiRP (src/slirp/) and
- * slirp_uae.cpp, which runs it (-include, src/port/amiberry.mk): their
+ * Included before every file of Amiberry's SLiRP (src/slirp/), slirp_uae.cpp,
+ * which runs it, and osdep/bsdsocket_host.cpp, the Amiga's bsdsocket.library
+ * (-include, src/port/amiberry.mk): their
  * socket calls (socket(), connect(), select(), and the read(), write() and
  * close() they also use on sockets) become bmnet's. bmnet's sockets have
  * descriptors of their own (BMNET_FD_BASE and up); read(), write(),
@@ -34,11 +35,42 @@
 #include <sys/time.h>
 #include <sys/select.h>
 #include <sys/socket.h>
+#ifdef __circle__
+/* newlib for Circle's sockaddr_in has no sin_zero: 8 bytes, where the
+   Amiga's (and every other system's) are 16, which bsdsocket.library
+   refuses ("len > sizeof(struct sockaddr_in)"). The files bmnet.h is in
+   only give their addresses to bmnet, so theirs is the full one. */
+#define sockaddr_in bmnet_newlib_sockaddr_in
 #include <netinet/in.h>
+#undef sockaddr_in
+struct sockaddr_in {
+	sa_family_t sin_family;
+	in_port_t sin_port;
+	struct in_addr sin_addr;
+	char sin_zero[8];
+};
+#else
+#include <netinet/in.h>
+#endif
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <fcntl.h>
 #include <unistd.h>
+#ifdef __cplusplus
+/* C++'s own, first: their std::bind(), read() members and the like would
+   meet the macros below otherwise. */
+#include <algorithm>
+#include <array>
+#include <atomic>
+#include <chrono>
+#include <condition_variable>
+#include <functional>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <vector>
+#endif
 
 /* On the Pi, BMAmiga's (src/port/circle/include) and newlib's. */
 #include <sys/ioctl.h>
@@ -53,6 +85,88 @@
 #endif
 #ifndef INADDR_LOOPBACK
 #define INADDR_LOOPBACK ((in_addr_t) 0x7f000001)
+#endif
+
+#ifdef __circle__
+/* What newlib for Circle's headers haven't, for bsdsocket.library (osdep/
+   bsdsocket_host.cpp): names it maps the Amiga's to and from. The errors
+   are never given here; the option and protocol numbers go to bmnet's
+   setsockopt(), which takes any. */
+#ifndef ESOCKTNOSUPPORT
+#define ESOCKTNOSUPPORT 2001
+#endif
+#ifndef ESHUTDOWN
+#define ESHUTDOWN 2002
+#endif
+#ifndef IPPROTO_IGMP
+#define IPPROTO_IGMP 2
+#endif
+#ifndef IPPROTO_EGP
+#define IPPROTO_EGP 8
+#endif
+#ifndef IPPROTO_PUP
+#define IPPROTO_PUP 12
+#endif
+#ifndef IPPROTO_IDP
+#define IPPROTO_IDP 22
+#endif
+#ifndef IPPROTO_ENCAP
+#define IPPROTO_ENCAP 98
+#endif
+#ifndef IP_RECVRETOPTS
+#define IP_RECVRETOPTS 6
+#endif
+#ifndef TCP_MAXSEG
+#define TCP_MAXSEG 2
+#endif
+/* The network interfaces' list (SIOCGIFCONF, which bmnet's ioctl()
+   refuses: the Amiga is told there are none). */
+#ifndef IFNAMSIZ
+#define IFNAMSIZ 16
+#endif
+#ifndef SIOCGIFCONF
+#define SIOCGIFCONF   0xc0106924
+#define SIOCGIFADDR   0xc0206921
+#define SIOCGIFFLAGS  0xc0206911
+#endif
+struct ifreq {
+	char ifr_name[IFNAMSIZ];
+	union {
+		struct sockaddr ifru_addr;
+		short ifru_flags;
+	} ifr_ifru;
+};
+#define ifr_addr  ifr_ifru.ifru_addr
+#define ifr_flags ifr_ifru.ifru_flags
+struct ifconf {
+	int ifc_len;
+	union {
+		char *ifcu_buf;
+		struct ifreq *ifcu_req;
+	} ifc_ifcu;
+};
+#define ifc_buf ifc_ifcu.ifcu_buf
+#define ifc_req ifc_ifcu.ifcu_req
+/* What newlib for Circle's netdb.h hasn't (bsdsocket.library's names). */
+struct hostent {
+	char *h_name;
+	char **h_aliases;
+	int h_addrtype;
+	int h_length;
+	char **h_addr_list;
+};
+#define h_addr h_addr_list[0]
+struct protoent {
+	char *p_name;
+	char **p_aliases;
+	int p_proto;
+};
+struct servent {
+	char *s_name;
+	char **s_aliases;
+	int s_port;
+	char *s_proto;
+};
 #endif
 
 #ifdef __cplusplus
@@ -121,6 +235,17 @@ int bmnet_getaddrinfo(const char *node, const char *service,
    DNS server the network gave (host_dns_server()): the Pi has no such
    file. */
 FILE *bmnet_fopen(const char *path, const char *mode);
+/* For bsdsocket.library (osdep/bsdsocket_host.cpp): pipes (a pair of
+   127.0.0.1 sockets), and names through the network's DNS server. */
+int bmnet_pipe(int fds[2]);
+int bmnet_dup(int fd);
+extern int bmnet_h_errno;
+struct hostent *bmnet_gethostbyname(const char *name);
+struct hostent *bmnet_gethostbyaddr(const void *addr, socklen_t len, int type);
+struct protoent *bmnet_getprotobyname(const char *name);
+struct protoent *bmnet_getprotobynumber(int number);
+struct servent *bmnet_getservbyname(const char *name, const char *proto);
+struct servent *bmnet_getservbyport(int port, const char *proto);
 
 #ifdef __cplusplus
 }
@@ -163,6 +288,19 @@ FILE *bmnet_fopen(const char *path, const char *mode);
 #define gethostname(n, l)          bmnet_gethostname(n, l)
 #define getaddrinfo(n, s, h, r)    bmnet_getaddrinfo(n, s, h, r)
 #define fopen(p, m)                bmnet_fopen(p, m)
+#define pipe(f)                    bmnet_pipe(f)
+#define dup(f)                     bmnet_dup(f)
+#undef h_errno
+#define h_errno                    bmnet_h_errno
+#define gethostbyname(n)           bmnet_gethostbyname(n)
+#define gethostbyaddr(a, l, t)     bmnet_gethostbyaddr(a, l, t)
+#define getprotobyname(n)          bmnet_getprotobyname(n)
+#define getprotobynumber(n)        bmnet_getprotobynumber(n)
+#define getservbyname(n, p)        bmnet_getservbyname(n, p)
+#define getservbyport(n, p)        bmnet_getservbyport(n, p)
+/* bmnet's descriptors are 1024 and up. */
+#undef FD_SETSIZE
+#define FD_SETSIZE                 (BMNET_FD_BASE + BMNET_MAX)
 
 #endif /* BMNET_IMPLEMENTATION */
 

@@ -51,9 +51,21 @@ static int failures;
 
 #define OUTSIDE "192.0.2.1"
 
+/* The DNS server, 192.0.2.53:53, is this test's, on 127.0.0.1:15353. */
+#define DNS_SERVER "192.0.2.53"
+#define DNS_PORT 15353
+
 static uint32_t real_ip(uint32_t ip)
 {
-	return ip == inet_addr(OUTSIDE) ? htonl(INADDR_LOOPBACK) : ip;
+	return ip == inet_addr(OUTSIDE) || ip == inet_addr(DNS_SERVER) ? htonl(INADDR_LOOPBACK) : ip;
+}
+
+#include <sys/time.h>
+double host_time(void)
+{
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	return tv.tv_sec + tv.tv_usec / 1e6;
 }
 
 int host_tcp_connect(const char *host, const char *port)
@@ -102,7 +114,7 @@ int host_udp_send(int h, uint32_t ip, unsigned port, const void *data, unsigned 
 	struct sockaddr_in to;
 	memset(&to, 0, sizeof to);
 	to.sin_family = AF_INET;
-	to.sin_port = htons((uint16_t) port);
+	to.sin_port = htons((uint16_t) (ip == inet_addr(DNS_SERVER) && port == 53 ? DNS_PORT : port));
 	to.sin_addr.s_addr = real_ip(ip);
 	return (int) sendto(h, data, size, 0, (struct sockaddr *) &to, sizeof to);
 }
@@ -116,6 +128,8 @@ int host_udp_recv(int h, void *buffer, unsigned size, uint32_t *ip, unsigned *po
 		return errno == EAGAIN || errno == EWOULDBLOCK ? 0 : -1;
 	*ip = from.sin_addr.s_addr == htonl(INADDR_LOOPBACK) ? inet_addr(OUTSIDE) : from.sin_addr.s_addr;
 	*port = ntohs(from.sin_port);
+	if (*port == DNS_PORT)
+		*ip = inet_addr(DNS_SERVER), *port = 53;
 	return (int) got;
 }
 
@@ -124,11 +138,61 @@ void host_udp_close(int h)
 	close(h);
 }
 
-/* The network's DNS server, for SLiRP's /etc/resolv.conf: 192.0.2.53. */
+/* The network's DNS server, for SLiRP's /etc/resolv.conf and bmnet's
+   names: 192.0.2.53. */
 int host_dns_server(uint32_t *ip)
 {
-	*ip = htonl(0xc0000235);
+	*ip = inet_addr(DNS_SERVER);
 	return 1;
+}
+
+/* A DNS server that knows example.com (93.184.216.34) both ways, and
+   nothing else. */
+static void *dns_server(void *arg)
+{
+	int fd = *(int *) arg;
+	uint8_t q[512], a[512];
+	for (;;) {
+		struct sockaddr_in from;
+		socklen_t flen = sizeof from;
+		ssize_t n = recvfrom(fd, q, sizeof q, 0, (struct sockaddr *) &from, &flen);
+		size_t at = 12, qend, len;
+		int type;
+		char name[256] = "";
+		size_t o = 0;
+		if (n < 17)
+			continue;
+		while (at < (size_t) n && q[at] != 0 && o + q[at] + 1 < sizeof name) {
+			memcpy(name + o, q + at + 1, q[at]);
+			o += q[at];
+			name[o++] = '.';
+			at += 1 + q[at];
+		}
+		if (o > 0)
+			name[o - 1] = '\0';
+		qend = at + 5;
+		type = q[at + 2];
+		memcpy(a, q, qend);
+		a[2] = 0x81, a[3] = 0x80;              /* answer, recursion */
+		a[6] = 0, a[7] = 0;
+		len = qend;
+		if (type == 1 && strcmp(name, "example.com") == 0) {
+			static const uint8_t rr[] = {0xc0, 12, 0, 1, 0, 1, 0, 0, 1, 0, 0, 4, 93, 184, 216, 34};
+			memcpy(a + len, rr, sizeof rr);
+			len += sizeof rr;
+			a[7] = 1;
+		} else if (type == 12 && strcmp(name, "34.216.184.93.in-addr.arpa") == 0) {
+			static const uint8_t rr[] = {0xc0, 12, 0, 12, 0, 1, 0, 0, 1, 0, 0, 13,
+			                             7, 'e', 'x', 'a', 'm', 'p', 'l', 'e', 3, 'c', 'o', 'm', 0};
+			memcpy(a + len, rr, sizeof rr);
+			len += sizeof rr;
+			a[7] = 1;
+		} else {
+			a[3] |= 3;                        /* NXDOMAIN */
+		}
+		sendto(fd, a, len, 0, (struct sockaddr *) &from, flen);
+	}
+	return NULL;
 }
 
 struct job {
@@ -356,11 +420,68 @@ int main(void)
 	files();
 	if (failures)
 		printf("%d bmnet test(s) failed.\n", failures);
+	/* bsdsocket.library's pipes, peeking, and waiting. */
+	{
+		int fds[2];
+		char c[4] = "";
+		bmnet_fd_set set;
+		struct timeval tv = {0, 200000};
+		double t0;
+		CHECK(bmnet_pipe(fds) == 0, "a pipe (two 127.0.0.1 sockets)");
+		CHECK(bmnet_write(fds[1], "ab", 2) == 2, "written at one end");
+		memset(&set, 0, sizeof set);
+		bmnet_fd_put(fds[0], &set, 1);
+		CHECK(bmnet_select(fds[0] + 1, &set, NULL, NULL, &tv) == 1, "the other end is readable");
+		CHECK(bmnet_recv(fds[0], c, 1, MSG_PEEK) == 1 && c[0] == 'a', "MSG_PEEK reads without taking");
+		CHECK(bmnet_read(fds[0], c, 2) == 2 && memcmp(c, "ab", 2) == 0, "and it is all read after");
+		memset(&set, 0, sizeof set);
+		bmnet_fd_put(fds[0], &set, 1);
+		tv.tv_sec = 0, tv.tv_usec = 200000;
+		t0 = host_time();
+		CHECK(bmnet_select(fds[0] + 1, &set, NULL, NULL, &tv) == 0 && host_time() - t0 >= 0.18,
+		      "select() waits its timeout when nothing comes");
+		bmnet_close(fds[0]);
+		bmnet_close(fds[1]);
+	}
+	/* Names */
+	{
+		pthread_t th;
+		struct sockaddr_in in;
+		static int dfd;
+		struct hostent *h;
+		struct in_addr a;
+		dfd = socket(AF_INET, SOCK_DGRAM, 0);
+		memset(&in, 0, sizeof in);
+		in.sin_family = AF_INET;
+		in.sin_port = htons(DNS_PORT);
+		in.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+		bind(dfd, (struct sockaddr *) &in, sizeof in);
+		pthread_create(&th, NULL, dns_server, &dfd);
+		h = bmnet_gethostbyname("example.com");
+		CHECK(h != NULL && h->h_length == 4 && h->h_addr_list[0] != NULL
+		      && memcmp(h->h_addr_list[0], (uint8_t[]){93, 184, 216, 34}, 4) == 0,
+		      "gethostbyname() asks the network's DNS server");
+		h = bmnet_gethostbyname("nosuch.example");
+		CHECK(h == NULL && bmnet_h_errno == HOST_NOT_FOUND, "an unknown name: HOST_NOT_FOUND");
+		h = bmnet_gethostbyname("10.1.2.3");
+		CHECK(h != NULL && memcmp(h->h_addr_list[0], (uint8_t[]){10, 1, 2, 3}, 4) == 0,
+		      "a dotted address needs no DNS");
+		h = bmnet_gethostbyname("localhost");
+		CHECK(h != NULL && memcmp(h->h_addr_list[0], (uint8_t[]){127, 0, 0, 1}, 4) == 0,
+		      "localhost is 127.0.0.1");
+		a.s_addr = inet_addr("93.184.216.34");
+		h = bmnet_gethostbyaddr(&a, 4, AF_INET);
+		CHECK(h != NULL && strcmp(h->h_name, "example.com") == 0, "gethostbyaddr() asks too (PTR)");
+		CHECK(bmnet_getservbyname("http", "tcp") && bmnet_getservbyname("http", "tcp")->s_port == htons(80),
+		      "getservbyname(\"http\") is port 80");
+		CHECK(bmnet_getprotobyname("udp") && bmnet_getprotobyname("udp")->p_proto == 17,
+		      "getprotobyname(\"udp\") is 17");
+	}
 	{
 		char line[64] = "";
 		FILE *f = bmnet_fopen("/etc/resolv.conf", "r");
 		CHECK(f != NULL && fgets(line, sizeof line, f) != NULL
-		      && strcmp(line, "nameserver 192.0.2.53\n") == 0,
+		      && strcmp(line, "nameserver " DNS_SERVER "\n") == 0,
 		      "SLiRP's /etc/resolv.conf names the network's DNS server");
 		if (f)
 			fclose(f);

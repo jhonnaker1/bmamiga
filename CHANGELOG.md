@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 – 2026-10-29
 
 From the first test on a real Pi 5:
 
@@ -27,6 +27,18 @@ From the first test on a real Pi 5:
   as on the Pi the C library's would; SLiRP's /etc/resolv.conf is the DNS
   server the Pi's DHCP gave. Simulator tests: bmnet's own, the A2065, and
   SLiRP's DHCP and DNS through bmnet ("netprobe")
+- bsdsocket.library (Amiga Setup, Network; bsdsocket_emu): Amiberry's own
+  osdep/bsdsocket_host.cpp, no longer replaced by a stub, on bmnet too,
+  which gained pipes, MSG_PEEK, select() waiting its whole timeout, and
+  names: gethostbyname() and gethostbyaddr() through the Pi's DNS server,
+  and the common protocols and services
+- The Amiga's memory: Amiberry's reservation (mmap()) comes from all of
+  the Pi's memory (host_large_alloc(), Circle's HEAP_ANY), up to 2 GB,
+  rather than 320 MB from the first 1 GB: room for AmiKit's 512 MB of
+  Zorro III RAM and its RTG card
+- bmamiga.uae's drives (filesystem2=, hardfile2=, uaehf...) go on the list
+  after the menu's DH0: to DH3:, once, at every hard reset; the log names
+  each drive
 
 ## 0.1.0 – 2026-10-29
 

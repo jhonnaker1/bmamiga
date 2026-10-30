@@ -6,7 +6,7 @@
  *    writable and executable; there is no virtual memory). Amiberry reserves 4 GB for the Amiga's memory on 64-bit
  *    hosts (for its JIT, which BMAmiga doesn't build), then tries smaller
  *    sizes until one is given (osdep/amiberry_mem.cpp): reservations over
- *    MAP_LIMIT fail, so it gets that much, all real. mprotect() does
+ *    host_large_limit() fail, so it gets that much, all real. mprotect() does
  *    nothing; munmap() frees a whole mapping. posix_memalign() with
  *    more than Circle's memalign() can align (see below), with free()
  *    wrapped (--wrap=free) to give the right block back.
@@ -47,15 +47,19 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
+#include "../../host.h"
+
 /* ---- Memory ---------------------------------------------------------------- */
 
 /* Mappings are aligned to 64K, as a desktop's pages are at least. Circle's
    memalign() can't give that: it asserts that the alignment is at most a
    cache line (64 bytes), which on the Pi stops every core (BMNeXT's first
-   Pi 5 start was a black screen from this). So a mapping is a block from
-   malloc() 64K bigger, aligned inside it. */
+   Pi 5 start was a black screen from this). So a mapping is a block 64K
+   bigger, aligned inside it: from host_large_alloc(), all of the Pi's
+   memory (malloc() has only the first 1 GB), up to host_large_limit()
+   (2 GB; Amiberry tries 4 GB first, then 64 MB less until one is given:
+   AmiKit's 512 MB of Zorro III RAM sits 1 GB into it). */
 #define MAP_ALIGN (64 * 1024)
-#define MAP_LIMIT ((size_t) 320 * 1024 * 1024)
 
 #define MAX_MAPPINGS 256
 static struct {
@@ -84,7 +88,7 @@ void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset)
 		errno = ENOMEM;
 		return MAP_FAILED;
 	}
-	if (length > MAP_LIMIT) {
+	if (length > host_large_limit()) {
 		errno = ENOMEM;
 		return MAP_FAILED;
 	}
@@ -95,7 +99,7 @@ void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset)
 		errno = ENOMEM;
 		return MAP_FAILED;
 	}
-	mappings[i].block = malloc(length + MAP_ALIGN);
+	mappings[i].block = host_large_alloc(length + MAP_ALIGN);
 	if (mappings[i].block == NULL) {
 		errno = ENOMEM;
 		return MAP_FAILED;
@@ -112,7 +116,7 @@ int munmap(void *addr, size_t length)
 	int i;
 	for (i = 0; i < MAX_MAPPINGS; i++)
 		if (mappings[i].start == addr && mappings[i].length == length) {
-			free(mappings[i].block);
+			host_large_free(mappings[i].block);
 			mappings[i].start = NULL;
 			mappings[i].block = NULL;
 			return 0;

@@ -148,6 +148,32 @@ Useful settings, as environment variables:
 | `BMAMIGA_WIFI`               | Pretend Wi-Fi is running, with a few networks to choose from |
 | `BMAMIGA_REFRESH_LATER`      | Change the display's refresh rate to this at frame 30: a display slightly off its first measurement |
 
+## The kernel's start, in QEMU
+
+The simulator runs the emulator, not the Pi's kernel. A fault in the
+kernel's own start (before the SD card is read, so before there is a log)
+shows on the Pi as a black screen and nothing else. QEMU's Raspberry Pi 4B
+(`raspi4b`) runs the Pi 4 kernel that far:
+
+```
+./make_all.sh pi4
+tools/qemu/run_qemu.sh
+```
+
+A good kernel prints Circle's first lines and BMAmiga's version, then waits
+on hardware QEMU's model hasn't (the SD card, as Circle drives it): QEMU
+shows the start, not the card, USB or the network. The script says how to
+find where a kernel stops. The first Pi 5's black screen (0.1.0) was found
+this way, against BMNeXT's Pi 4 kernel, which starts in QEMU, as a check.
+
+## The network
+
+`run_tests.sh` tests the Amiga's network without an Amiga stack: bmnet's
+own test first (`build/bmnet_test`, from `bmnet_test.c`: sockets, pipes,
+names, with a DNS server of its own), then the script command
+`netprobe dhcp` / `netprobe dns`, which talks to SLiRP as a network card
+would (src/port/bridge.cpp) and logs the answers.
+
 ## On the Pi itself
 
 On the Pi there is no debugger or strace, but there is a log. Add

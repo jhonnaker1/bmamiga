@@ -30,6 +30,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <string>
 #include <sys/stat.h>
 
 extern "C" {
@@ -101,13 +102,19 @@ static void quoted(char *out, size_t size, const char *path)
 		snprintf(out, size, "%s", path);
 }
 
+/* bmamiga.uae's drives (filesystem2=, hardfile2=, uaehf0=...), one a line,
+   kept by bmamiga_core_set_config(): they go on the list after the menu's
+   DH0: to DH3:. */
+static std::string mounts;
+
 /* The hard drives: PATHS[0] to PATHS[3] are DH0: to DH3: (NULL or "" for
    none): a disk image (HDF), or a folder, which the Amiga sees as a volume
    named NAMES[n]. They are mounted at the next hard reset, as Amiberry's
    own GUI does (its "filesys hack": the list goes to the running
    configuration too, as filesys.cpp reads it there). DH0: boots first
    (priority 0), the others after (-1), and a floppy in DF0: before them
-   all. Returns the number of drives. */
+   all; then bmamiga.uae's, as they are there. Returns the number of
+   drives. */
 int bmamiga_core_set_hard_drives(const char *const paths[4], const char *const names[4])
 {
 	int n = 0;
@@ -130,6 +137,20 @@ int bmamiga_core_set_hard_drives(const char *const paths[4], const char *const n
 			         has_rdb(paths[d]) ? "0,0,0,512" : "32,1,2,512", d == 0 ? 0 : -1);
 		cfgfile_parse_line(&changed_prefs, line, 0);
 		n++;
+	}
+	for (size_t at = 0; at < mounts.size();) {
+		size_t end = mounts.find('\n', at);
+		std::string m = mounts.substr(at, end - at);
+		TCHAR line[MAX_DPATH * 2];
+		uae_tcslcpy(line, m.c_str(), sizeof line / sizeof line[0]);
+		cfgfile_parse_line(&changed_prefs, line, 0);
+		n++;
+		at = end == std::string::npos ? mounts.size() : end + 1;
+	}
+	for (int i = 0; i < changed_prefs.mountitems; i++) {
+		const struct uaedev_config_info *ci = &changed_prefs.mountconfig[i].ci;
+		write_log(_T("Drive %s: %s (%s), boot priority %d\n"), ci->devname,
+		          ci->volname[0] ? ci->volname : ci->rootdir, ci->rootdir, ci->bootpri);
 	}
 	currprefs.mountitems = changed_prefs.mountitems;
 	memcpy(&currprefs.mountconfig, &changed_prefs.mountconfig, sizeof currprefs.mountconfig);
@@ -190,7 +211,7 @@ static struct {
 	unsigned int chipset_mask;
 	uae_u32 chipmem, bogomem, fastmem;
 	int sound_filter, sound_stereo_separation;
-	bool sana2;
+	bool sana2, socket_emu;
 } preset;
 
 static void take_preset(void)
@@ -211,6 +232,7 @@ static void take_preset(void)
 	preset.sound_filter = changed_prefs.sound_filter;
 	preset.sound_stereo_separation = changed_prefs.sound_stereo_separation;
 	preset.sana2 = changed_prefs.sana2;
+	preset.socket_emu = changed_prefs.socket_emu;
 }
 
 static void put_back_preset(void)
@@ -231,9 +253,20 @@ static void put_back_preset(void)
 	changed_prefs.sound_stereo_separation = preset.sound_stereo_separation;
 	/* The network: no model has one. */
 	changed_prefs.sana2 = preset.sana2;
+	changed_prefs.socket_emu = preset.socket_emu;
 	if (get_device_romconfig(&changed_prefs, ROMTYPE_A2065, 0) != nullptr)
 		clear_device_rom(&changed_prefs, ROMTYPE_A2065, 0, true);
 	changed_prefs.a2065name[0] = 0;
+}
+
+static bool is_mount_line(const TCHAR *s)
+{
+	static const char *const keys[] = {"filesystem=", "filesystem2=", "hardfile=", "hardfile2=",
+	                                   "uaehf"};
+	for (const char *k : keys)
+		if (_tcsnicmp(s, k, strlen(k)) == 0)
+			return true;
+	return false;
 }
 
 /* LINES: Amiberry's own settings, as in a .uae file, one a line ("#" or ";"
@@ -249,6 +282,7 @@ int bmamiga_core_set_config(const char *lines)
 	if (!preset.taken)
 		take_preset();
 	put_back_preset();
+	mounts.clear();
 	while (p != nullptr && *p != '\0') {
 		const char *end = strchr(p, '\n');
 		size_t n = end != nullptr ? (size_t) (end - p) : strlen(p);
@@ -266,6 +300,14 @@ int bmamiga_core_set_config(const char *lines)
 			s[--len] = 0;
 		if (*s == 0 || *s == '#' || *s == ';' || _tcschr(s, '=') == nullptr)
 			continue;
+		/* Drives: kept for bmamiga_core_set_hard_drives(), which puts the
+		   list together. */
+		if (is_mount_line(s)) {
+			if (mounts.size() < 16384)
+				mounts += std::string(s) + "\n";
+			taken++;
+			continue;
+		}
 		cfgfile_parse_line(&changed_prefs, s, 0);
 		taken++;
 	}

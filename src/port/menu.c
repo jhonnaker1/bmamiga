@@ -682,10 +682,11 @@ static const struct {
 	{"Stereo Separation", "stereo_separation",
 	 (const char *const[]){"Model's", "Mono", "30%", "50%", "70%", "100%", NULL},
 	 (const char *const[]){"", "0", "3", "5", "7", "10", NULL}, FALSE},
-	/* SLiRP: the Pi's network, shared (Network has the Pi's). */
+	/* The Pi's network, shared (Network has the Pi's): bsdsocket.library
+	   (as AmiKit has it), or SLiRP for the Amiga's own TCP/IP stack. */
 	{"Network", "amiga_network",
-	 (const char *const[]){"None", "uaenet.device", "A2065 Card", NULL},
-	 (const char *const[]){"", "uaenet", "a2065", NULL}, TRUE},
+	 (const char *const[]){"None", "bsdsocket.library", "uaenet.device", "A2065 Card", NULL},
+	 (const char *const[]){"", "bsdsocket", "uaenet", "a2065", NULL}, TRUE},
 };
 #define N_SETUPS ((int) (sizeof setups / sizeof setups[0]))
 

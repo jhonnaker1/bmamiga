@@ -34,6 +34,7 @@
 #include <circle/bcmpropertytags.h>
 #include <circle/bcmwatchdog.h>
 #include <circle/machineinfo.h>
+#include <circle/memory.h>
 #include <circle/startup.h>
 #include <circle/synchronize.h>
 #include <circle/usb/usbhid.h>
@@ -1185,6 +1186,24 @@ void host_sleep_us(unsigned us) {
 }
 
 void host_yield(void) { CScheduler::Get()->Yield(); }
+
+// The Amiga's memory: from above 1 GB if the Pi has it (HEAP_ANY), else
+// below. Up to 2 GB (AmiKit's Zorro III RAM at 1 GB into the Amiga's
+// addresses, and its RTG card's, fit), leaving 256 MB over.
+void *host_large_alloc(size_t size) {
+  return CMemorySystem::HeapAllocate(size, HEAP_ANY);
+}
+
+void host_large_free(void *block) { CMemorySystem::HeapFree(block); }
+
+size_t host_large_limit(void) {
+  const size_t kKeep = 256u << 20, kMost = (size_t)2 << 30;
+  CMemorySystem *memory = CMemorySystem::Get();
+  size_t high = memory->GetHeapFreeSpace(HEAP_HIGH);
+  size_t free = high > 0 ? high : memory->GetHeapFreeSpace(HEAP_LOW);
+  free = free > kKeep ? free - kKeep : 0;
+  return free < kMost ? free : kMost;
+}
 
 int host_video_init(int width, int height, uint16_t **pixels, int *pitch) {
   return CKernel::Get()->VideoInit(width, height, pixels, pitch);

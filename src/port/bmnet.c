@@ -15,9 +15,10 @@
  *               socket turns writable when it is done, as SLiRP's
  *               non-blocking connect() expects
  *
- * select() reports what is ready now; if nothing is, it lets the
- * emulator run for up to its timeout first (SLiRP's thread, slirp_uae.cpp,
- * would otherwise spin). All on the emulator's core, on its threads
+ * select() waits as long as it is asked to (bsdsocket.library's
+ * WaitSelect() needs that), letting the emulator run meanwhile, 10 ms at a
+ * time. Names are looked up with the network's DNS server (host.h's
+ * host_dns_server()), for bsdsocket.library's gethostbyname(). All on the emulator's core, on its threads
  * (src/port/circle/threads.c), but for the background connects, which only
  * fill in their own job.
  *
@@ -36,6 +37,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <strings.h>
 
 #include "../host.h"
 
@@ -507,7 +509,8 @@ static ssize_t stream_send(struct bsock *s, const void *buf, size_t len)
 	return sent > 0 ? sent : fail(EAGAIN);
 }
 
-static ssize_t stream_recv(struct bsock *s, void *buf, size_t len)
+/* PEEK: MSG_PEEK, which leaves what it reads to be read again. */
+static ssize_t stream_recv(struct bsock *s, void *buf, size_t len, int peek)
 {
 	size_t n;
 	int r;
@@ -518,7 +521,14 @@ static ssize_t stream_recv(struct bsock *s, void *buf, size_t len)
 	if (len == 0)
 		return 0;
 	if (s->lo) {
-		n = ring_get(s, buf, len);
+		if (peek) {
+			size_t head = s->ring_head, have = s->ring_len;
+			n = ring_get(s, buf, len);
+			s->ring_head = head;
+			s->ring_len = have;
+		} else {
+			n = ring_get(s, buf, len);
+		}
 		if (n > 0)
 			return (ssize_t) n;
 		return s->peer_gone || s->peer < 0 ? 0 : fail(EAGAIN);
@@ -532,7 +542,8 @@ static ssize_t stream_recv(struct bsock *s, void *buf, size_t len)
 	if (n > len)
 		n = len;
 	memcpy(buf, s->xbuf + s->xpos, n);
-	s->xpos += n;
+	if (!peek)
+		s->xpos += n;
 	return (ssize_t) n;
 }
 
@@ -610,10 +621,19 @@ ssize_t bmnet_recvfrom(int fd, void *buf, size_t len, int flags,
 	if (s == NULL)
 		return bmnet_read(fd, buf, len);
 	if (s->type == SOCK_STREAM) {
-		ssize_t r = stream_recv(s, buf, len);
+		ssize_t r = stream_recv(s, buf, len, (flags & MSG_PEEK) != 0);
 		if (r >= 0)
 			fill_addr(from, fromlen, s->rip, s->rport);
 		return r;
+	}
+	if (flags & MSG_PEEK) {
+		g = s->dq_head != NULL ? s->dq_head : udp_fill(s) ? s->xdg : NULL;
+		if (g == NULL)
+			return fail(EAGAIN);
+		n = g->len < len ? g->len : len;
+		memcpy(buf, g->data, n);
+		fill_addr(from, fromlen, g->ip, g->port);
+		return (ssize_t) n;
 	}
 	if (s->dq_head != NULL) {
 		g = s->dq_head;
@@ -791,16 +811,12 @@ int bmnet_select(int nfds, bmnet_fd_set *r, bmnet_fd_set *w, bmnet_fd_set *x,
                  struct timeval *timeout)
 {
 	bmnet_fd_set rr, ww;
-	int fd, count = 0, pass;
-	for (pass = 0; pass < 2 && count == 0; pass++) {
-		/* Nothing ready: let the emulator run, for up to 10 ms (or the
-		   timeout), and look again. */
-		if (pass == 1) {
-			long us = timeout ? timeout->tv_sec * 1000000L + timeout->tv_usec : 10000;
-			if (us <= 0)
-				break;
-			bma_usleep(us > 10000 ? 10000 : (useconds_t) us);
-		}
+	int fd, count;
+	/* Until something is ready or the timeout is over (none: for ever),
+	   letting the emulator run meanwhile, 10 ms at a time. */
+	double until = timeout ? host_time() + timeout->tv_sec + timeout->tv_usec / 1e6 : 0;
+	for (;;) {
+		count = 0;
 		reap_jobs();
 		memset(&rr, 0, sizeof rr);
 		memset(&ww, 0, sizeof ww);
@@ -816,6 +832,16 @@ int bmnet_select(int nfds, bmnet_fd_set *r, bmnet_fd_set *w, bmnet_fd_set *x,
 				bmnet_fd_put(fd, &ww, 1);
 				count++;
 			}
+		}
+		if (count > 0)
+			break;
+		if (timeout) {
+			double left = until - host_time();
+			if (left <= 0)
+				break;
+			bma_usleep(left > 0.01 ? 10000 : (useconds_t) (left * 1e6) + 1);
+		} else {
+			bma_usleep(10000);
 		}
 	}
 	if (r)
@@ -845,10 +871,14 @@ int bmnet_getsockopt(int fd, int level, int name, void *value, socklen_t *len)
 		*len = sizeof(int);
 		return 0;
 	}
-	if (value && len && *len >= sizeof(int)) {
-		*(int *) value = 0;
+	if (level == SOL_SOCKET && name == SO_TYPE && value && len && *len >= sizeof(int)) {
+		*(int *) value = s->type;
 		*len = sizeof(int);
+		return 0;
 	}
+	/* Anything else (SO_RCVTIMEO's struct timeval too): zero. */
+	if (value && len && *len > 0)
+		memset(value, 0, *len);
 	return 0;
 }
 
@@ -952,4 +982,344 @@ FILE *bmnet_fopen(const char *path, const char *mode)
 		return fmemopen(resolv, strlen(resolv), "r");
 	}
 	return fopen(path, mode);
+}
+
+/* ---- Pipes ---------------------------------------------------------------- */
+
+/* A pair of 127.0.0.1 TCP sockets: bsdsocket.library's (osdep/
+   bsdsocket_host.cpp) wake-up and abort pipes, which it select()s on with
+   its sockets. */
+int bmnet_pipe(int fds[2])
+{
+	struct sockaddr_in in;
+	socklen_t len = sizeof in;
+	int l = bmnet_socket(AF_INET, SOCK_STREAM, 0), w, r;
+	if (l < 0)
+		return -1;
+	memset(&in, 0, sizeof in);
+	in.sin_family = AF_INET;
+	in.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+	if (bmnet_bind(l, (struct sockaddr *) &in, sizeof in) < 0 || bmnet_listen(l, 1) < 0
+	    || bmnet_getsockname(l, (struct sockaddr *) &in, &len) < 0) {
+		bmnet_close(l);
+		return -1;
+	}
+	w = bmnet_socket(AF_INET, SOCK_STREAM, 0);
+	if (w < 0 || bmnet_connect(w, (struct sockaddr *) &in, sizeof in) < 0) {
+		if (w >= 0)
+			bmnet_close(w);
+		bmnet_close(l);
+		return -1;
+	}
+	r = bmnet_accept(l, NULL, NULL);
+	bmnet_close(l);
+	if (r < 0) {
+		bmnet_close(w);
+		return -1;
+	}
+	fds[0] = r;
+	fds[1] = w;
+	return 0;
+}
+
+/* Not for bmnet's sockets (bsdsocket.library's Dup2Socket() fails then);
+   a file's goes to the C library. */
+int bmnet_dup(int fd)
+{
+	if (bmnet_fd_index(fd) < 0)
+		return dup(fd);
+	return fail(EOPNOTSUPP);
+}
+
+/* ---- Names: DNS, through the network's DNS server ------------------------- */
+
+int bmnet_h_errno;
+
+#define DNS_TRIES   3
+#define DNS_WAIT    1.5    /* seconds a try */
+#define MAX_ADDRS   8
+
+static char host_name[256];
+static uint32_t host_addrs[MAX_ADDRS];
+static char *host_addr_ptrs[MAX_ADDRS + 1];
+static char *host_no_aliases[1];
+static struct hostent host_entry;
+
+static struct hostent *host_result(const char *name, const uint32_t *addrs, int n)
+{
+	int i;
+	snprintf(host_name, sizeof host_name, "%s", name);
+	for (i = 0; i < n && i < MAX_ADDRS; i++) {
+		host_addrs[i] = addrs[i];
+		host_addr_ptrs[i] = (char *) &host_addrs[i];
+	}
+	host_addr_ptrs[i] = NULL;
+	host_no_aliases[0] = NULL;
+	host_entry.h_name = host_name;
+	host_entry.h_aliases = host_no_aliases;
+	host_entry.h_addrtype = AF_INET;
+	host_entry.h_length = 4;
+	host_entry.h_addr_list = host_addr_ptrs;
+	bmnet_h_errno = 0;
+	return &host_entry;
+}
+
+/* Puts NAME in DNS form ("example.com" as 7example3com0); returns its
+   length, or 0 if it can't be. */
+static size_t dns_name(uint8_t *out, size_t size, const char *name)
+{
+	size_t n = 0;
+	while (*name) {
+		const char *dot = strchr(name, '.');
+		size_t len = dot ? (size_t) (dot - name) : strlen(name);
+		if (len == 0 || len > 63 || n + len + 2 > size)
+			return 0;
+		out[n++] = (uint8_t) len;
+		memcpy(out + n, name, len);
+		n += len;
+		name += len + (dot ? 1 : 0);
+	}
+	if (n + 1 > size)
+		return 0;
+	out[n++] = 0;
+	return n;
+}
+
+/* Skips a (maybe compressed) name at AT in MSG; returns where it ends, or
+   0. If OUT, writes it there as text. */
+static size_t dns_skip(const uint8_t *msg, size_t len, size_t at, char *out, size_t size)
+{
+	size_t end = 0, o = 0;
+	int jumps = 0;
+	while (at < len) {
+		uint8_t c = msg[at];
+		if (c == 0) {
+			if (out && size)
+				out[o > 0 ? o - 1 : 0] = '\0';
+			return end ? end : at + 1;
+		}
+		if ((c & 0xc0) == 0xc0) {
+			if (at + 1 >= len || ++jumps > 16)
+				return 0;
+			if (!end)
+				end = at + 2;
+			at = ((size_t) (c & 0x3f) << 8) | msg[at + 1];
+			continue;
+		}
+		if (at + 1 + c > len)
+			return 0;
+		if (out && o + c + 1 < size) {
+			memcpy(out + o, msg + at + 1, c);
+			o += c;
+			out[o++] = '.';
+		}
+		at += 1 + c;
+	}
+	return 0;
+}
+
+/* Asks the network's DNS server for QNAME's records of TYPE (1: A, 12:
+   PTR), waiting (and letting the emulator run) for the answer. Returns
+   the number of A addresses put in ADDRS, or with PTR the name in NAME
+   (1); 0 if there is no such name, -1 if the server didn't answer. */
+static int dns_query(const char *qname, int type, uint32_t *addrs, int max, char *name, size_t size)
+{
+	uint8_t q[300], a[1500];
+	uint32_t server, ip;
+	unsigned port;
+	size_t qlen, at;
+	int sock, tries, got, n = 0, i;
+	static uint16_t next_id = 0x4242;
+	uint16_t id = next_id++;
+	if (!host_dns_server(&server))
+		return -1;
+	memset(q, 0, 12);
+	q[0] = id >> 8, q[1] = id & 255;
+	q[2] = 1;                       /* recursion desired */
+	q[5] = 1;                       /* one question */
+	qlen = dns_name(q + 12, sizeof q - 16, qname);
+	if (qlen == 0)
+		return 0;
+	qlen += 12;
+	q[qlen++] = 0, q[qlen++] = (uint8_t) type, q[qlen++] = 0, q[qlen++] = 1;
+	sock = host_udp_open();
+	if (sock < 0)
+		return -1;
+	for (tries = 0; tries < DNS_TRIES; tries++) {
+		double until = host_time() + DNS_WAIT;
+		host_udp_send(sock, server, 53, q, (unsigned) qlen);
+		while (host_time() < until) {
+			got = host_udp_recv(sock, a, sizeof a, &ip, &port);
+			if (got <= 0) {
+				bma_usleep(5000);
+				continue;
+			}
+			if (got < 12 || a[0] != q[0] || a[1] != q[1])
+				continue;
+			host_udp_close(sock);
+			if ((a[3] & 15) != 0)
+				return 0;           /* NXDOMAIN and the like */
+			at = dns_skip(a, (size_t) got, 12, NULL, 0);
+			if (at == 0)
+				return 0;
+			at += 4;
+			for (i = 0; i < ((a[6] << 8) | a[7]) && at < (size_t) got; i++) {
+				size_t rd;
+				int rtype, rlen;
+				at = dns_skip(a, (size_t) got, at, NULL, 0);
+				if (at == 0 || at + 10 > (size_t) got)
+					break;
+				rtype = (a[at] << 8) | a[at + 1];
+				rlen = (a[at + 8] << 8) | a[at + 9];
+				rd = at + 10;
+				if (rd + (size_t) rlen > (size_t) got)
+					break;
+				if (type == 1 && rtype == 1 && rlen == 4 && n < max)
+					memcpy(&addrs[n++], a + rd, 4);
+				else if (type == 12 && rtype == 12 && name
+				         && dns_skip(a, (size_t) got, rd, name, size) != 0)
+					return 1;
+				at = rd + (size_t) rlen;
+			}
+			return n;
+		}
+	}
+	host_udp_close(sock);
+	return -1;
+}
+
+struct hostent *bmnet_gethostbyname(const char *name)
+{
+	struct in_addr a;
+	uint32_t addrs[MAX_ADDRS];
+	int n;
+	if (name == NULL || *name == '\0') {
+		bmnet_h_errno = HOST_NOT_FOUND;
+		return NULL;
+	}
+	if (inet_aton(name, &a))
+		return host_result(name, &a.s_addr, 1);
+	if (strcasecmp(name, "localhost") == 0) {
+		uint32_t lo = htonl(INADDR_LOOPBACK);
+		return host_result(name, &lo, 1);
+	}
+	n = dns_query(name, 1, addrs, MAX_ADDRS, NULL, 0);
+	if (n <= 0) {
+		bmnet_h_errno = n < 0 ? TRY_AGAIN : HOST_NOT_FOUND;
+		return NULL;
+	}
+	return host_result(name, addrs, n);
+}
+
+struct hostent *bmnet_gethostbyaddr(const void *addr, socklen_t len, int type)
+{
+	char qname[64], name[256];
+	const uint8_t *b = addr;
+	uint32_t ip;
+	if (addr == NULL || len != 4 || type != AF_INET) {
+		bmnet_h_errno = HOST_NOT_FOUND;
+		return NULL;
+	}
+	memcpy(&ip, addr, 4);
+	if (ntohl(ip) == INADDR_LOOPBACK)
+		return host_result("localhost", &ip, 1);
+	snprintf(qname, sizeof qname, "%u.%u.%u.%u.in-addr.arpa", b[3], b[2], b[1], b[0]);
+	if (dns_query(qname, 12, NULL, 0, name, sizeof name) != 1) {
+		bmnet_h_errno = HOST_NOT_FOUND;
+		return NULL;
+	}
+	return host_result(name, &ip, 1);
+}
+
+/* ---- Protocols and services: the common ones -------------------------------- */
+
+static const struct {
+	const char *name;
+	int number;
+} protocols[] = {{"ip", 0}, {"icmp", 1}, {"tcp", 6}, {"udp", 17}};
+
+static const struct {
+	const char *name;
+	int port;
+	const char *proto;   /* NULL: both */
+} services[] = {
+	{"echo", 7, NULL}, {"discard", 9, NULL}, {"daytime", 13, NULL}, {"ftp-data", 20, "tcp"},
+	{"ftp", 21, "tcp"}, {"ssh", 22, "tcp"}, {"telnet", 23, "tcp"}, {"smtp", 25, "tcp"},
+	{"time", 37, NULL}, {"domain", 53, NULL}, {"tftp", 69, "udp"}, {"gopher", 70, "tcp"},
+	{"finger", 79, "tcp"}, {"http", 80, "tcp"}, {"www", 80, "tcp"}, {"pop3", 110, "tcp"},
+	{"nntp", 119, "tcp"}, {"ntp", 123, "udp"}, {"imap", 143, "tcp"}, {"irc", 194, "tcp"},
+	{"https", 443, "tcp"}, {"submission", 587, "tcp"}, {"imaps", 993, "tcp"},
+	{"pop3s", 995, "tcp"}, {"ircd", 6667, "tcp"},
+};
+
+static char proto_name[16];
+static char *proto_no_aliases[1];
+static struct protoent proto_entry;
+
+static struct protoent *proto_result(int i)
+{
+	snprintf(proto_name, sizeof proto_name, "%s", protocols[i].name);
+	proto_no_aliases[0] = NULL;
+	proto_entry.p_name = proto_name;
+	proto_entry.p_aliases = proto_no_aliases;
+	proto_entry.p_proto = protocols[i].number;
+	return &proto_entry;
+}
+
+struct protoent *bmnet_getprotobyname(const char *name)
+{
+	unsigned i;
+	for (i = 0; name && i < sizeof protocols / sizeof protocols[0]; i++)
+		if (strcasecmp(name, protocols[i].name) == 0)
+			return proto_result((int) i);
+	return NULL;
+}
+
+struct protoent *bmnet_getprotobynumber(int number)
+{
+	unsigned i;
+	for (i = 0; i < sizeof protocols / sizeof protocols[0]; i++)
+		if (protocols[i].number == number)
+			return proto_result((int) i);
+	return NULL;
+}
+
+static char serv_name[16], serv_proto[8];
+static char *serv_no_aliases[1];
+static struct servent serv_entry;
+
+static struct servent *serv_result(int i, const char *proto)
+{
+	snprintf(serv_name, sizeof serv_name, "%s", services[i].name);
+	snprintf(serv_proto, sizeof serv_proto, "%s",
+	         proto ? proto : services[i].proto ? services[i].proto : "tcp");
+	serv_no_aliases[0] = NULL;
+	serv_entry.s_name = serv_name;
+	serv_entry.s_aliases = serv_no_aliases;
+	serv_entry.s_port = htons((uint16_t) services[i].port);
+	serv_entry.s_proto = serv_proto;
+	return &serv_entry;
+}
+
+static int serv_proto_ok(int i, const char *proto)
+{
+	return proto == NULL || services[i].proto == NULL || strcasecmp(proto, services[i].proto) == 0;
+}
+
+struct servent *bmnet_getservbyname(const char *name, const char *proto)
+{
+	unsigned i;
+	for (i = 0; name && i < sizeof services / sizeof services[0]; i++)
+		if (strcasecmp(name, services[i].name) == 0 && serv_proto_ok((int) i, proto))
+			return serv_result((int) i, proto);
+	return NULL;
+}
+
+struct servent *bmnet_getservbyport(int port, const char *proto)
+{
+	unsigned i;
+	for (i = 0; i < sizeof services / sizeof services[0]; i++)
+		if (htons((uint16_t) services[i].port) == (uint16_t) port && serv_proto_ok((int) i, proto))
+			return serv_result((int) i, proto);
+	return NULL;
 }

@@ -24,7 +24,7 @@ BMA_THREADS := $(foreach f,create join detach self mutex_init mutex_destroy mute
                  cond_broadcast cond_wait cond_timedwait,-Dpthread_$(f)=bma_pthread_$(f)) \
                -Dsched_yield=bma_sched_yield
 BMA_FLAGS := -Dclock_gettime=bma_clock_gettime -Dclock_gettime_nsec_np=bma_clock_gettime_nsec_np \
-             -Dnanosleep=bma_nanosleep -Dusleep=bma_usleep $(BMA_THREADS) -DBMAMIGA_BMNET
+             -Dnanosleep=bma_nanosleep -Dusleep=bma_usleep $(BMA_THREADS) -DBMAMIGA_BMNET=2
 
 CFLAGS = -O2 -g -std=gnu11 -I $(ROOT)/src/port -I $(AMIBERRY)/libretro \
          -I $(AMIBERRY)/libretro/libretro-common/include -I $(AMIBERRY)/src \

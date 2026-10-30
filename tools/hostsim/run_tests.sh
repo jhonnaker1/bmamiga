@@ -242,6 +242,21 @@ run setupmenu 50 "$OUT/aros" "" "$script"
 check_cfg setupmenu "^sound_filter=off" "Sound Filter Off kept in bmamiga.cfg"
 check_log setupmenu "Amiga setup: 1 setting" "and given to Amiberry at once"
 
+echo "Drives from bmamiga.uae"
+# bmamiga.uae's drive (as AmiKit's: a device name and volume name of its
+# own) after the menu's DH0:, once each, and again once after a hard reset.
+mkdir -p "$OUT/mounts/disks/ak"
+printf 'dh0=disks/ak\n' > "$OUT/mounts/bmamiga.cfg"
+printf 'filesystem2=rw,AK0:AKTest:disks/ak,0\n' > "$OUT/mounts/bmamiga.uae"
+run mounts 50 "$OUT/aros" "" '300 webui coldstart\n600 quit\n'
+check_log mounts "Drive AK0: AKTest " "bmamiga.uae's AK0:, named AKTest"
+if [ "$(grep -c "Drive AK0: " "$OUT/mounts/log.txt")" -eq "$(grep -c "Drive DH0: " "$OUT/mounts/log.txt")" ] \
+    && [ "$(grep -c "Drive " "$OUT/mounts/log.txt")" -ge 4 ]; then
+    pass "mounts: with DH0:, once each, after the hard reset too"
+else
+    fail mounts "the drive list ($(grep "Drive " "$OUT/mounts/log.txt" | tr '\n' ' '))"
+fi
+
 echo "Network"
 # An A2065 card on SLiRP, from bmamiga.cfg; then SLiRP itself, through
 # bmnet, as a network card would use it: an address by DHCP, and a name
