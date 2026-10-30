@@ -47,7 +47,7 @@ CIRCLE_FORCED := -include $(ROOT)/src/port/circle/include/bma_circle.h
 # memory).
 CIRCLE_AMIBERRY_FLAGS := -Dclock_gettime=bma_clock_gettime -Dclock_gettime_nsec_np=bma_clock_gettime_nsec_np \
 	-Dnanosleep=bma_nanosleep -Dusleep=bma_usleep \
-	$(CIRCLE_CXX_INCLUDES) $(CIRCLE_TARGET) -DLIBRETRO_NO_JIT $(CIRCLE_FORCED)
+	$(CIRCLE_CXX_INCLUDES) $(CIRCLE_TARGET) -DLIBRETRO_NO_JIT -DBMAMIGA_BMNET $(CIRCLE_FORCED)
 
 # Amiberry's files that need what Circle hasn't, and BMAmiga's in their
 # place (relative to src/port).
@@ -81,7 +81,7 @@ $(CIRCLE_AMIBERRY_LIB): $(CIRCLE_BUILD)/amiberry.flags FORCE
 	    BMA_EXCLUDE="$(CIRCLE_AMIBERRY_EXCLUDE)" BMA_EXTRA="$(CIRCLE_AMIBERRY_EXTRA)" $@
 
 # BMAmiga's Circle layer.
-CIRCLE_PORT_SRCS := circle/threads.c circle/posix.c circle/tls.c clock.c
+CIRCLE_PORT_SRCS := circle/threads.c circle/posix.c circle/tls.c clock.c bmnet.c
 CIRCLE_PORT_OBJS := $(addprefix $(CIRCLE_BUILD)/port/,$(notdir $(CIRCLE_PORT_SRCS:.c=.o)))
 
 $(CIRCLE_BUILD)/port/%.o: $(ROOT)/src/port/circle/%.c $(wildcard $(ROOT)/src/port/circle/include/*.h)
@@ -91,6 +91,13 @@ $(CIRCLE_BUILD)/port/%.o: $(ROOT)/src/port/circle/%.c $(wildcard $(ROOT)/src/por
 	    -I$(ROOT)/third_party/amiberry/libretro/libco -Wall -Wextra -Wno-unused-parameter -c -o $@ $<
 
 $(CIRCLE_BUILD)/port/clock.o: $(ROOT)/src/port/clock.c
+	@mkdir -p $(dir $@)
+	@echo "  CC    $<"
+	@$(CIRCLE_PREFIX)gcc $(CIRCLE_C_INCLUDES) $(CIRCLE_TARGET) $(CIRCLE_FORCED) -O2 -g -std=gnu11 \
+	    -Wall -Wextra -Wno-unused-parameter -c -o $@ $<
+
+# The Amiga's network's sockets (SLiRP's, src/port/bmnet.h).
+$(CIRCLE_BUILD)/port/bmnet.o: $(ROOT)/src/port/bmnet.c $(ROOT)/src/port/bmnet.h $(ROOT)/src/host.h
 	@mkdir -p $(dir $@)
 	@echo "  CC    $<"
 	@$(CIRCLE_PREFIX)gcc $(CIRCLE_C_INCLUDES) $(CIRCLE_TARGET) $(CIRCLE_FORCED) -O2 -g -std=gnu11 \

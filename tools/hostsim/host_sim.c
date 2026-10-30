@@ -40,6 +40,7 @@
  *   <frame> audio                  print audio statistics
  *   <frame> webui <reboot|coldstart>  a request from the web UI
  *   <frame> run <path>             the web UI starts a file
+ *   <frame> netprobe <dhcp|dns>    SLiRP is asked for an address or a name
  *   <frame> quit                   end the test
  *
  * BMAMIGA_SIM_FRAME_MS=N makes each frame's emulation take N ms of the
@@ -71,9 +72,14 @@
 #include <errno.h>
 #include <netdb.h>
 #include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
 
 #include "../../src/host.h"
 #include "live.h"
+
+/* src/port/bridge.cpp: the network's test */
+void bmamiga_core_net_probe(int step);
 
 /* From src/port/platform.c, called by the web UI on the Pi. */
 void bmamiga_request_power(int power_off);
@@ -620,6 +626,8 @@ static void run_script(void)
 				bmamiga_request_power(0);
 			else if (strstr(line + n, "coldstart"))
 				bmamiga_request_coldstart();
+		} else if (strcmp(cmd, "netprobe") == 0) {
+			bmamiga_core_net_probe(strstr(line + n, "dns") != NULL);
 		} else if (strcmp(cmd, "audio") == 0) {
 			fprintf(stderr, "[sim] frame %ld: audio written %ld frames in %ld writes, "
 			        "queue before write min %.0f, after write max %.0f, underruns %ld, "
@@ -846,6 +854,70 @@ void host_tcp_close_all(void)
 			break;
 		host_tcp_close(fd);
 	}
+}
+
+/* UDP (host.h, from BMNeXT): the PC's own sockets, as for TCP; a handle is
+   the socket. */
+int host_udp_open(void)
+{
+	return socket(AF_INET, SOCK_DGRAM, 0);
+}
+
+int host_udp_send(int handle, uint32_t ip, unsigned port, const void *data, unsigned size)
+{
+	struct sockaddr_in to;
+	ssize_t sent;
+	if (size == 0)
+		return 0;
+	memset(&to, 0, sizeof to);
+	to.sin_family = AF_INET;
+	to.sin_port = htons((uint16_t) port);
+	to.sin_addr.s_addr = ip;
+	sent = sendto(handle, data, size, MSG_DONTWAIT, (struct sockaddr *) &to, sizeof to);
+	if (sent >= 0)
+		return (int) sent;
+	return errno == EAGAIN || errno == EWOULDBLOCK ? 0 : -1;
+}
+
+int host_udp_recv(int handle, void *buffer, unsigned size, uint32_t *ip, unsigned *port)
+{
+	struct sockaddr_in from;
+	socklen_t len = sizeof from;
+	ssize_t got = recvfrom(handle, buffer, size, MSG_DONTWAIT, (struct sockaddr *) &from, &len);
+	if (got < 0)
+		return errno == EAGAIN || errno == EWOULDBLOCK ? 0 : -1;
+	*ip = from.sin_addr.s_addr;
+	*port = ntohs(from.sin_port);
+	return (int) got;
+}
+
+void host_udp_close(int handle)
+{
+	if (handle >= 0)
+		close(handle);
+}
+
+/* The DNS server: BMAMIGA_DNS, or the PC's own (/etc/resolv.conf). */
+int host_dns_server(uint32_t *ip)
+{
+	char line[256], addr[64];
+	const char *env = getenv("BMAMIGA_DNS");
+	FILE *f;
+	struct in_addr a;
+	if (env != NULL)
+		return inet_aton(env, &a) ? (*ip = a.s_addr, 1) : 0;
+	f = fopen("/etc/resolv.conf", "r");
+	if (f == NULL)
+		return 0;
+	while (fgets(line, sizeof line, f) != NULL) {
+		if (sscanf(line, "nameserver %63s", addr) == 1 && inet_aton(addr, &a)) {
+			fclose(f);
+			*ip = a.s_addr;
+			return 1;
+		}
+	}
+	fclose(f);
+	return 0;
 }
 
 int host_run_in_background(void (*fn)(void *arg), void *arg)

@@ -687,6 +687,16 @@ static void setup_lines(char *out, size_t size)
 		if (value[0] != '\0')
 			ADD(numbers[i].format, atoi(value) / numbers[i].divide);
 	}
+	/* The Amiga's network: SLiRP (NAT through the Pi's network, src/port/
+	   bmnet.c), on uaenet.device (a SANA-II device, on any Amiga) or an
+	   A2065 card. */
+	{
+		const char *net = host_option("amiga_network", "");
+		if (strcmp(net, "uaenet") == 0)
+			ADD("sana2=true\n");
+		else if (strcmp(net, "a2065") == 0)
+			ADD("a2065=slirp\n");
+	}
 	/* The fastest: as fast as the Pi can, which isn't cycle-exact. */
 	if (strcmp(host_option("cpu_speed", ""), "max") == 0)
 		ADD("cpu_speed=max\ncycle_exact=false\n");

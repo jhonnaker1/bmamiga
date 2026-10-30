@@ -61,9 +61,13 @@ $(BMA_OBJDIR)/libretro/%.o: ./%.c
 	@mkdir -p $(dir $@)
 	@$(CC) $(INCFLAGS) $(FLAGS) $(BMA_FLAGS) -std=gnu99 -c -o $@ $<
 
+# SLiRP's socket calls are bmnet's (src/port/bmnet.h): on the Pi the C
+# library's would wait, and hold its table of open files while they do.
+$(BMA_OBJDIR)/src/slirp/%.o $(BMA_OBJDIR)/src/slirp_uae.o: BMA_NET_FLAGS = -include $(BMA_PORT)/bmnet.h
+
 $(BMA_OBJDIR)/%.o: ../%.cpp | $(NLOHMANN_JSON_HEADER)
 	@mkdir -p $(dir $@)
-	@$(CXX) $(INCFLAGS) $(FLAGS) $(BMA_FLAGS) -std=gnu++17 -c -o $@ $<
+	@$(CXX) $(INCFLAGS) $(FLAGS) $(BMA_FLAGS) $(BMA_NET_FLAGS) -std=gnu++17 -c -o $@ $<
 
 $(BMA_OBJDIR)/%.o: ../%.c
 	@mkdir -p $(dir $@)

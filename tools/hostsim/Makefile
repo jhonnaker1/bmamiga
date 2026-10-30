@@ -24,14 +24,14 @@ BMA_THREADS := $(foreach f,create join detach self mutex_init mutex_destroy mute
                  cond_broadcast cond_wait cond_timedwait,-Dpthread_$(f)=bma_pthread_$(f)) \
                -Dsched_yield=bma_sched_yield
 BMA_FLAGS := -Dclock_gettime=bma_clock_gettime -Dclock_gettime_nsec_np=bma_clock_gettime_nsec_np \
-             -Dnanosleep=bma_nanosleep -Dusleep=bma_usleep $(BMA_THREADS)
+             -Dnanosleep=bma_nanosleep -Dusleep=bma_usleep $(BMA_THREADS) -DBMAMIGA_BMNET
 
 CFLAGS = -O2 -g -std=gnu11 -I $(ROOT)/src/port -I $(AMIBERRY)/libretro \
          -I $(AMIBERRY)/libretro/libretro-common/include -I $(AMIBERRY)/src \
          -DBMAMIGA_HOST_LIBC
 
 AMIBERRY_LIB := $(OUT)/amiberry/libamiberry.a
-PORT_OBJS := $(addprefix $(OUT)/port/,platform.o keys.o osd.o menu.o clock.o) $(OUT)/port/threads.o
+PORT_OBJS := $(addprefix $(OUT)/port/,platform.o keys.o osd.o menu.o clock.o bmnet.o) $(OUT)/port/threads.o
 OBJS := $(PORT_OBJS) $(OUT)/host_sim.o $(OUT)/live.o
 
 all: $(OUT)/bmamiga_sim
@@ -52,7 +52,7 @@ $(AMIBERRY_LIB): $(OUT)/amiberry/flags FORCE
 	    BMA_OBJDIR=$(OUT)/amiberry BMA_LIB=$@ BMA_FLAGS="$(BMA_FLAGS)" $@
 
 $(OUT)/port/%.o: $(ROOT)/src/port/%.c $(ROOT)/src/port/bmamiga.h $(ROOT)/src/port/osd.h \
-                 $(ROOT)/src/host.h
+                 $(ROOT)/src/port/bmnet.h $(ROOT)/src/host.h
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -Wall -Wextra -Wno-unused-parameter -c -o $@ $<
 
@@ -67,6 +67,12 @@ $(OUT)/host_sim.o: host_sim.c live.h $(ROOT)/src/host.h
 $(OUT)/live.o: live.c live.h
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -Wall -Wextra -DLIVE_HTML=\"$(abspath live.html)\" -c -o $@ $<
+
+# bmnet's own test (bmnet_test.c, from BMNeXT): bmnet.c with test versions
+# of the kernel's TCP and UDP. No ROMs needed.
+$(OUT)/bmnet_test: bmnet_test.c $(ROOT)/src/port/bmnet.c $(ROOT)/src/port/bmnet.h $(ROOT)/src/host.h
+	@mkdir -p $(dir $@)
+	$(CC) -O2 -g -std=gnu11 -DBMAMIGA_HOST_LIBC -Wall -I $(ROOT)/src/port -o $@ bmnet_test.c $(ROOT)/src/port/bmnet.c -lpthread
 
 clean:
 	rm -rf $(OUT)

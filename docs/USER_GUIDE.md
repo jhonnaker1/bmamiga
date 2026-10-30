@@ -80,6 +80,7 @@ what the chosen model has, and choosing anything else is kept in
 | Fast RAM          | none, 1M, 2M, 4M, 8M | `fast_ram` (in MB) |
 | Sound Filter      | off, emulated, on (the Amiga's low-pass filter) | `sound_filter` |
 | Stereo Separation | mono, 30%, 50%, 70%, 100% | `stereo_separation` (0 to 10) |
+| Network           | none, uaenet.device, an A2065 card (see The Amiga's network) | `amiga_network` (`uaenet`, `a2065`) |
 
 The hardware changes take effect from a hard reset, which the menu offers
 at once (as switching a real Amiga off and on); the sound's at once. Not
@@ -221,7 +222,7 @@ speed.
 BMAmiga can join your network over Ethernet or Wi-Fi and serve a web page
 for managing the SD card from any browser on the same network, so files can
 be copied to and from the Pi without taking the card out. It is the web UI
-from BMC64. (The Amiga itself has no network yet.)
+from BMC64. The Amiga can use the network too (see The Amiga's network).
 
 Turn it on in the menu's *Network*. For Ethernet, set *Network* to Ethernet
 and reboot. For Wi-Fi, choose *Scan for Wi-Fi Networks*: the first time,
@@ -275,6 +276,32 @@ The network also sets the Pi's clock, so files saved on the card get the
 right date and time. Set `timezone` to your offset from UTC in minutes, for
 example `timezone=600` for UTC+10.
 
+## The Amiga's network
+
+The Amiga can share the Pi's network (Ethernet or Wi-Fi, set up in the
+menu's *Network*): the Pi is a router for it, which hands its connections
+on as its own (NAT, through SLiRP, as in Amiberry). In *Amiga Setup*, set
+*Network* to:
+
+- **uaenet.device**: a SANA-II network device, for any Amiga model. Point
+  the Amiga's TCP/IP stack (Roadshow, AmiTCP, Miami) at `uaenet.device`,
+  unit 0.
+- **A2065 Card**: Commodore's Zorro II Ethernet card, for software that
+  wants real hardware; its driver is `a2065.device`.
+
+Then hard reset. The Amiga gets its address by DHCP: 10.0.2.15, with the
+router 10.0.2.2 and the DNS server 10.0.2.3 (to set by hand if the stack
+has no DHCP; the netmask is 255.255.255.0). It can reach the Internet and
+your network (web, mail, FTP, the Amiga's own clients), but nothing can
+connect to it from outside, and `ping` to the Internet doesn't work (as
+in SLiRP everywhere). The Pi's
+network must be up before the Amiga's stack starts.
+
+The Amiga needs a TCP/IP stack of its own, such as Roadshow (whose demo is
+on Aminet), AmiTCP or Miami. Amiberry's other way, its
+bsdsocket.library emulation (programs use the host's network without a
+stack, as AmiKit does), isn't in BMAmiga yet.
+
 ## Options
 
 `cmdline.txt` is a single line of `name=value` options separated by spaces.
@@ -285,7 +312,7 @@ the web UI.
 | Option              | Values                       | Default  | What it does |
 |---------------------|------------------------------|----------|--------------|
 | `model`             | `A500`, `A500OG`, `A500+`, `A600`, `A1200OG`, `A1200`, `A4030`, `A4040`, `CD32`, `CDTV` | `A500` | The Amiga to emulate (the menu's *Model*) |
-| `kickstart`, `cpu`, `cpu_speed`, `chipset`, `chip_ram`, `slow_ram`, `fast_ram`, `sound_filter`, `stereo_separation` | see Amiga Setup | the model's | The menu's Amiga Setup |
+| `kickstart`, `cpu`, `cpu_speed`, `chipset`, `chip_ram`, `slow_ram`, `fast_ram`, `sound_filter`, `stereo_separation`, `amiga_network` | see Amiga Setup | the model's | The menu's Amiga Setup |
 | `df0` ... `df3`     | paths                        | none     | The floppy images in the drives (the menu's *Floppy Drives*) |
 | `dh0` ... `dh3`     | paths                        | none     | The hard drives: hard disk images or folders (the menu's *Hard Drives and CD*) |
 | `cd0`               | path                         | none     | The CD image in the CD drive |

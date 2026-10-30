@@ -20,6 +20,13 @@ From the first test on a real Pi 5:
   from a hard reset (src/port/bridge.cpp puts them in Amiberry's
   changed_prefs, as its own settings window does)
 - bmamiga.uae on the card: any of Amiberry's .uae settings, one a line
+- The Amiga's network: Amiberry's SLiRP (NAT through the Pi's Ethernet or
+  Wi-Fi) on uaenet.device or an A2065 card (Amiga Setup, Network). SLiRP's
+  sockets are bmnet's (src/port/bmnet.c, from BMNeXT) over the kernel's
+  TCP and UDP (UDP and the DNS server added to src/host.h), never waiting,
+  as on the Pi the C library's would; SLiRP's /etc/resolv.conf is the DNS
+  server the Pi's DHCP gave. Simulator tests: bmnet's own, the A2065, and
+  SLiRP's DHCP and DNS through bmnet ("netprobe")
 
 ## 0.1.0 – 2026-10-29
 

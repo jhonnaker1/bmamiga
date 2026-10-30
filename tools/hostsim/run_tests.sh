@@ -24,6 +24,13 @@ SIM=$HERE/build/bmamiga_sim
 
 make -s -C "$HERE" -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)" || exit 1
 
+# The network's sockets (src/port/bmnet.c) first: they need no Amiga.
+make -s -C "$HERE" "$HERE/build/bmnet_test" || exit 1
+if ! "$HERE/build/bmnet_test"; then
+    echo "bmnet's tests failed." >&2
+    exit 1
+fi
+
 rm -rf "$OUT"
 mkdir -p "$OUT/aros"
 cp "$ROOT"/third_party/amiberry/roms/aros-*.bin "$OUT/aros/"
@@ -234,6 +241,23 @@ script="$script$f key 0x28 1\n$((f + 1)) key 0x28 0\n$((f + 30)) quit\n"
 run setupmenu 50 "$OUT/aros" "" "$script"
 check_cfg setupmenu "^sound_filter=off" "Sound Filter Off kept in bmamiga.cfg"
 check_log setupmenu "Amiga setup: 1 setting" "and given to Amiberry at once"
+
+echo "Network"
+# An A2065 card on SLiRP, from bmamiga.cfg; then SLiRP itself, through
+# bmnet, as a network card would use it: an address by DHCP, and a name
+# looked up through the PC's DNS server (if the PC is on the Internet).
+mkdir -p "$OUT/network"
+printf 'amiga_network=a2065\n' > "$OUT/network/bmamiga.cfg"
+run network 50 "$OUT/aros" "" '300 quit\n'
+check_log network "Card [0-9]+: Z2 0x00e90000 .*7990 Ethernet" "the A2065 card"
+check_log network "7990: 'slirp'" "on SLiRP"
+run netprobe 50 "$OUT/aros" "" '200 netprobe dhcp\n260 netprobe dns\n500 quit\n'
+check_log netprobe "netprobe: DHCP offer of 10\.0\.2\.15" "SLiRP's DHCP gives 10.0.2.15"
+if host example.com > /dev/null 2>&1 || nslookup example.com > /dev/null 2>&1; then
+    check_log netprobe "netprobe: DNS answer, [1-9][0-9]* answer\(s\), code 0" "a name looked up, out through bmnet"
+else
+    echo "SKIP  netprobe: DNS (this computer is offline)"
+fi
 
 if [ -n "${BMAMIGA_ROMS:-}" ] && [ -n "${BMAMIGA_WORKBENCH:-}" ]; then
     echo "Workbench 1.3 (Kickstart from $BMAMIGA_ROMS)"

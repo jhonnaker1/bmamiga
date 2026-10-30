@@ -18,7 +18,7 @@ BMAmiga includes [zlib](https://zlib.net) 1.3.1 by Jean-loup Gailly and Mark Adl
 
 ## BMCoco
 
-BMAmiga is based on [BMCoco](https://github.com/jhonnaker1/bmcoco), the bare metal Tandy Color Computer emulator for the Raspberry Pi, under the GNU General Public License version 3: its kernel, display, sound, network, menu and web UI code, merged up to BMCoco 0.5.8. Some fixes come from [BMNeXT](https://github.com/jhonnaker1/bmnext), built on the same code.
+BMAmiga is based on [BMCoco](https://github.com/jhonnaker1/bmcoco), the bare metal Tandy Color Computer emulator for the Raspberry Pi, under the GNU General Public License version 3: its kernel, display, sound, network, menu and web UI code, merged up to BMCoco 0.5.8. Some fixes come from [BMNeXT](https://github.com/jhonnaker1/bmnext), built on the same code, and so do the Amiga network's sockets (`src/port/bmnet.c`) and the kernel's UDP.
 
 ## BMA800XL
 

@@ -25,6 +25,8 @@
 #include "blkdev.h"
 #include "inputdevice.h"
 #include "uae.h"
+#include "rommgr.h"
+#include "ethernet.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -188,6 +190,7 @@ static struct {
 	unsigned int chipset_mask;
 	uae_u32 chipmem, bogomem, fastmem;
 	int sound_filter, sound_stereo_separation;
+	bool sana2;
 } preset;
 
 static void take_preset(void)
@@ -207,6 +210,7 @@ static void take_preset(void)
 	preset.fastmem = changed_prefs.fastmem[0].size;
 	preset.sound_filter = changed_prefs.sound_filter;
 	preset.sound_stereo_separation = changed_prefs.sound_stereo_separation;
+	preset.sana2 = changed_prefs.sana2;
 }
 
 static void put_back_preset(void)
@@ -225,6 +229,11 @@ static void put_back_preset(void)
 	changed_prefs.fastmem[0].size = preset.fastmem;
 	changed_prefs.sound_filter = preset.sound_filter;
 	changed_prefs.sound_stereo_separation = preset.sound_stereo_separation;
+	/* The network: no model has one. */
+	changed_prefs.sana2 = preset.sana2;
+	if (get_device_romconfig(&changed_prefs, ROMTYPE_A2065, 0) != nullptr)
+		clear_device_rom(&changed_prefs, ROMTYPE_A2065, 0, true);
+	changed_prefs.a2065name[0] = 0;
 }
 
 /* LINES: Amiberry's own settings, as in a .uae file, one a line ("#" or ";"
@@ -263,6 +272,104 @@ int bmamiga_core_set_config(const char *lines)
 	fixup_prefs(&changed_prefs, true);
 	set_config_changed();
 	return taken;
+}
+
+/* ---- The network's test (the PC simulator's "netprobe") ------------------ */
+
+/* Talks to SLiRP as an Amiga's network card would (ethernet.cpp's driver,
+   which uaenet.device and the A2065 use), and logs what comes back: STEP
+   0 asks for an address (DHCP), 1 looks example.com up (DNS, which SLiRP
+   passes to the network's DNS server through bmnet). */
+static struct netdriverdata *probe_ndd;
+static void *probe_data;
+static uae_u8 probe_frame[600];
+static int probe_len;
+static const uae_u8 probe_mac[6] = {0x02, 0x00, 0x00, 0x00, 0x00, 0x01};
+
+static void probe_got(void *dev, const uae_u8 *d, int len)
+{
+	(void) dev;
+	/* Ethernet, IPv4, UDP: the source port says what answered. */
+	if (len < 42 || d[12] != 0x08 || d[13] != 0x00 || d[23] != 17)
+		return;
+	int ihl = (d[14] & 15) * 4, udp = 14 + ihl, sport = (d[udp] << 8) | d[udp + 1];
+	if (sport == 67 && len >= udp + 8 + 20)
+		write_log(_T("netprobe: DHCP offer of %d.%d.%d.%d\n"), d[udp + 24], d[udp + 25],
+		          d[udp + 26], d[udp + 27]);
+	else if (sport == 53 && len >= udp + 8 + 12)
+		write_log(_T("netprobe: DNS answer, %d answer(s), code %d\n"),
+		          (d[udp + 14] << 8) | d[udp + 15], d[udp + 11] & 15);
+}
+
+static int probe_get(void *dev, uae_u8 *d, int *len)
+{
+	(void) dev;
+	if (probe_len == 0 || probe_len > *len)
+		return 0;
+	memcpy(d, probe_frame, probe_len);
+	*len = probe_len;
+	probe_len = 0;
+	return 1;
+}
+
+/* An Ethernet frame of a UDP datagram from SRC:SPORT to DST:DPORT. */
+static void probe_udp(const uae_u8 *dst_mac, uae_u32 src, int sport, uae_u32 dst, int dport,
+                      const uae_u8 *payload, int n)
+{
+	uae_u8 *f = probe_frame, *ip = f + 14, *udp = ip + 20;
+	unsigned sum = 0;
+	memset(f, 0, sizeof probe_frame);
+	memcpy(f, dst_mac, 6);
+	memcpy(f + 6, probe_mac, 6);
+	f[12] = 0x08;
+	ip[0] = 0x45;
+	ip[2] = (20 + 8 + n) >> 8, ip[3] = (20 + 8 + n) & 255;
+	ip[8] = 64, ip[9] = 17;
+	for (int i = 0; i < 4; i++)
+		ip[12 + i] = src >> (24 - 8 * i), ip[16 + i] = dst >> (24 - 8 * i);
+	for (int i = 0; i < 20; i += 2)
+		sum += (ip[i] << 8) | ip[i + 1];
+	sum = (sum & 0xffff) + (sum >> 16);
+	sum = ~((sum & 0xffff) + (sum >> 16)) & 0xffff;
+	ip[10] = sum >> 8, ip[11] = sum & 255;
+	udp[0] = sport >> 8, udp[1] = sport & 255, udp[2] = dport >> 8, udp[3] = dport & 255;
+	udp[4] = (8 + n) >> 8, udp[5] = (8 + n) & 255;
+	memcpy(udp + 8, payload, n);
+	probe_len = 14 + 20 + 8 + n;
+}
+
+void bmamiga_core_net_probe(int step)
+{
+	static const uae_u8 broadcast[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+	static const uae_u8 slirp_mac[6] = {0x52, 0x54, 0x00, 0x12, 0x35, 0x02};
+	uae_u8 p[300];
+	if (probe_ndd == nullptr) {
+		probe_ndd = ethernet_find_driver(_T("slirp"));
+		if (probe_ndd == nullptr)
+			return;
+		probe_data = xcalloc(uae_u8, ethernet_getdatalength(probe_ndd));
+		if (!ethernet_open(probe_ndd, probe_data, nullptr, probe_got, probe_get, 0, probe_mac)) {
+			write_log(_T("netprobe: SLiRP didn't open\n"));
+			probe_ndd = nullptr;
+			return;
+		}
+	}
+	memset(p, 0, sizeof p);
+	if (step == 0) {
+		/* BOOTP request, DHCP DISCOVER */
+		p[0] = 1, p[1] = 1, p[2] = 6, p[4] = 0x12, p[5] = 0x34, p[10] = 0x80;
+		memcpy(p + 28, probe_mac, 6);
+		p[236] = 99, p[237] = 130, p[238] = 83, p[239] = 99;
+		p[240] = 53, p[241] = 1, p[242] = 1, p[243] = 255;
+		probe_udp(broadcast, 0, 68, 0xffffffff, 67, p, 244);
+	} else {
+		/* example.com, A, from 10.0.2.15 to SLiRP's DNS, 10.0.2.3 */
+		static const uae_u8 q[] = {0x42, 0x42, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0,
+		                           7, 'e', 'x', 'a', 'm', 'p', 'l', 'e', 3, 'c', 'o', 'm', 0, 0, 1, 0, 1};
+		memcpy(p, q, sizeof q);
+		probe_udp(slirp_mac, 0x0a00020f, 40000, 0x0a000203, 53, p, sizeof q);
+	}
+	ethernet_trigger(probe_ndd, probe_data);
 }
 
 void bmamiga_core_warp(int on)
