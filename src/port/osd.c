@@ -788,8 +788,21 @@ static void free_entries(struct entry *list, int n)
 	free(list);
 }
 
+/* The same folder, but for a '/' at the end. */
+static int same_dir(const char *a, const char *b)
+{
+	size_t la = strlen(a), lb = strlen(b);
+	while (la > 1 && a[la - 1] == '/')
+		la--;
+	while (lb > 1 && b[lb - 1] == '/')
+		lb--;
+	return la == lb && strncmp(a, b, la) == 0;
+}
+
 /* osd_browse(), and osd_browse_dir() with PICK_DIR: "Use This Folder" at
-   the top chooses the folder shown. */
+   the top chooses the folder shown. At the card's top, the card's second
+   partition (host_volume2(), SD2:) is there too, and ".." at its top goes
+   back to the card. */
 static int browse(const char *title, char *dir, size_t dir_size,
                   const char *const exts[], char *path, size_t path_size, int pick_dir)
 {
@@ -812,8 +825,12 @@ static int browse(const char *title, char *dir, size_t dir_size,
 			return 0;
 		}
 
-		/* The directory, ("Use This Folder"), "..", then the entries. */
-		int first = pick_dir ? 3 : 2;
+		/* The directory, ("Use This Folder"), "..", (SD2:), then the
+		   entries. */
+		const char *vol2 = host_volume2();
+		int at_top = same_dir(dir, "/") || same_dir(dir, bmamiga_sd_root());
+		int show_vol2 = vol2 != NULL && at_top;
+		int first = (pick_dir ? 3 : 2) + show_vol2;
 		items = calloc(n + first, sizeof(*items));
 		if (items == NULL) {
 			free_entries(list, n);
@@ -827,9 +844,14 @@ static int browse(const char *title, char *dir, size_t dir_size,
 			items[1].text = "Use This Folder";
 			items[1].id = -4;
 		}
-		items[first - 1].text = "..";
-		items[first - 1].value = "<DIR>";
-		items[first - 1].id = -3;
+		items[first - 1 - show_vol2].text = "..";
+		items[first - 1 - show_vol2].value = "<DIR>";
+		items[first - 1 - show_vol2].id = -3;
+		if (show_vol2) {
+			items[first - 1].text = "SD2: (second partition)";
+			items[first - 1].value = "<DIR>";
+			items[first - 1].id = -5;
+		}
 		for (i = 0; i < n; i++) {
 			items[i + first].text = list[i].name;
 			items[i + first].value = list[i].is_dir ? "<DIR>" : NULL;
@@ -840,7 +862,7 @@ static int browse(const char *title, char *dir, size_t dir_size,
 		if (pick_dir)
 			sel = came_from[0] != '\0' ? sel : 1;
 		else if (n > 0 && came_from[0] == '\0')
-			sel = 2;
+			sel = first;
 
 		chosen = osd_menu(title, items, n + first, &sel);
 		free(items);
@@ -854,9 +876,22 @@ static int browse(const char *title, char *dir, size_t dir_size,
 			free_entries(list, n);
 			return 1;
 		}
+		if (chosen == -5) {
+			snprintf(dir, dir_size, "%s", vol2);
+			came_from[0] = '\0';
+			free_entries(list, n);
+			continue;
+		}
 		if (chosen == -3) {
 			char *slash;
 			size_t len = strlen(dir);
+			if (vol2 != NULL && same_dir(dir, vol2)) {
+				/* From SD2:'s top, back to the card's. */
+				snprintf(dir, dir_size, "%s", bmamiga_sd_root());
+				came_from[0] = '\0';
+				free_entries(list, n);
+				continue;
+			}
 			if (strcmp(dir, "/") == 0) {
 				free_entries(list, n);
 				continue;
@@ -866,6 +901,10 @@ static int browse(const char *title, char *dir, size_t dir_size,
 			slash = strrchr(dir, '/');
 			snprintf(came_from, sizeof(came_from), "%s", slash ? slash + 1 : "");
 			parent_dir(dir);
+			/* "SD2:/hd"'s parent ("SD2:"): SD2:'s top, as host_volume2()
+			   names it. */
+			if (vol2 != NULL && same_dir(dir, vol2))
+				snprintf(dir, dir_size, "%s", vol2);
 			free_entries(list, n);
 			continue;
 		}

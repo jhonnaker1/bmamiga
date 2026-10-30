@@ -189,6 +189,7 @@ private:
 #endif
   CEMMCDevice mEMMC;
   FATFS mFileSystem;
+  FATFS mFileSystem2;  // SD2:, the card's second partition, if any
   CUSBHCIDevice mUSBHCI;
   CConsole mConsole;
 #ifdef ARM_ALLOW_MULTI_CORE

@@ -68,6 +68,9 @@ static const unsigned kJoyGpio[2][5] = {
 
 CKernel *CKernel::s_pThis = 0;
 
+// The card's second partition is mounted as SD2: (host_volume2()).
+static bool s_bVolume2 = false;
+
 // gettimeofday() reads Circle's timer from here on (src/port/circle/posix.c).
 extern "C" volatile int bma_timer_ready;
 
@@ -228,6 +231,13 @@ bool CKernel::Initialize(void) {
   }
   // Settings saved by the BMAmiga menu win over cmdline.txt.
   mOptions.LoadSettings("SD:/bmamiga.cfg");
+  // A second partition (exFAT, for disk images over 4 GB; or FAT32), as
+  // SD2:. The Pi boots from the first, which must be FAT32.
+  s_bVolume2 = f_mount(&mFileSystem2, "SD2:", 1) == FR_OK;
+  if (s_bVolume2) {
+    mLogger.Write(FromKernel, LogNotice, "Second partition mounted as SD2: (%s)",
+                  mFileSystem2.fs_type == FS_EXFAT ? "exFAT" : "FAT");
+  }
 
   // Until here the log went to the serial port. No setting means no log.
   const char *logging = mOptions.Get("enable_logging", "off");
@@ -1186,6 +1196,8 @@ void host_sleep_us(unsigned us) {
 }
 
 void host_yield(void) { CScheduler::Get()->Yield(); }
+
+const char *host_volume2(void) { return s_bVolume2 ? "SD2:/" : 0; }
 
 // The Amiga's memory: from above 1 GB if the Pi has it (HEAP_ANY), else
 // below. Up to 2 GB (AmiKit's Zorro III RAM at 1 GB into the Amiga's

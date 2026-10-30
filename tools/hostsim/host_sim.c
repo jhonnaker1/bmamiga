@@ -106,7 +106,7 @@ static const char *option(const char *name)
 
 /* Settings changed by the menu, which win over BMAMIGA_CMDLINE, as
    bmamiga.cfg does on the Pi. Saved to ./bmamiga.cfg. */
-static char set_name[48][24], set_value[48][72];
+static char set_name[64][24], set_value[64][256];   /* as src/options.h */
 static int n_set;
 
 int host_option_set(const char *name, const char *value)
@@ -116,7 +116,7 @@ int host_option_set(const char *name, const char *value)
 		if (strcmp(set_name[i], name) == 0)
 			break;
 	if (i == n_set) {
-		if (n_set == 48)
+		if (n_set == 64)
 			return 0;
 		snprintf(set_name[n_set++], sizeof(set_name[0]), "%s", name);
 	}
@@ -138,7 +138,7 @@ int host_options_save(void)
 /* ./bmamiga.cfg from an earlier run, as the Pi reads it at boot. */
 static void load_settings(void)
 {
-	char line[160];
+	char line[24 + 256 + 8];
 	FILE *f = fopen("bmamiga.cfg", "r");
 	if (f == NULL)
 		return;
@@ -854,6 +854,13 @@ void host_tcp_close_all(void)
 			break;
 		host_tcp_close(fd);
 	}
+}
+
+/* The second partition (host.h): BMAMIGA_SD2, a folder, for tests. */
+const char *host_volume2(void)
+{
+	const char *dir = getenv("BMAMIGA_SD2");
+	return dir != NULL && dir[0] != '\0' ? dir : NULL;
 }
 
 /* Large blocks (host.h): the PC's malloc(), up to 2 GB, as the Pi gives. */

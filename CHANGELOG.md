@@ -10,6 +10,14 @@
   FatFs used code page 850, while Amiberry gives and expects UTF-8, so a
   name with an accented letter was garbled on the card, for a Mac or PC,
   and one made on a Mac didn't reach the Amiga as it was
+- exFAT, and the card's second partition as SD2: (circle_fatfs_exfat_patch
+  .diff: FatFs's exFAT on, and its SD2 volume the card's partition 2
+  rather than a second SD controller): a card made with a FAT32 partition
+  for BMAmiga and an exFAT one holds disk images over 4 GB. The menu's
+  file browser shows SD2: at the card's top; Installation says how to
+  partition a card on macOS, Windows and Linux
+- A setting longer than 71 characters (a disk's path in folders) was
+  refused, so bmamiga.cfg lost the drive: 255 now, and 64 settings, not 48
 - tools/copy_amiga_folder.py: copies an Amiga folder (a folder drive, such
   as AmiKit's) to the card with the names Amiberry would have given it:
   the Amiga's characters FAT32 can't hold as %xx, a file's .uaem with it,

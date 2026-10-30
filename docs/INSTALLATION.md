@@ -28,6 +28,52 @@
 There is no image to write and nothing to install on the card beyond
 copying the files.
 
+### A second partition for big disk images (optional)
+
+A file on FAT32 can be at most 4 GB, so a hard disk image can't be bigger.
+For bigger ones, the card can have a second partition formatted as exFAT,
+which BMAmiga mounts as **SD2:**: the menu's file browser shows it at the
+top of the card, as *SD2: (second partition)*. The first partition must
+stay FAT32, with BMAmiga's files on it: the Pi starts from it. Use an MBR
+partition table (not GPT).
+
+Making the partitions erases the card. Put 4 GB or more in the first, for
+BMAmiga, the ROMs, floppies and the rest, and the remainder in the second.
+
+**macOS** (find the card's disk with `diskutil list`; here `disk4`):
+
+```
+diskutil partitionDisk disk4 MBR FAT32 BMAMIGA 4G ExFAT AMIGA R
+```
+
+**Windows**, in an administrator's command prompt (`list disk` shows the
+card's number; here 2):
+
+```
+diskpart
+select disk 2
+clean
+create partition primary size=4096
+format fs=fat32 quick label=BMAMIGA
+assign
+create partition primary
+format fs=exfat quick label=AMIGA
+assign
+exit
+```
+
+**Linux** (the card here is `/dev/sdX`):
+
+```
+sudo parted /dev/sdX --script mklabel msdos mkpart primary fat32 1MiB 4GiB mkpart primary 4GiB 100%
+sudo mkfs.vfat -F 32 -n BMAMIGA /dev/sdX1
+sudo mkfs.exfat -n AMIGA /dev/sdX2
+```
+
+Then copy BMAmiga's files to the first partition as above, and big disk
+images to the second. BMAmiga's log says `Second partition mounted as SD2:
+(exFAT)` when it finds it. The web UI shows only the first partition.
+
 ## Kickstart ROMs
 
 The Amiga's Kickstart ROMs are copyrighted, so BMAmiga can't include them.

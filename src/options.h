@@ -32,9 +32,9 @@
 #include <circle/bcmpropertytags.h>
 
 #define OPTIONS_MAX 32
-#define SETTINGS_MAX 48
+#define SETTINGS_MAX 64
 #define SETTING_NAME_MAX 24
-#define SETTING_VALUE_MAX 72
+#define SETTING_VALUE_MAX 256  // a path, with folders in it
 
 class Options {
 public:

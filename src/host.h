@@ -173,6 +173,10 @@ void host_udp_close(int handle);
 /* The DNS server the network's DHCP gave (network byte order). Returns 0
    if there is none (no network). */
 int host_dns_server(uint32_t *ip);
+/* The SD card's second partition, if it has one the kernel could mount
+   (exFAT, for disk images over FAT32's 4 GB; or FAT32): its root, as a
+   path to open files with ("SD2:/" on the Pi); 0 if there is none. */
+const char *host_volume2(void);
 /* Large blocks: the Amiga's memory (src/port/circle/posix.c's mmap()). On
    the Pi they come from all its memory, above 1 GB too, which malloc()
    doesn't reach (Circle keeps that below 1 GB, where its drivers' DMA can

@@ -152,7 +152,10 @@ A hard drive is either:
   and comments) in small `.uaem` files beside them; leave those where
   they are.
 
-A hard disk image can be up to 4 GB, the most a file on FAT32 can be.
+A hard disk image can be up to 4 GB, the most a file on FAT32 can be;
+bigger ones go on an exFAT second partition on the card, **SD2:**, which the
+file browser shows at the card's top (see [Installation](INSTALLATION.md),
+*A second partition for big disk images*).
 
 **Copying an Amiga folder to the card.** The Amiga allows characters in
 file names that FAT32 doesn't (`\ * ? " < > |`, and a name ending in a dot

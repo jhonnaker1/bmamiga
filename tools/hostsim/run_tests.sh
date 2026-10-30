@@ -252,6 +252,26 @@ run cd32 50 "$OUT/aros" "" '300 quit\n'
 check_log cd32 "hardreset" "the setup's hard reset"
 check_log cd32 "CD32: media changed = 1" "the disc in the CD32's drive after it"
 
+echo "The card's second partition"
+# BMAMIGA_SD2 stands for SD2: (the card's second partition, an exFAT one for
+# big disk images): F12, Hard Drives and CD, DH0:, Hard Disk Image..., up
+# from the disks folder to the card's top, SD2:, hd, big.hdf. Its path (long
+# here) is kept whole in bmamiga.cfg.
+mkdir -p "$OUT/sd2/disks" "$OUT/sd2/second/hd"
+dd if=/dev/zero of="$OUT/sd2/second/hd/big.hdf" bs=1024 count=4096 2> /dev/null
+f=200
+script="$f key 0x45 1\n$((f + 1)) key 0x45 0\n"; f=$((f + 20))
+for key in 0x51 0x28 0x28 0x28 0x52 0x28 0x52 0x28 0x28 0x28 0x28; do
+    script="$script$f key $key 1\n$((f + 1)) key $key 0\n"; f=$((f + 15))
+done
+script="$script$((f + 60)) quit\n"
+mkdir -p "$OUT/sd2"
+[ -e "$OUT/sd2/roms" ] || ln -s "$OUT/aros" "$OUT/sd2/roms"
+(cd "$OUT/sd2" && printf "$script" | BMAMIGA_SD2="$OUT/sd2/second" BMAMIGA_REFRESH=50 \
+    BMAMIGA_CMDLINE="root=." perl -e 'alarm 300; exec @ARGV' "$SIM" > log.txt 2>&1)
+check_cfg sd2 "^dh0=$OUT/sd2/second/hd/big\.hdf\$" "a disk image chosen on SD2:, its long path kept whole"
+check_log sd2 "Drive DH0: .*second/hd/big\.hdf" "and mounted as DH0:"
+
 echo "Drives from bmamiga.uae"
 # bmamiga.uae's drive (as AmiKit's: a device name and volume name of its
 # own) after the menu's DH0:, once each, and again once after a hard reset.
