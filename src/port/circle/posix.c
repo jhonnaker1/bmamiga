@@ -63,15 +63,23 @@
 
 #define MAX_MAPPINGS 256
 static struct {
-	void *start;            /* what mmap() returned, aligned */
+	void *start;            /* what mmap() returned, aligned; NULL: free */
 	size_t length;
-	void *block;            /* what malloc() gave */
+	void *block;            /* what host_large_alloc() gave */
+	size_t capacity;        /* how much the block holds, aligned */
 } mappings[MAX_MAPPINGS];
+
+/* Only the big reservation (Amiberry's Amiga memory, tried at 4 GB and
+   then 64 MB less each time) has to leave host_large_limit()'s 256 MB
+   over; what comes after it (the JIT's code, 16 MB and 2 KB) is given
+   from those 256 MB. On a 4 GB Pi 4 the reservation leaves nothing
+   more, which had kept the JIT off. */
+#define MAP_SMALL ((size_t) 64 << 20)
 
 void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset)
 {
 	void *p;
-	int i;
+	int i, best = -1;
 	(void) prot;
 	(void) offset;
 	if (!(flags & MAP_ANONYMOUS) || fd != -1 || length == 0) {
@@ -88,26 +96,38 @@ void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset)
 		errno = ENOMEM;
 		return MAP_FAILED;
 	}
-	if (length > host_large_limit()) {
-		errno = ENOMEM;
-		return MAP_FAILED;
-	}
+	/* A block given back before, if one is big enough: Circle's heap
+	   never takes back a block over 512K, so the JIT's 16 MB, made again
+	   at each hard reset, would otherwise be lost each time. */
 	for (i = 0; i < MAX_MAPPINGS; i++)
-		if (mappings[i].start == NULL)
-			break;
-	if (i == MAX_MAPPINGS) {
-		errno = ENOMEM;
-		return MAP_FAILED;
+		if (mappings[i].start == NULL && mappings[i].block != NULL
+		    && mappings[i].capacity >= length
+		    && (best < 0 || mappings[i].capacity < mappings[best].capacity))
+			best = i;
+	if (best < 0) {
+		if (length > MAP_SMALL && length > host_large_limit()) {
+			errno = ENOMEM;
+			return MAP_FAILED;
+		}
+		for (i = 0; i < MAX_MAPPINGS; i++)
+			if (mappings[i].start == NULL && mappings[i].block == NULL)
+				break;
+		if (i == MAX_MAPPINGS) {
+			errno = ENOMEM;
+			return MAP_FAILED;
+		}
+		mappings[i].block = host_large_alloc(length + MAP_ALIGN);
+		if (mappings[i].block == NULL) {
+			errno = ENOMEM;
+			return MAP_FAILED;
+		}
+		mappings[i].capacity = length;
+		best = i;
 	}
-	mappings[i].block = host_large_alloc(length + MAP_ALIGN);
-	if (mappings[i].block == NULL) {
-		errno = ENOMEM;
-		return MAP_FAILED;
-	}
-	p = (void *) (((uintptr_t) mappings[i].block + MAP_ALIGN - 1) & ~(uintptr_t) (MAP_ALIGN - 1));
+	p = (void *) (((uintptr_t) mappings[best].block + MAP_ALIGN - 1) & ~(uintptr_t) (MAP_ALIGN - 1));
 	memset(p, 0, length);
-	mappings[i].start = p;
-	mappings[i].length = length;
+	mappings[best].start = p;
+	mappings[best].length = length;
 	return p;
 }
 
@@ -116,9 +136,10 @@ int munmap(void *addr, size_t length)
 	int i;
 	for (i = 0; i < MAX_MAPPINGS; i++)
 		if (mappings[i].start == addr && mappings[i].length == length) {
-			host_large_free(mappings[i].block);
+			/* Kept for the next mmap() that fits (see above); a block
+			   from a heap bucket would do as well, but keeping them all
+			   is simpler. */
 			mappings[i].start = NULL;
-			mappings[i].block = NULL;
 			return 0;
 		}
 	/* Part of a mapping (decommitting): kept. */

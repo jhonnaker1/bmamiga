@@ -10,7 +10,15 @@
   circle_jit_exec_patch.diff lets the heap hold code (Circle made memory
   after its own code never executable). In the PC simulator, on a Mac, it
   ran a register loop 9 times and a memory loop 5 times as fast as the
-  fastest interpreter (23 and 14 times the A1200's default)
+  fastest interpreter (23 and 14 times the A1200's default). On the Pi
+  (1000s of loops a second, register / memory): Pi 5 183 / 79, Pi 4 92 /
+  37, against the Pi 4's interpreter's 5 / 5 and the Pi 5's A1200 default's
+  2.6 (register)
+- mmap() on the Pi: after the Amiga's memory, which leaves 256 MB of the
+  heap over, smaller mappings (the JIT's code) come from those 256 MB (a
+  4 GB Pi 4 had none left, and its JIT stayed off); and a mapping given
+  back is kept for the next that fits, as Circle never takes back a block
+  over 512K (each hard reset with the JIT lost 16 MB)
 - tools/bench/make_bench_adf.py: bench-cpu.adf and bench-mem.adf, boot
   floppies that loop in fast RAM and count at $F0; with bench=1 the log
   says how many 1000s of loops a second, every 10 s ("peek" in the
