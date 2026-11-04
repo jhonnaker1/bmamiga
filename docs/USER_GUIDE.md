@@ -81,6 +81,16 @@ what the chosen model has, and choosing anything else is kept in
 | Sound Filter      | off, emulated, on (the Amiga's low-pass filter) | `sound_filter` |
 | Stereo Separation | mono, 30%, 50%, 70%, 100% | `stereo_separation` (0 to 10) |
 | Network           | none, bsdsocket.library, uaenet.device, an A2065 card (see The Amiga's network) | `amiga_network` (`bsdsocket`, `uaenet`, `a2065`) |
+| JIT (68020+)      | off, on: Amiberry's JIT compiler, which turns the Amiga's code into the Pi's (see below) | `jit` (`on`) |
+
+**The JIT** makes a 68020 or later CPU much faster (several times, more on
+code that works in its registers than on code that works in memory), for
+Workbench, AmiKit and other software that wants a fast Amiga. It runs the
+CPU at full speed and not cycle-exact, so games that need a real A1200's
+timing are better without it; a 68000 (the A500's) can't use it. On the Pi
+it is Amiberry's JIT in its *indirect* mode: the Amiga's memory through
+Amiberry's own access functions, as the Pi can't trap the Amiga's I/O the
+way a desktop does.
 
 The hardware changes take effect from a hard reset, which the menu offers
 at once (as switching a real Amiga off and on); the sound's at once. Not
@@ -357,6 +367,7 @@ the web UI.
 | `cd0`               | path                         | none     | The CD image in the CD drive |
 | `video_standard`    | `auto`, `pal`, `ntsc`        | `auto`   | The Amiga's video standard |
 | `floppy_speed`      | `100`, `200`, `400`, `800`, `0` | `100` | The floppy drives' speed: a real drive's, faster, or `0` turbo |
+| `bench`             | `0`, `1`                     | `0`      | With a floppy from `tools/bench/make_bench_adf.py`: the log's speed line every 10 s adds its loops a second, to measure the CPU (with and without the JIT) |
 | `statusline`        | `0`, `1`                     | `0`      | Amiberry's status line: drive lights and speed |
 | `aspect`            | number                       | `1.0`    | Multiplies the width of the picture |
 | `scale`             | 0.1 to 1.0                   | `1.0`    | Height of the picture as a fraction of the screen (less for a TV that cuts off the edges) |

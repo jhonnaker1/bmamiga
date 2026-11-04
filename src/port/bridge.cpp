@@ -26,6 +26,7 @@
 #include "inputdevice.h"
 #include "uae.h"
 #include "rommgr.h"
+#include "memory.h"
 #include "ethernet.h"
 
 #include <stdio.h>
@@ -212,6 +213,8 @@ static struct {
 	uae_u32 chipmem, bogomem, fastmem;
 	int sound_filter, sound_stereo_separation;
 	bool sana2, socket_emu;
+	int cachesize, comptrustbyte, comptrustword, comptrustlong, comptrustnaddr;
+	bool cpu_compatible;
 } preset;
 
 static void take_preset(void)
@@ -233,6 +236,12 @@ static void take_preset(void)
 	preset.sound_stereo_separation = changed_prefs.sound_stereo_separation;
 	preset.sana2 = changed_prefs.sana2;
 	preset.socket_emu = changed_prefs.socket_emu;
+	preset.cachesize = changed_prefs.cachesize;
+	preset.comptrustbyte = changed_prefs.comptrustbyte;
+	preset.comptrustword = changed_prefs.comptrustword;
+	preset.comptrustlong = changed_prefs.comptrustlong;
+	preset.comptrustnaddr = changed_prefs.comptrustnaddr;
+	preset.cpu_compatible = changed_prefs.cpu_compatible;
 }
 
 static void put_back_preset(void)
@@ -254,6 +263,12 @@ static void put_back_preset(void)
 	/* The network: no model has one. */
 	changed_prefs.sana2 = preset.sana2;
 	changed_prefs.socket_emu = preset.socket_emu;
+	changed_prefs.cachesize = preset.cachesize;
+	changed_prefs.comptrustbyte = preset.comptrustbyte;
+	changed_prefs.comptrustword = preset.comptrustword;
+	changed_prefs.comptrustlong = preset.comptrustlong;
+	changed_prefs.comptrustnaddr = preset.comptrustnaddr;
+	changed_prefs.cpu_compatible = preset.cpu_compatible;
 	if (get_device_romconfig(&changed_prefs, ROMTYPE_A2065, 0) != nullptr)
 		clear_device_rom(&changed_prefs, ROMTYPE_A2065, 0, true);
 	changed_prefs.a2065name[0] = 0;
@@ -412,6 +427,12 @@ void bmamiga_core_net_probe(int step)
 		probe_udp(slirp_mac, 0x0a00020f, 40000, 0x0a000203, 53, p, sizeof q);
 	}
 	ethernet_trigger(probe_ndd, probe_data);
+}
+
+/* The Amiga's longword at ADDR (tools/bench's counter, at $F0). */
+uae_u32 bmamiga_core_peek_long(uae_u32 addr)
+{
+	return get_long(addr);
 }
 
 void bmamiga_core_warp(int on)

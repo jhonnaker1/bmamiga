@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+- The JIT (Amiga Setup, JIT): Amiberry's ARM64 JIT on the Pi, in its
+  indirect mode (memory through Amiberry's banks; the Pi can't reserve 4 GB
+  for the Amiga's memory or trap its I/O as a desktop does), with a 16 MB
+  cache, at full speed, not cycle-exact, and not "more compatible"
+  (cpu_compatible, with which the ARM64 JIT compiles nothing).
+  circle_jit_exec_patch.diff lets the heap hold code (Circle made memory
+  after its own code never executable). In the PC simulator, on a Mac, it
+  ran a register loop 9 times and a memory loop 5 times as fast as the
+  fastest interpreter (23 and 14 times the A1200's default)
+- tools/bench/make_bench_adf.py: bench-cpu.adf and bench-mem.adf, boot
+  floppies that loop in fast RAM and count at $F0; with bench=1 the log
+  says how many 1000s of loops a second, every 10 s ("peek" in the
+  simulator)
+
 ## 0.2.3 – 2026-10-30
 
 - Disk images past 2 GB: Circle's C library cut a file position to 32

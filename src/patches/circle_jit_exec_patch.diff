@@ -1,0 +1,33 @@
+--- a/lib/translationtable64.cpp
++++ b/lib/translationtable64.cpp
+@@ -129,11 +129,12 @@
+ 		pDesc->UXN	     = 1;
+ 		pDesc->Ignored	     = 0;
+ 
++		// BMAmiga: normal memory after the kernel's code stays executable,
++		// for Amiberry's JIT, which compiles the Amiga's code into the heap;
++		// device and coherent (DMA) memory are never executed.
+ 		extern u8 _etext;
+ 		if (nBaseAddress >= (u64) &_etext)
+ 		{
+-			pDesc->PXN = 1;
+-
+ #if RASPPI >= 4
+ 			if (   (   nBaseAddress >= m_nMemSize
+ 			        && nBaseAddress < MEM_HIGHMEM_START)
+@@ -144,6 +145,7 @@
+ 			{
+ 				pDesc->AttrIndx = ATTRINDX_DEVICE;
+ 				pDesc->SH	= ATTRIB_SH_OUTER_SHAREABLE;
++				pDesc->PXN	= 1;
+ 			}
+ 			else if (   nBaseAddress >= MEM_COHERENT_REGION
+ #ifndef KASAN_SUPPORTED
+@@ -154,6 +156,7 @@
+ 			{
+ 				pDesc->AttrIndx = ATTRINDX_COHERENT;
+ 				pDesc->SH	= ATTRIB_SH_OUTER_SHAREABLE;
++				pDesc->PXN	= 1;
+ 			}
+ 		}
+ 

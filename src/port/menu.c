@@ -687,6 +687,10 @@ static const struct {
 	{"Network", "amiga_network",
 	 (const char *const[]){"None", "bsdsocket.library", "uaenet.device", "A2065 Card", NULL},
 	 (const char *const[]){"", "bsdsocket", "uaenet", "a2065", NULL}, TRUE},
+	/* For a 68020 or later; at full speed, not cycle-exact. */
+	{"JIT (68020+)", "jit",
+	 (const char *const[]){"Off", "On", NULL},
+	 (const char *const[]){"", "on", NULL}, TRUE},
 };
 #define N_SETUPS ((int) (sizeof setups / sizeof setups[0]))
 

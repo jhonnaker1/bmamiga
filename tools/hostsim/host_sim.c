@@ -41,6 +41,7 @@
  *   <frame> webui <reboot|coldstart>  a request from the web UI
  *   <frame> run <path>             the web UI starts a file
  *   <frame> netprobe <dhcp|dns>    SLiRP is asked for an address or a name
+ *   <frame> peek <addr>            print the Amiga's longword at addr
  *   <frame> quit                   end the test
  *
  * BMAMIGA_SIM_FRAME_MS=N makes each frame's emulation take N ms of the
@@ -78,8 +79,9 @@
 #include "../../src/host.h"
 #include "live.h"
 
-/* src/port/bridge.cpp: the network's test */
+/* src/port/bridge.cpp: the network's test, and the Amiga's memory */
 void bmamiga_core_net_probe(int step);
+unsigned bmamiga_core_peek_long(unsigned addr);
 
 /* From src/port/platform.c, called by the web UI on the Pi. */
 void bmamiga_request_power(int power_off);
@@ -563,6 +565,8 @@ static char line[1100];
 static int have_line = 0;
 static long line_frame = -1;
 
+static double sim_cpu_ms(void);
+
 static void run_script(void)
 {
 	for (;;) {
@@ -626,6 +630,11 @@ static void run_script(void)
 				bmamiga_request_power(0);
 			else if (strstr(line + n, "coldstart"))
 				bmamiga_request_coldstart();
+		} else if (strcmp(cmd, "peek") == 0) {
+			unsigned addr = 0;
+			sscanf(line + n, "%i", &addr);
+			fprintf(stderr, "[sim] frame %ld: peek 0x%x = %u (%.2f ms CPU so far)\n",
+			        frame, addr, bmamiga_core_peek_long(addr), sim_cpu_ms());
 		} else if (strcmp(cmd, "netprobe") == 0) {
 			bmamiga_core_net_probe(strstr(line + n, "dns") != NULL);
 		} else if (strcmp(cmd, "audio") == 0) {
@@ -660,6 +669,14 @@ static void tick(void)
 	}
 	if (frame > 2000000)
 		exit(1);
+}
+
+/* The emulator's CPU time so far, in ms (its threads are this one's). */
+static double sim_cpu_ms(void)
+{
+	struct timespec ts;
+	clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
+	return ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6;
 }
 
 static void cpu_report(void)

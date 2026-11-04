@@ -49,6 +49,7 @@
 int bmamiga_core_insert_floppy(int drive, const char *path);
 void bmamiga_core_eject_floppy(int drive);
 void bmamiga_core_set_floppy_speed(int speed);
+uint32_t bmamiga_core_peek_long(uint32_t addr);
 int bmamiga_core_set_config(const char *lines);
 int bmamiga_core_set_hard_drives(const char *const paths[4], const char *const names[4]);
 void bmamiga_core_set_cd(const char *path, int builtin);
@@ -704,6 +705,16 @@ static void setup_lines(char *out, size_t size)
 		else if (strcmp(net, "a2065") == 0)
 			ADD("a2065=slirp\n");
 	}
+	/* The JIT: Amiberry's, compiling the Amiga's code to the ARM's, for a
+	   68020 or later at full speed (not cycle-exact, which it can't be, nor
+	   "more compatible", cpu_compatible, with which Amiberry's ARM64 JIT
+	   compiles nothing: the A1200's preset has it on).
+	   Indirect: memory through Amiberry's banks, as the Pi can't reserve
+	   4 GB for the Amiga's memory or trap its I/O as a desktop does. */
+	if (strcmp(host_option("jit", ""), "on") == 0)
+		ADD("cachesize=16384\ncomp_trustbyte=indirect\ncomp_trustword=indirect\n"
+		    "comp_trustlong=indirect\ncomp_trustnaddr=indirect\n"
+		    "cpu_speed=max\ncycle_exact=false\ncpu_compatible=false\n");
 	/* The fastest: as fast as the Pi can, which isn't cycle-exact. */
 	if (strcmp(host_option("cpu_speed", ""), "max") == 0)
 		ADD("cpu_speed=max\ncycle_exact=false\n");
@@ -1202,6 +1213,14 @@ static void report_speed(double now)
 	    speed_frames * 100.0 / (span * bmamiga_core_frame_rate()), speed_frames, span,
 	    mhz, celsius, speed_amiga * 100.0 / span, tasks * 100.0 / span,
 	    log * 100.0 / span, picture * 100.0 / span, warp ? " (warp)" : "");
+	/* bench=1: tools/bench's floppy counts its loops at $F0; how many a
+	   second, to compare the CPU's speed with and without the JIT. */
+	if (option_on("bench", FALSE)) {
+		static uint32_t last;
+		uint32_t count = bmamiga_core_peek_long(0xF0);
+		LOG("bench: %.0f loops a second\n", (uint32_t) (count - last) / span);
+		last = count;
+	}
 	speed_since = now;
 	speed_frames = 0;
 	speed_amiga = 0.0;

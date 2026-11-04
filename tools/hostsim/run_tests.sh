@@ -252,6 +252,22 @@ run cd32 50 "$OUT/aros" "" '300 quit\n'
 check_log cd32 "hardreset" "the setup's hard reset"
 check_log cd32 "CD32: media changed = 1" "the disc in the CD32's drive after it"
 
+echo "JIT"
+# Amiga Setup's JIT on an A1200 with a 68020: Amiberry's JIT, indirect, with
+# its 16 MB cache, from the setup's hard reset; the same picture as without.
+mkdir -p "$OUT/jit" "$OUT/nojit"
+printf 'model=A1200\ncpu=68020\njit=on\n' > "$OUT/jit/bmamiga.cfg"
+printf 'model=A1200\ncpu=68020\ncpu_speed=max\n' > "$OUT/nojit/bmamiga.cfg"
+run jit 50 "$OUT/aros" "" '600 shot screen.ppm\n601 quit\n'
+run nojit 50 "$OUT/aros" "" '600 shot screen.ppm\n601 quit\n'
+check_log jit "CPU=68020.*JIT=.*16384" "the JIT, with its 16 MB cache"
+check_log jit "translation cache size : 16384 KB" "its code cache made"
+if ! ppm differ "$OUT/jit/screen.ppm" "$OUT/nojit/screen.ppm"; then
+    pass "jit: the same picture as without it"
+else
+    fail jit "the picture differs from the one without the JIT (see out/jit/screen.ppm)"
+fi
+
 echo "The card's second partition"
 # BMAMIGA_SD2 stands for SD2: (the card's second partition, an exFAT one for
 # big disk images): F12, Hard Drives and CD, DH0:, Hard Disk Image..., up

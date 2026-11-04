@@ -42,12 +42,13 @@ CIRCLE_CXX_INCLUDES := -nostdinc -I$(ROOT)/src/port/circle/include \
 	-isystem $(CIRCLE_STDLIB)/libs/circle/addon
 CIRCLE_FORCED := -include $(ROOT)/src/port/circle/include/bma_circle.h
 
-# Amiberry's time and sleeps are BMAmiga's (src/port/clock.c). No JIT (it
-# needs the 4 GB of address space a desktop reserves for the Amiga's
-# memory).
+# Amiberry's time and sleeps are BMAmiga's (src/port/clock.c). Its JIT is
+# on: in indirect mode (memory through Amiberry's banks, as the Pi can't
+# reserve 4 GB for the Amiga's memory or trap its I/O), in the heap, which
+# circle_jit_exec_patch.diff lets hold code.
 CIRCLE_AMIBERRY_FLAGS := -Dclock_gettime=bma_clock_gettime -Dclock_gettime_nsec_np=bma_clock_gettime_nsec_np \
 	-Dnanosleep=bma_nanosleep -Dusleep=bma_usleep \
-	$(CIRCLE_CXX_INCLUDES) $(CIRCLE_TARGET) -DLIBRETRO_NO_JIT -DBMAMIGA_BMNET=3 $(CIRCLE_FORCED)
+	$(CIRCLE_CXX_INCLUDES) $(CIRCLE_TARGET) -DBMAMIGA_BMNET=3 -DBMAMIGA_JIT=1 $(CIRCLE_FORCED)
 
 # Amiberry's files that need what Circle hasn't, and BMAmiga's in their
 # place (relative to src/port).
