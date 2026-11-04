@@ -92,6 +92,33 @@ it is Amiberry's JIT in its *indirect* mode: the Amiga's memory through
 Amiberry's own access functions, as the Pi can't trap the Amiga's I/O the
 way a desktop does.
 
+What the JIT needs, in Amiga Setup:
+
+- **A 68020 or later CPU.** *Amiga 1200, 2 MB + 8 MB Fast*, *Amiga
+  4000/030* and *Amiga 4000/040* have one; with another model, set *CPU*
+  to 68020, 68030 or 68040. On a 68000 or 68010 *JIT* On does nothing.
+- **Fast RAM.** The JIT only compiles code in fast RAM; code in chip RAM
+  runs as before, so *Amiga 1200, 2 MB* (no fast RAM) gains nothing until
+  *Fast RAM* is set (8M). AmigaOS loads programs into fast RAM when there
+  is some.
+- **JIT (68020+) On, then the hard reset** the menu offers: the JIT starts
+  with the Amiga.
+
+On sets the rest itself, and these need not be changed: *CPU Speed* as
+*Fastest*, not cycle-exact, Amiberry's "more compatible" CPU off (with it
+the ARM JIT compiles nothing), a 16 MB cache, and the indirect mode. Don't
+undo them in `bmamiga.uae`: `cachesize=0`, `cpu_compatible=true` or
+`cycle_exact=true` there turn the JIT off again, and an MMU (`mmu_model`)
+is left out while the JIT is on. A Kickstart 2.04 or later is needed for a 68030 or
+68040 (3.x for the A1200 and A4000).
+
+The log says whether it is on: `JIT=CPU=16384` and `actual translation
+cache size : 16384 KB` (`JIT=0`, or `prefetch` in that line, means it is
+off). To measure it, `tools/bench/make_bench_adf.py` makes two boot
+floppies (see `bench` in the options below). On the Pi, in 1000s of loops
+a second (register / memory): a Pi 4's interpreter 5 / 5, its JIT 92 / 37,
+a Pi 5's JIT 183 / 79.
+
 The hardware changes take effect from a hard reset, which the menu offers
 at once (as switching a real Amiga off and on); the sound's at once. Not
 every mix works: an AGA chipset wants a Kickstart 3.x, and a 68030 or
