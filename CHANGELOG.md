@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.2.4 – 2026-11-04
+
+Tried on a Pi 4 (4 GB) and a Pi 5 (8 GB): the bench floppies with and
+without the JIT, and Workbench 3.1 with it.
 
 - The JIT (Amiga Setup, JIT): Amiberry's ARM64 JIT on the Pi, in its
   indirect mode (memory through Amiberry's banks; the Pi can't reserve 4 GB
