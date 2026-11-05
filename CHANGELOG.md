@@ -6,8 +6,9 @@ Tried on a Pi 4 (4 GB) and a Pi 5 (8 GB): the bench floppies with and
 without the JIT, and Workbench 3.1 with it.
 
 - The JIT (Amiga Setup, JIT): Amiberry's ARM64 JIT on the Pi, in its
-  indirect mode (memory through Amiberry's banks; the Pi can't reserve 4 GB
-  for the Amiga's memory or trap its I/O as a desktop does), with a 16 MB
+  indirect mode (memory through Amiberry's banks; direct mode is chosen
+  when the emulator starts, before the setup's hard reset, and traps I/O
+  with SIGSEGV, which bare metal hasn't), with a 16 MB
   cache, at full speed, not cycle-exact, and not "more compatible"
   (cpu_compatible, with which the ARM64 JIT compiles nothing).
   circle_jit_exec_patch.diff lets the heap hold code (Circle made memory
