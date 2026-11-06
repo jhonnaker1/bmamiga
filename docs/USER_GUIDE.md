@@ -80,7 +80,7 @@ what the chosen model has, and choosing anything else is kept in
 | Fast RAM          | none, 1M, 2M, 4M, 8M | `fast_ram` (in MB) |
 | Sound Filter      | off, emulated, on (the Amiga's low-pass filter) | `sound_filter` |
 | Stereo Separation | mono, 30%, 50%, 70%, 100% | `stereo_separation` (0 to 10) |
-| Network           | none, bsdsocket.library, uaenet.device, an A2065 card (see The Amiga's network) | `amiga_network` (`bsdsocket`, `uaenet`, `a2065`) |
+| Network (reboot)  | none, bsdsocket.library, uaenet.device, an A2065 card (see The Amiga's network); from BMAmiga's next start, which the menu offers | `amiga_network` (`bsdsocket`, `uaenet`, `a2065`) |
 | JIT (68020+)      | off, on: Amiberry's JIT compiler, which turns the Amiga's code into the Pi's (see below) | `jit` (`on`) |
 
 **The JIT** makes a 68020 or later CPU much faster (several times, more on

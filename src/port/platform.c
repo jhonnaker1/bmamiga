@@ -729,6 +729,33 @@ static void setup_lines(char *out, size_t size)
 #undef ADD
 }
 
+/* The setup's settings that Amiberry takes only as it starts (bridge.cpp's
+   bmamiga_amiberry_main()): the Amiga's network, bsdsocket.library or
+   uaenet.device, from the menu or bmamiga.uae. */
+const char *bmamiga_start_options(void)
+{
+	static char lines[8192], start[512];
+	const char *p = lines;
+	size_t len = 0;
+	setup_lines(lines, sizeof lines);
+	start[0] = '\0';
+	while (*p != '\0') {
+		const char *end = strchr(p, '\n');
+		size_t n = end != NULL ? (size_t) (end - p) : strlen(p);
+		while (n > 0 && (*p == ' ' || *p == '\t'))
+			p++, n--;
+		if ((strncmp(p, "bsdsocket_emu=", 14) == 0 || strncmp(p, "sana2=", 6) == 0)
+		    && len + n + 2 < sizeof start) {
+			memcpy(start + len, p, n);
+			len += n;
+			start[len++] = '\n';
+			start[len] = '\0';
+		}
+		p = end != NULL ? end + 1 : p + n;
+	}
+	return start;
+}
+
 /* Gives Amiberry the setup; a hard reset then uses it (the sound's
    settings it takes at once). Returns how many settings there are. */
 static int apply_setup(void)

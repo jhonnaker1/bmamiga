@@ -32,6 +32,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <string>
+#include <vector>
 #include <sys/stat.h>
 
 extern "C" {
@@ -212,7 +213,6 @@ static struct {
 	unsigned int chipset_mask;
 	uae_u32 chipmem, bogomem, fastmem;
 	int sound_filter, sound_stereo_separation;
-	bool sana2, socket_emu;
 	int cachesize, comptrustbyte, comptrustword, comptrustlong, comptrustnaddr;
 	bool cpu_compatible;
 } preset;
@@ -234,8 +234,6 @@ static void take_preset(void)
 	preset.fastmem = changed_prefs.fastmem[0].size;
 	preset.sound_filter = changed_prefs.sound_filter;
 	preset.sound_stereo_separation = changed_prefs.sound_stereo_separation;
-	preset.sana2 = changed_prefs.sana2;
-	preset.socket_emu = changed_prefs.socket_emu;
 	preset.cachesize = changed_prefs.cachesize;
 	preset.comptrustbyte = changed_prefs.comptrustbyte;
 	preset.comptrustword = changed_prefs.comptrustword;
@@ -260,9 +258,10 @@ static void put_back_preset(void)
 	changed_prefs.fastmem[0].size = preset.fastmem;
 	changed_prefs.sound_filter = preset.sound_filter;
 	changed_prefs.sound_stereo_separation = preset.sound_stereo_separation;
-	/* The network: no model has one. */
-	changed_prefs.sana2 = preset.sana2;
-	changed_prefs.socket_emu = preset.socket_emu;
+	/* The network: no model has one (the start's options may have, see
+	   bmamiga_amiberry_main()). */
+	changed_prefs.sana2 = false;
+	changed_prefs.socket_emu = false;
 	changed_prefs.cachesize = preset.cachesize;
 	changed_prefs.comptrustbyte = preset.comptrustbyte;
 	changed_prefs.comptrustword = preset.comptrustword;
@@ -447,4 +446,37 @@ double bmamiga_core_frame_rate(void)
 	return fake_vblank_hz > 1.0f ? fake_vblank_hz : vblank_hz;
 }
 
+}
+
+/* ---- The start ---------------------------------------------------------------- */
+
+/* libretro.cpp is built with amiberry_main renamed to this (amiberry.mk),
+   which adds the settings Amiberry only takes as it starts to its command
+   line: bsdsocket.library and uaenet.device are put in the UAE Boot ROM
+   once, by memory_init(), from the settings then, so a hard reset with
+   them turned on (bmamiga_core_set_config()) is too late; the Amiga had no
+   TCP stack. A later hard reset turns them on or off; both are there. */
+extern int amiberry_main(int argc, char **argv);
+extern "C" const char *bmamiga_start_options(void);   /* platform.c */
+
+int bmamiga_amiberry_main(int argc, char **argv)
+{
+	std::vector<char *> args(argv, argv + argc);
+	std::vector<std::string> options;
+	const char *p = bmamiga_start_options();
+	while (p != nullptr && *p != '\0') {
+		const char *end = strchr(p, '\n');
+		std::string line(p, end != nullptr ? (size_t) (end - p) : strlen(p));
+		p = end != nullptr ? end + 1 : nullptr;
+		if (!line.empty())
+			options.push_back(line);
+	}
+	static char dash_s[] = "-s";
+	for (auto &o : options) {
+		write_log(_T("BMAmiga: start with %s\n"), o.c_str());
+		args.push_back(dash_s);
+		args.push_back(&o[0]);
+	}
+	args.push_back(nullptr);
+	return amiberry_main((int) args.size() - 1, args.data());
 }

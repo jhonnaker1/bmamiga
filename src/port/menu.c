@@ -651,8 +651,11 @@ static void model_menu(void)
 /* ---- Amiga Setup ------------------------------------------------------------ */
 
 /* Settings over the model's own ("" in VALUES; bmamiga.cfg then has none),
-   which Amiberry takes at a hard reset (HARD) or at once. Anything else of
+   which Amiberry takes at a hard reset (HARD), at once, or as it starts
+   (REBOOT: bsdsocket.library and uaenet.device are put in the UAE Boot ROM
+   then). Anything else of
    Amiberry's goes in bmamiga.uae on the card. */
+#define REBOOT 2
 static const struct {
 	const char *label, *key;
 	const char *const *names, *const *values;
@@ -684,9 +687,9 @@ static const struct {
 	 (const char *const[]){"", "0", "3", "5", "7", "10", NULL}, FALSE},
 	/* The Pi's network, shared (Network has the Pi's): bsdsocket.library
 	   (as AmiKit has it), or SLiRP for the Amiga's own TCP/IP stack. */
-	{"Network", "amiga_network",
+	{"Network (reboot)", "amiga_network",
 	 (const char *const[]){"None", "bsdsocket.library", "uaenet.device", "A2065 Card", NULL},
-	 (const char *const[]){"", "bsdsocket", "uaenet", "a2065", NULL}, TRUE},
+	 (const char *const[]){"", "bsdsocket", "uaenet", "a2065", NULL}, REBOOT},
 	/* For a 68020 or later; at full speed, not cycle-exact. */
 	{"JIT (68020+)", "jit",
 	 (const char *const[]){"Off", "On", NULL},
@@ -762,7 +765,9 @@ static int setup_menu(void)
 		if (i < 0 || i == setup_index(s))
 			continue;
 		save_setting(setups[s].key, setups[s].values[i]);
-		if (!setups[s].hard)
+		if (setups[s].hard == REBOOT)
+			reboot_needed = TRUE;
+		else if (!setups[s].hard)
 			bmamiga_setup_changed();
 		else if (offer_hard_reset())
 			return TRUE;

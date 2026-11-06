@@ -55,7 +55,12 @@ $(BMA_LIB): $(BMA_OBJECTS)
 
 $(BMA_OBJDIR)/libretro/%.o: ./%.cpp | $(NLOHMANN_JSON_HEADER)
 	@mkdir -p $(dir $@)
-	@$(CXX) $(INCFLAGS) $(FLAGS) $(BMA_FLAGS) -std=gnu++17 -c -o $@ $<
+	@$(CXX) $(INCFLAGS) $(FLAGS) $(BMA_FLAGS) $(BMA_MAIN_FLAGS) -std=gnu++17 -c -o $@ $<
+
+# The core's start goes through BMAmiga's bmamiga_amiberry_main()
+# (bridge.cpp), which adds the settings Amiberry only takes as it starts.
+$(BMA_OBJDIR)/libretro/libretro.o: BMA_MAIN_FLAGS = -Damiberry_main=bmamiga_amiberry_main
+$(BMA_OBJDIR)/libretro/libretro.o: $(BMA_PORT)/amiberry.mk
 
 $(BMA_OBJDIR)/libretro/%.o: ./%.c
 	@mkdir -p $(dir $@)

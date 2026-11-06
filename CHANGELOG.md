@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- bsdsocket.library was never there (Amelinium: "no TCP stack"): Amiberry
+  puts it, and uaenet.device, in the UAE Boot ROM once, as it starts, from
+  the settings then, and BMAmiga gave it the Amiga Setup only after, with
+  a hard reset. libretro.cpp's amiberry_main() is now BMAmiga's
+  bmamiga_amiberry_main() (amiberry.mk renames it), which adds the
+  setup's network to the start's command line; Network is now "(reboot)"
+  in the menu. In the simulator, a slim Workbench 3.1 with Amelinium
+  (from a tester) shows example.com
+- docs: the JIT's settings; the reason it is in indirect mode
+
 ## 0.2.4 – 2026-11-04
 
 Tried on a Pi 4 (4 GB) and a Pi 5 (8 GB): the bench floppies with and
