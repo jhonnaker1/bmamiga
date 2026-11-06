@@ -95,6 +95,9 @@ struct bsock {
 	uint8_t *xbuf;
 	size_t xpos, xlen;
 	struct dgram *xdg;
+	/* made with BSD's numbers (the Amiga's, see bmnet_socket()): its
+	   addresses go back with BSD's AF_INET too */
+	int bsd;
 };
 
 static struct bsock socks[BMNET_MAX];
@@ -147,13 +150,18 @@ static uint16_t ephemeral_port(int type)
 	return 0;
 }
 
-static void fill_addr(struct sockaddr *addr, socklen_t *len, uint32_t ip, uint16_t port)
+/* BSD's AF_INET, the Amiga's: bsdsocket.library hands the family on as it
+   is (only Haiku's build turns it into 2), and the Amiga checks it. */
+#define BSD_AF_INET 2
+
+static void fill_addr(const struct bsock *s, struct sockaddr *addr, socklen_t *len, uint32_t ip,
+                      uint16_t port)
 {
 	struct sockaddr_in in;
 	if (addr == NULL || len == NULL)
 		return;
 	memset(&in, 0, sizeof in);
-	in.sin_family = AF_INET;
+	in.sin_family = s != NULL && s->bsd ? BSD_AF_INET : AF_INET;
 	in.sin_addr.s_addr = ip;
 	in.sin_port = port;
 	if (*len > sizeof in)
@@ -165,7 +173,8 @@ static void fill_addr(struct sockaddr *addr, socklen_t *len, uint32_t ip, uint16
 static int read_addr(const struct sockaddr *addr, socklen_t len, uint32_t *ip, uint16_t *port)
 {
 	const struct sockaddr_in *in = (const struct sockaddr_in *) addr;
-	if (addr == NULL || len < sizeof(struct sockaddr_in) || in->sin_family != AF_INET)
+	if (addr == NULL || len < sizeof(struct sockaddr_in)
+	    || (in->sin_family != AF_INET && in->sin_family != BSD_AF_INET))   /* the Amiga's */
 		return -1;
 	*ip = in->sin_addr.s_addr;
 	*port = in->sin_port;
@@ -331,6 +340,21 @@ static int udp_fill(struct bsock *s)
 int bmnet_socket(int domain, int type, int protocol)
 {
 	int i;
+#if defined(__circle__)
+	/* BSD's numbers, which the Amiga's are and bsdsocket.library passes
+	   on as they are: AF_INET 2, SOCK_STREAM 1, SOCK_DGRAM 2. Circle's C
+	   library has AF_INET 1 (2 is its AF_INET6, which bmnet hasn't),
+	   SOCK_STREAM 4 and SOCK_DGRAM 1: the Amiga's every socket() failed
+	   (errno 47, EAFNOSUPPORT: Amelinium's "no socket"). */
+	int bsd = 0;
+	if (domain == 2) {
+		domain = AF_INET;
+		type = type == 1 ? SOCK_STREAM : type == 2 ? SOCK_DGRAM : -1;
+		bsd = 1;
+	}
+#else
+	int bsd = 1;
+#endif
 	if (domain != AF_INET || (type != SOCK_STREAM && type != SOCK_DGRAM))
 		return fail(EAFNOSUPPORT);   /* no raw (ICMP) sockets: no ping */
 	for (i = 0; i < BMNET_MAX; i++) {
@@ -338,6 +362,7 @@ int bmnet_socket(int domain, int type, int protocol)
 			release(&socks[i]);
 			socks[i].state = S_NEW;
 			socks[i].type = type;
+			socks[i].bsd = bsd;
 			return i + BMNET_FD_BASE;
 		}
 	}
@@ -390,7 +415,8 @@ int bmnet_accept(int fd, struct sockaddr *addr, socklen_t *len)
 	memmove(s->pending, s->pending + 1, (size_t) (s->npending - 1) * sizeof s->pending[0]);
 	s->npending--;
 	c = &socks[i];
-	fill_addr(addr, len, c->rip, c->rport);
+	c->bsd = s->bsd;
+	fill_addr(c, addr, len, c->rip, c->rport);
 	return fd_of(c);
 }
 
@@ -612,6 +638,14 @@ ssize_t bmnet_sendto(int fd, const void *buf, size_t len, int flags,
 	return sent > 0 ? sent : (ssize_t) len;   /* a full queue drops it */
 }
 
+/* MSG_PEEK: also the Amiga's (BSD's, 2), which bsdsocket.library passes on
+   as it is; on Circle 2 is MSG_DONTROUTE, which nothing here sends. */
+#if defined(__circle__)
+#define PEEK_FLAGS (MSG_PEEK | 2)
+#else
+#define PEEK_FLAGS MSG_PEEK
+#endif
+
 ssize_t bmnet_recvfrom(int fd, void *buf, size_t len, int flags,
                        struct sockaddr *from, socklen_t *fromlen)
 {
@@ -621,18 +655,18 @@ ssize_t bmnet_recvfrom(int fd, void *buf, size_t len, int flags,
 	if (s == NULL)
 		return bmnet_read(fd, buf, len);
 	if (s->type == SOCK_STREAM) {
-		ssize_t r = stream_recv(s, buf, len, (flags & MSG_PEEK) != 0);
+		ssize_t r = stream_recv(s, buf, len, (flags & PEEK_FLAGS) != 0);
 		if (r >= 0)
-			fill_addr(from, fromlen, s->rip, s->rport);
+			fill_addr(s, from, fromlen, s->rip, s->rport);
 		return r;
 	}
-	if (flags & MSG_PEEK) {
+	if (flags & PEEK_FLAGS) {
 		g = s->dq_head != NULL ? s->dq_head : udp_fill(s) ? s->xdg : NULL;
 		if (g == NULL)
 			return fail(EAGAIN);
 		n = g->len < len ? g->len : len;
 		memcpy(buf, g->data, n);
-		fill_addr(from, fromlen, g->ip, g->port);
+		fill_addr(s, from, fromlen, g->ip, g->port);
 		return (ssize_t) n;
 	}
 	if (s->dq_head != NULL) {
@@ -649,7 +683,7 @@ ssize_t bmnet_recvfrom(int fd, void *buf, size_t len, int flags,
 	}
 	n = g->len < len ? g->len : len;
 	memcpy(buf, g->data, n);
-	fill_addr(from, fromlen, g->ip, g->port);
+	fill_addr(s, from, fromlen, g->ip, g->port);
 	free(g);
 	return (ssize_t) n;
 }
@@ -887,7 +921,7 @@ int bmnet_getsockname(int fd, struct sockaddr *addr, socklen_t *len)
 	struct bsock *s = get(fd);
 	if (s == NULL)
 		return fail(EBADF);
-	fill_addr(addr, len, s->lip, s->lport);
+	fill_addr(s, addr, len, s->lip, s->lport);
 	return 0;
 }
 
@@ -898,7 +932,7 @@ int bmnet_getpeername(int fd, struct sockaddr *addr, socklen_t *len)
 		return fail(EBADF);
 	if (s->state != S_CONNECTED)
 		return fail(ENOTCONN);
-	fill_addr(addr, len, s->rip, s->rport);
+	fill_addr(s, addr, len, s->rip, s->rport);
 	return 0;
 }
 
@@ -1057,7 +1091,7 @@ static struct hostent *host_result(const char *name, const uint32_t *addrs, int 
 	host_no_aliases[0] = NULL;
 	host_entry.h_name = host_name;
 	host_entry.h_aliases = host_no_aliases;
-	host_entry.h_addrtype = AF_INET;
+	host_entry.h_addrtype = BSD_AF_INET;   /* only bsdsocket.library asks */
 	host_entry.h_length = 4;
 	host_entry.h_addr_list = host_addr_ptrs;
 	bmnet_h_errno = 0;
@@ -1216,7 +1250,7 @@ struct hostent *bmnet_gethostbyaddr(const void *addr, socklen_t len, int type)
 	char qname[64], name[256];
 	const uint8_t *b = addr;
 	uint32_t ip;
-	if (addr == NULL || len != 4 || type != AF_INET) {
+	if (addr == NULL || len != 4 || (type != AF_INET && type != BSD_AF_INET)) {
 		bmnet_h_errno = HOST_NOT_FOUND;
 		return NULL;
 	}

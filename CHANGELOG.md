@@ -25,6 +25,13 @@
   listings (readdir, wrapped): the Amiga ran DEVS:Monitors/._PAL from its
   Startup-Sequence. tools/copy_amiga_folder.py removes them from the card
   after copying
+- On the Pi the Amiga's every socket() failed (errno 47, Amelinium's "no
+  socket"): bsdsocket.library passes the Amiga's numbers on as they are,
+  BSD's (AF_INET 2, SOCK_STREAM 1, SOCK_DGRAM 2), and Circle's C library
+  has others (1, 4, 1); the same numbers on a Mac, so the simulator
+  showed nothing. bmnet takes BSD's from the Amiga's sockets (and its
+  MSG_PEEK) and gives BSD's AF_INET back in their addresses and host
+  entries
 - docs: the JIT's settings; the reason it is in indirect mode
 
 ## 0.2.4 – 2026-11-04
