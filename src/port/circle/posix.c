@@ -61,7 +61,14 @@
    AmiKit's 512 MB of Zorro III RAM sits 1 GB into it). */
 #define MAP_ALIGN (64 * 1024)
 
-#define MAX_MAPPINGS 256
+/* Amiberry's JIT takes a 16K pool for its blocks' records each time the
+   last is full, and never gives one back while it runs: a Workbench
+   opening its Shell went past 256 mappings, and the JIT stopped ("Could
+   not allocate block pool!") with the Amiga. Small mappings are aligned
+   to a page only (else each 16K pool took 80K). */
+#define MAX_MAPPINGS 4096
+#define PAGE_ALIGN 4096
+#define MAP_ALIGN_FOR(length) ((length) >= MAP_ALIGN ? (size_t) MAP_ALIGN : (size_t) PAGE_ALIGN)
 static struct {
 	void *start;            /* what mmap() returned, aligned; NULL: free */
 	size_t length;
@@ -116,7 +123,7 @@ void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset)
 			errno = ENOMEM;
 			return MAP_FAILED;
 		}
-		mappings[i].block = host_large_alloc(length + MAP_ALIGN);
+		mappings[i].block = host_large_alloc(length + MAP_ALIGN_FOR(length));
 		if (mappings[i].block == NULL) {
 			errno = ENOMEM;
 			return MAP_FAILED;
@@ -124,7 +131,10 @@ void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset)
 		mappings[i].capacity = length;
 		best = i;
 	}
-	p = (void *) (((uintptr_t) mappings[best].block + MAP_ALIGN - 1) & ~(uintptr_t) (MAP_ALIGN - 1));
+	{
+		size_t align = MAP_ALIGN_FOR(mappings[best].capacity);
+		p = (void *) (((uintptr_t) mappings[best].block + align - 1) & ~(uintptr_t) (align - 1));
+	}
 	memset(p, 0, length);
 	mappings[best].start = p;
 	mappings[best].length = length;

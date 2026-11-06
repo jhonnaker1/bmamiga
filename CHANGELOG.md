@@ -10,6 +10,10 @@
   setup's network to the start's command line; Network is now "(reboot)"
   in the menu. In the simulator, a slim Workbench 3.1 with Amelinium
   (from a tester) shows example.com
+- The JIT stopped, and the Amiga with it, once it had compiled enough
+  (opening a Shell on Workbench 3.1, on a Pi 5): it takes a 16K pool for
+  its blocks' records each time the last is full, and the Pi's mmap() had
+  256 mappings. 4096 now, and small ones aligned to 4K, not 64K
 - docs: the JIT's settings; the reason it is in indirect mode
 
 ## 0.2.4 – 2026-11-04
