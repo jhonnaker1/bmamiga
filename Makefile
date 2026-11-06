@@ -72,7 +72,7 @@ INCLUDE := $(CIRCLE_STDLIB_INCLUDES) $(INCLUDE) -I $(CIRCLEHOME)/addon/fatfs
 
 # See src/port/fswrap.c, and posix_memalign(), gettimeofday() and realpath()
 # in src/port/circle/posix.c
-LDFLAGS += --wrap=stat --wrap=free --wrap=gettimeofday --wrap=realpath
+LDFLAGS += --wrap=stat --wrap=readdir --wrap=free --wrap=gettimeofday --wrap=realpath
 
 VERSION_DEFINES = -DBMAMIGA_VERSION=\"$(BMAMIGA_VERSION)\" \
                   -DBMAMIGA_GIT=\"$(BMAMIGA_GIT)\" -DAMIBERRY_VERSION=\"$(AMIBERRY_VERSION)\"

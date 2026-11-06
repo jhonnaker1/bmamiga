@@ -26,10 +26,17 @@
  * kernel is linked with --wrap=stat, so every call to stat() comes here
  * first; the root (and ".") are reported as directories, everything else
  * goes to the real stat().
+ *
+ * readdir() (--wrap=readdir) leaves out the Mac's files: "._" ones (macOS
+ * keeps a file's extended attributes in them on FAT32, and adds one to
+ * files it writes, a Finder copy or not) and .DS_Store. The Amiga saw
+ * DEVS:Monitors/._PAL and tried to run it from its Startup-Sequence; the
+ * menu's file browser listed them too.
  */
 
 #include <string.h>
 #include <sys/stat.h>
+#include <dirent.h>
 
 int __real_stat(const char *path, struct stat *st);
 
@@ -53,4 +60,19 @@ int __wrap_stat(const char *path, struct stat *st)
 		return 0;
 	}
 	return __real_stat(path, st);
+}
+
+struct dirent *__real_readdir(DIR *dir);
+
+static int is_mac_file(const char *name)
+{
+	return (name[0] == '.' && name[1] == '_' && name[2] != '\0') || strcmp(name, ".DS_Store") == 0;
+}
+
+struct dirent *__wrap_readdir(DIR *dir)
+{
+	struct dirent *entry;
+	while ((entry = __real_readdir(dir)) != NULL && is_mac_file(entry->d_name))
+		;
+	return entry;
 }

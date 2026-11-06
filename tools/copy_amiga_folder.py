@@ -113,6 +113,23 @@ def copy_folder(source, dest, dry_run, renamed):
                 os.utime(dst, (st.st_atime, st.st_mtime))
 
 
+def remove_apple_double(folder):
+    removed = 0
+    for path, _, files in os.walk(folder):
+        for name in files:
+            if name.startswith("._"):
+                full = os.path.join(path, name)
+                try:
+                    with open(full, "rb") as f:
+                        magic = f.read(4)
+                    if magic == b"\x00\x05\x16\x07":
+                        os.remove(full)
+                        removed += 1
+                except OSError:
+                    pass
+    return removed
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Copy an Amiga folder onto BMAmiga's SD card, with names safe for FAT32 "
@@ -126,6 +143,14 @@ def main():
         parser.error("%s is not a folder" % args.source)
     renamed = []
     copy_folder(args.source, args.destination, args.dry_run, renamed)
+    if not args.dry_run:
+        # macOS adds an attribute to the files it writes and, on FAT32,
+        # keeps it in a "._" file beside each: the Amiga saw them as files
+        # (DEVS:Monitors/._PAL, run by its Startup-Sequence). Only those
+        # that are AppleDouble files (their magic number) are removed.
+        removed = remove_apple_double(args.destination)
+        if removed:
+            print("%d of the Mac's ._ file(s) removed from the card" % removed)
     for src, new in renamed:
         print("%s -> %s" % (src, new))
     print("%d name(s) changed%s" % (len(renamed), " (nothing copied: --dry-run)" if args.dry_run else ""))

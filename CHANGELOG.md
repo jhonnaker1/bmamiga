@@ -20,6 +20,11 @@
   write-through cache of single sectors; the log says each 10 s how many
   reads the card had, how many the cache, and the time reading. Not yet
   tried on a Pi
+- The Mac's "._" files (macOS keeps a file's extended attributes in one
+  on FAT32, and adds one to files it writes) are left out of directory
+  listings (readdir, wrapped): the Amiga ran DEVS:Monitors/._PAL from its
+  Startup-Sequence. tools/copy_amiga_folder.py removes them from the card
+  after copying
 - docs: the JIT's settings; the reason it is in indirect mode
 
 ## 0.2.4 – 2026-11-04
