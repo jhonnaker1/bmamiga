@@ -1,0 +1,195 @@
+--- a/addon/fatfs/diskio.cpp	2026-11-06 05:46:44
++++ b/addon/fatfs/diskio.cpp	2026-11-06 05:46:44
+@@ -13,6 +13,8 @@
+ #include <circle/device.h>
+ #include <circle/devicenameservice.h>
+ #include <circle/util.h>
++#include <circle/timer.h>
++#include <circle/spinlock.h>
+ #include <circle/types.h>
+ #include <assert.h>
+ 
+@@ -40,9 +42,116 @@
+ 
+ static u8 *s_pBuffer = 0;
+ static unsigned s_nBufferSize = 0;
++
++/* BMAmiga: a cache of single sectors, which is how FatFs reads directories
++   and the FAT (its one sector window). Amiberry's folder drives look names
++   up all the time (each with a .uaem beside it), and each lookup read the
++   same directory's sectors from the card again: Workbench from a folder
++   ran at 3%. Writes go through it (write-through), so it is never stale.
++   4 MB, from the heap when first used (not in the kernel's image). */
++#define CACHE_SECTORS	8192
++struct TCacheLine
++{
++	u64	nKey;		/* sector * FF_VOLUMES + pdrv, + 1 (0 is empty) */
++};
++static TCacheLine *s_pCacheLine = 0;
++static u8 *s_pCacheData = 0;
++static CSpinLock s_CacheLock;
++static u64 s_nReadMicros = 0;
++static unsigned s_nReads = 0, s_nHits = 0, s_nWrites = 0;
++
++static u64 cache_key (BYTE pdrv, LBA_t sector)
++{
++	return (u64) sector * FF_VOLUMES + pdrv + 1;
++}
++
++static unsigned cache_slot (u64 nKey)
++{
++	return (unsigned) ((nKey * 0x9E3779B97F4A7C15ULL) >> 51) % CACHE_SECTORS;
++}
++
++/* Copies the sector out if it is cached. */
++static boolean cache_get (BYTE pdrv, LBA_t sector, BYTE *buff)
++{
++	boolean bHit = FALSE;
++	u64 nKey = cache_key (pdrv, sector);
++	s_CacheLock.Acquire ();
++	if (s_pCacheLine != 0)
++	{
++		unsigned nSlot = cache_slot (nKey);
++		if (s_pCacheLine[nSlot].nKey == nKey)
++		{
++			memcpy (buff, s_pCacheData + (size_t) nSlot * SECTOR_SIZE, SECTOR_SIZE);
++			bHit = TRUE;
++		}
++	}
++	s_CacheLock.Release ();
++	return bHit;
++}
++
++/* Keeps a sector read (ALWAYS) or written (only if it is cached already). */
++static void cache_put (BYTE pdrv, LBA_t sector, const BYTE *buff, boolean bAlways)
++{
++	u64 nKey = cache_key (pdrv, sector);
++	s_CacheLock.Acquire ();
++	if (s_pCacheLine == 0 && bAlways)
++	{
++		s_pCacheLine = new TCacheLine[CACHE_SECTORS];
++		s_pCacheData = new u8[(size_t) CACHE_SECTORS * SECTOR_SIZE];
++		if (s_pCacheLine == 0 || s_pCacheData == 0)
++		{
++			delete [] s_pCacheLine;
++			delete [] s_pCacheData;
++			s_pCacheLine = 0;
++			s_pCacheData = 0;
++		}
++		else
++		{
++			memset (s_pCacheLine, 0, sizeof (TCacheLine) * CACHE_SECTORS);
++		}
++	}
++	if (s_pCacheLine != 0)
++	{
++		unsigned nSlot = cache_slot (nKey);
++		if (bAlways || s_pCacheLine[nSlot].nKey == nKey)
++		{
++			memcpy (s_pCacheData + (size_t) nSlot * SECTOR_SIZE, buff, SECTOR_SIZE);
++			s_pCacheLine[nSlot].nKey = nKey;
++		}
++	}
++	s_CacheLock.Release ();
++}
+ 
++/* A drive gone or (re)initialised: its sectors are forgotten. */
++static void cache_forget (BYTE pdrv)
++{
++	s_CacheLock.Acquire ();
++	if (s_pCacheLine != 0)
++	{
++		for (unsigned i = 0; i < CACHE_SECTORS; i++)
++		{
++			if (s_pCacheLine[i].nKey != 0 && (s_pCacheLine[i].nKey - 1) % FF_VOLUMES == pdrv)
++			{
++				s_pCacheLine[i].nKey = 0;
++			}
++		}
++	}
++	s_CacheLock.Release ();
++}
+ 
++/* For BMAmiga's log: the card's reads (all, and from the cache), the time
++   spent reading from it, and writes, since the start. */
++extern "C" void fatfs_disk_stats (unsigned *pReads, unsigned *pHits, unsigned long long *pReadMicros,
++				  unsigned *pWrites)
++{
++	*pReads = s_nReads;
++	*pHits = s_nHits;
++	*pReadMicros = s_nReadMicros;
++	*pWrites = s_nWrites;
++}
+ 
++
++
+ /*-----------------------------------------------------------------------*/
+ /* Callbacks                                                             */
+ /*-----------------------------------------------------------------------*/
+@@ -52,7 +161,9 @@
+ 	void *pContext
+ )
+ {
+-	*((CDevice **) pContext) = 0;
++	CDevice **ppVolume = (CDevice **) pContext;
++	*ppVolume = 0;
++	cache_forget ((BYTE) (ppVolume - s_pVolume));
+ }
+ 
+ 
+@@ -89,6 +200,7 @@
+ 		return STA_NOINIT;
+ 	}
+ 
++	cache_forget (pdrv);
+ 	s_pVolume[pdrv] = CDeviceNameService::Get ()->GetDevice (s_pVolumeName[pdrv], TRUE);
+ 	if (s_pVolume[pdrv] != 0)
+ 	{
+@@ -124,6 +236,14 @@
+ 		return RES_NOTRDY;
+ 	}
+ 
++	s_nReads++;
++	if (count == 1 && cache_get (pdrv, sector, buff))
++	{
++		s_nHits++;
++		return RES_OK;
++	}
++	u64 nStart = CTimer::GetClockTicks64 ();
++
+ 	/* Ensure that the transfer buffer is word aligned */
+ 	BYTE *pBuffer = buff;
+ 	unsigned nSize = count * SECTOR_SIZE;
+@@ -156,6 +276,12 @@
+ 		memcpy (buff, pBuffer, nSize);
+ 	}
+ 
++	s_nReadMicros += CTimer::GetClockTicks64 () - nStart;
++	if (count == 1)
++	{
++		cache_put (pdrv, sector, buff, TRUE);
++	}
++
+ 	return RES_OK;
+ }
+ 
+@@ -209,11 +335,19 @@
+ 	offset *= SECTOR_SIZE;
+ 	pDevice->Seek (offset);
+ 
++	s_nWrites++;
+ 	if (pDevice->Write (pBuffer, nSize) < 0)
+ 	{
++		/* What the card has now is unknown. */
++		cache_forget (pdrv);
+ 		return RES_ERROR;
+ 	}
+ 
++	for (UINT i = 0; i < count; i++)
++	{
++		cache_put (pdrv, sector + i, buff + (size_t) i * SECTOR_SIZE, FALSE);
++	}
++
+ 	return RES_OK;
+ }
+ 

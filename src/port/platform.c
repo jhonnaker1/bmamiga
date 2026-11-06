@@ -50,6 +50,9 @@ int bmamiga_core_insert_floppy(int drive, const char *path);
 void bmamiga_core_eject_floppy(int drive);
 void bmamiga_core_set_floppy_speed(int speed);
 uint32_t bmamiga_core_peek_long(uint32_t addr);
+/* circle_fatfs_sectorcache_patch.diff's counters (none in the simulator). */
+void fatfs_disk_stats(unsigned *reads, unsigned *hits, unsigned long long *read_us, unsigned *writes)
+	__attribute__((weak));
 int bmamiga_core_set_config(const char *lines);
 int bmamiga_core_set_hard_drives(const char *const paths[4], const char *const names[4]);
 void bmamiga_core_set_cd(const char *path, int builtin);
@@ -1240,6 +1243,23 @@ static void report_speed(double now)
 	    speed_frames * 100.0 / (span * bmamiga_core_frame_rate()), speed_frames, span,
 	    mhz, celsius, speed_amiga * 100.0 / span, tasks * 100.0 / span,
 	    log * 100.0 / span, picture * 100.0 / span, warp ? " (warp)" : "");
+	/* The card's reads in the last 10 s (circle_fatfs_sectorcache_patch.diff;
+	   not in the PC simulator): how many, how many the cache had, and the
+	   time spent reading the card, when there were any. */
+	if (fatfs_disk_stats != NULL) {
+		static unsigned last_reads, last_hits, last_writes;
+		static unsigned long long last_us;
+		unsigned reads, hits, writes;
+		unsigned long long us;
+		fatfs_disk_stats(&reads, &hits, &us, &writes);
+		if (reads != last_reads || writes != last_writes)
+			LOG("card: %u reads (%u cached), %.1f s reading, %u writes\n",
+			    reads - last_reads, hits - last_hits, (us - last_us) / 1e6, writes - last_writes);
+		last_reads = reads;
+		last_hits = hits;
+		last_us = us;
+		last_writes = writes;
+	}
 	/* bench=1: tools/bench's floppy counts its loops at $F0; how many a
 	   second, to compare the CPU's speed with and without the JIT. */
 	if (option_on("bench", FALSE)) {

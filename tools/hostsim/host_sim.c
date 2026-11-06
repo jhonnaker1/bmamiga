@@ -1105,3 +1105,11 @@ int main(void)
 	bmamiga_main();
 	return 0;
 }
+
+/* The Pi's FatFs disk counters (circle_fatfs_sectorcache_patch.diff):
+   none here, so the log has no "card:" line. */
+void fatfs_disk_stats(unsigned *reads, unsigned *hits, unsigned long long *read_us, unsigned *writes)
+{
+	*reads = *hits = *writes = 0;
+	*read_us = 0;
+}

@@ -14,6 +14,12 @@
   (opening a Shell on Workbench 3.1, on a Pi 5): it takes a 16K pool for
   its blocks' records each time the last is full, and the Pi's mmap() had
   256 mappings. 4096 now, and small ones aligned to 4K, not 64K
+- A folder as a hard drive (Workbench from a folder) ran at 3% on the Pi,
+  with 12 s stops: FatFs has no cache, and Amiberry's folder drives look
+  names up all the time. circle_fatfs_sectorcache_patch.diff: a 4 MB
+  write-through cache of single sectors; the log says each 10 s how many
+  reads the card had, how many the cache, and the time reading. Not yet
+  tried on a Pi
 - docs: the JIT's settings; the reason it is in indirect mode
 
 ## 0.2.4 – 2026-11-04
