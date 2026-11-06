@@ -679,6 +679,14 @@ static const struct {
 	{"Fast RAM", "fast_ram",
 	 (const char *const[]){"Model's", "None", "1M", "2M", "4M", "8M", NULL},
 	 (const char *const[]){"", "0", "1", "2", "4", "8", NULL}, TRUE},
+	/* Above 16 MB: the CPU then addresses 32 bits (a 68020 or later). */
+	{"Zorro III RAM", "z3_ram",
+	 (const char *const[]){"None", "16M", "32M", "64M", "128M", "256M", NULL},
+	 (const char *const[]){"", "16", "32", "64", "128", "256", NULL}, TRUE},
+	/* Picasso96's uaegfx card (Picasso96 on the Amiga's disk), Zorro III. */
+	{"RTG Card", "rtg",
+	 (const char *const[]){"None", "8M", "16M", "32M", "64M", NULL},
+	 (const char *const[]){"", "8", "16", "32", "64", NULL}, TRUE},
 	{"Sound Filter", "sound_filter",
 	 (const char *const[]){"Model's", "Off", "Emulated", "On", NULL},
 	 (const char *const[]){"", "off", "emulated", "on", NULL}, FALSE},

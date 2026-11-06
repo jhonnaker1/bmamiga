@@ -32,6 +32,10 @@
   showed nothing. bmnet takes BSD's from the Amiga's sockets (and its
   MSG_PEEK) and gives BSD's AF_INET back in their addresses and host
   entries
+- Amiga Setup: Zorro III RAM (16 to 256 MB, z3_ram) and an RTG card
+  (Picasso96's uaegfx on Zorro III, 8 to 64 MB, rtg); either turns on the
+  CPU's 32-bit addressing. Amelinium with JavaScript needs more than 8 MB
+  (on a Pi 5 with 64 MB of Zorro III RAM it shows frogfind.de)
 - docs: the JIT's settings; the reason it is in indirect mode
 
 ## 0.2.4 – 2026-11-04

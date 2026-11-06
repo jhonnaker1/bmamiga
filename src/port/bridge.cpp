@@ -211,7 +211,8 @@ static struct {
 	int cpu_model, fpu_model, m68k_speed;
 	bool address_space_24, cpu_cycle_exact, cpu_memory_cycle_exact, blitter_cycle_exact;
 	unsigned int chipset_mask;
-	uae_u32 chipmem, bogomem, fastmem;
+	uae_u32 chipmem, bogomem, fastmem, z3fastmem, rtgmem;
+	int rtgtype;
 	int sound_filter, sound_stereo_separation;
 	int cachesize, comptrustbyte, comptrustword, comptrustlong, comptrustnaddr;
 	bool cpu_compatible;
@@ -232,6 +233,9 @@ static void take_preset(void)
 	preset.chipmem = changed_prefs.chipmem.size;
 	preset.bogomem = changed_prefs.bogomem.size;
 	preset.fastmem = changed_prefs.fastmem[0].size;
+	preset.z3fastmem = changed_prefs.z3fastmem[0].size;
+	preset.rtgmem = changed_prefs.rtgboards[0].rtgmem_size;
+	preset.rtgtype = changed_prefs.rtgboards[0].rtgmem_type;
 	preset.sound_filter = changed_prefs.sound_filter;
 	preset.sound_stereo_separation = changed_prefs.sound_stereo_separation;
 	preset.cachesize = changed_prefs.cachesize;
@@ -256,6 +260,9 @@ static void put_back_preset(void)
 	changed_prefs.chipmem.size = preset.chipmem;
 	changed_prefs.bogomem.size = preset.bogomem;
 	changed_prefs.fastmem[0].size = preset.fastmem;
+	changed_prefs.z3fastmem[0].size = preset.z3fastmem;
+	changed_prefs.rtgboards[0].rtgmem_size = preset.rtgmem;
+	changed_prefs.rtgboards[0].rtgmem_type = preset.rtgtype;
 	changed_prefs.sound_filter = preset.sound_filter;
 	changed_prefs.sound_stereo_separation = preset.sound_stereo_separation;
 	/* The network: no model has one (the start's options may have, see

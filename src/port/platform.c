@@ -669,6 +669,7 @@ static void setup_lines(char *out, size_t size)
 		{"chip_ram", "chipmem_size=%d\n", 512},   /* KB, in 512K */
 		{"slow_ram", "bogomem_size=%d\n", 256},   /* KB, in 256K */
 		{"fast_ram", "fastmem_size=%d\n", 1},     /* MB */
+		{"z3_ram", "z3mem_size=%d\n", 1},         /* MB */
 		{"stereo_separation", "sound_stereo_separation=%d\n", 1},   /* 0-10 */
 	};
 	static const struct {
@@ -694,6 +695,17 @@ static void setup_lines(char *out, size_t size)
 		const char *value = host_option(numbers[i].key, "");
 		if (value[0] != '\0')
 			ADD(numbers[i].format, atoi(value) / numbers[i].divide);
+	}
+	/* Zorro III RAM and an RTG card (Picasso96's uaegfx, on Zorro III):
+	   both are above the 24 bits' 16 MB, so the CPU (a 68020 or later)
+	   addresses 32 bits. Picasso96 must be on the Amiga's disk (uaegfx in
+	   DEVS:Monitors) for the card to show anything. */
+	{
+		const char *rtg = host_option("rtg", "");
+		if (rtg[0] != '\0')
+			ADD("gfxcard_type=ZorroIII\ngfxcard_size=%d\n", atoi(rtg));
+		if (rtg[0] != '\0' || atoi(host_option("z3_ram", "0")) > 0)
+			ADD("cpu_24bit_addressing=false\n");
 	}
 	/* The Amiga's network, through the Pi's (src/port/bmnet.c): Amiberry's
 	   bsdsocket.library, for programs without a TCP/IP stack on the Amiga

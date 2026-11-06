@@ -78,10 +78,23 @@ what the chosen model has, and choosing anything else is kept in
 | Chip RAM          | 512K, 1M, 2M | `chip_ram` (in KB) |
 | Slow RAM          | none, 512K, 1M, 1.5M, 1.8M | `slow_ram` (in KB) |
 | Fast RAM          | none, 1M, 2M, 4M, 8M | `fast_ram` (in MB) |
+| Zorro III RAM     | none, 16M, 32M, 64M, 128M, 256M: more fast RAM, above the 24-bit 16 MB (see below) | `z3_ram` (in MB) |
+| RTG Card          | none, 8M, 16M, 32M, 64M: Picasso96's `uaegfx` graphics card, on Zorro III (see below) | `rtg` (in MB) |
 | Sound Filter      | off, emulated, on (the Amiga's low-pass filter) | `sound_filter` |
 | Stereo Separation | mono, 30%, 50%, 70%, 100% | `stereo_separation` (0 to 10) |
 | Network (reboot)  | none, bsdsocket.library, uaenet.device, an A2065 card (see The Amiga's network); from BMAmiga's next start, which the menu offers | `amiga_network` (`bsdsocket`, `uaenet`, `a2065`) |
 | JIT (68020+)      | off, on: Amiberry's JIT compiler, which turns the Amiga's code into the Pi's (see below) | `jit` (`on`) |
+
+**Zorro III RAM and the RTG card** sit above the first 16 MB of the
+Amiga's addresses, so either one makes the CPU address 32 bits; both need
+a 68020 or later CPU (*CPU*, or a model that has one). Zorro III RAM is
+for programs that need more than the 8 MB *Fast RAM* gives: Amelinium
+with JavaScript, for one, says "not enough memory available" with 8 MB and
+runs with 64 MB. The RTG card is Picasso96's `uaegfx`, for Workbench
+screens bigger and with more colours than the AGA chipset's: Picasso96
+must be installed on the Amiga's disk (`uaegfx` in `DEVS:Monitors`), and
+a `uaegfx` mode chosen in Prefs/ScreenMode; without a card, a Workbench
+that loads `uaegfx` can't open its screen there.
 
 **The JIT** makes a 68020 or later CPU much faster (several times, more on
 code that works in its registers than on code that works in memory), for
@@ -388,7 +401,7 @@ the web UI.
 | Option              | Values                       | Default  | What it does |
 |---------------------|------------------------------|----------|--------------|
 | `model`             | `A500`, `A500OG`, `A500+`, `A600`, `A1200OG`, `A1200`, `A4030`, `A4040`, `CD32`, `CDTV` | `A500` | The Amiga to emulate (the menu's *Model*) |
-| `kickstart`, `cpu`, `cpu_speed`, `chipset`, `chip_ram`, `slow_ram`, `fast_ram`, `sound_filter`, `stereo_separation`, `amiga_network` | see Amiga Setup | the model's | The menu's Amiga Setup |
+| `kickstart`, `cpu`, `cpu_speed`, `chipset`, `chip_ram`, `slow_ram`, `fast_ram`, `z3_ram`, `rtg`, `sound_filter`, `stereo_separation`, `amiga_network` | see Amiga Setup | the model's | The menu's Amiga Setup |
 | `df0` ... `df3`     | paths                        | none     | The floppy images in the drives (the menu's *Floppy Drives*) |
 | `dh0` ... `dh3`     | paths                        | none     | The hard drives: hard disk images or folders (the menu's *Hard Drives and CD*) |
 | `cd0`               | path                         | none     | The CD image in the CD drive |

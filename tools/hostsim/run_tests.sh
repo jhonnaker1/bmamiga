@@ -257,6 +257,20 @@ check_log cd32 "CD32: media changed = 1" "the disc in the CD32's drive after it"
 check_log cd32 "start with bsdsocket_emu=true" "the setup's network given to Amiberry's start"
 check_log cd32 "bsdsocket.library installed" "bsdsocket.library in the UAE Boot ROM"
 
+echo "Zorro III RAM and an RTG card"
+# Amiga Setup's Zorro III RAM and RTG card: both above 16 MB, so the CPU
+# addresses 32 bits; from the setup's hard reset.
+mkdir -p "$OUT/z3rtg"
+printf 'model=A1200\ncpu=68020\nz3_ram=64\nrtg=16\n' > "$OUT/z3rtg/bmamiga.cfg"
+run z3rtg 50 "$OUT/aros" "" '400 quit\n'
+check_log z3rtg "Z3 0x[0-9A-F]+ +64M RAM" "64 MB of Zorro III RAM"
+check_log z3rtg "16M.*RTG RAM|RTG RAM.*16M|Z3 0x[0-9A-F]+ +16M IO +RTG" "a 16 MB RTG card"
+if grep -a "CPU=68020" "$OUT/z3rtg/log.txt" | tail -1 | grep -q "24-bit"; then
+    fail z3rtg "still 24-bit addressing after the setup's hard reset (see out/z3rtg/log.txt)"
+else
+    pass "z3rtg: 32-bit addressing after the setup's hard reset"
+fi
+
 echo "JIT"
 # Amiga Setup's JIT on an A1200 with a 68020: Amiberry's JIT, indirect, with
 # its 16 MB cache, from the setup's hard reset; the same picture as without.
