@@ -251,6 +251,11 @@ printf 'model=CD32\namiga_network=bsdsocket\ncd0=disks/test.iso\n' > "$OUT/cd32/
 run cd32 50 "$OUT/aros" "" '300 quit\n'
 check_log cd32 "hardreset" "the setup's hard reset"
 check_log cd32 "CD32: media changed = 1" "the disc in the CD32's drive after it"
+# Amiberry puts bsdsocket.library in the UAE Boot ROM only as it starts, so
+# the setup's network must be on its command line (0.2.4's Amiga had no
+# TCP stack).
+check_log cd32 "start with bsdsocket_emu=true" "the setup's network given to Amiberry's start"
+check_log cd32 "bsdsocket.library installed" "bsdsocket.library in the UAE Boot ROM"
 
 echo "JIT"
 # Amiga Setup's JIT on an A1200 with a 68020: Amiberry's JIT, indirect, with
