@@ -36,6 +36,11 @@
   (Picasso96's uaegfx on Zorro III, 8 to 64 MB, rtg); either turns on the
   CPU's 32-bit addressing. Amelinium with JavaScript needs more than 8 MB
   (on a Pi 5 with 64 MB of Zorro III RAM it shows frogfind.de)
+- Folder drives answered every ACTION_INFO and ACTION_DISK_INFO (Workbench's
+  titles, Info, a program asking for free space) with an error on the Pi:
+  circle-newlib's statvfs() is a stub that fails without setting errno
+  (the log's "Unimplemented error Bad file number", errno left over).
+  statvfs() is wrapped and gives FatFs's free space
 - docs: the JIT's settings; the reason it is in indirect mode
 
 ## 0.2.4 – 2026-11-04

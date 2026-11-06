@@ -228,13 +228,13 @@ check_log setup "CPU=68020" "the 68020 from the CPU setting"
 check_log setup "2048K/[0-9]+ = +2048K .*Chip memory" "2M of chip RAM"
 check_log setup "Fast memory" "fast RAM from bmamiga.uae"
 # The menu: down to Amiga Setup (past Floppy Drives, Hard Drives and CD,
-# Model), Enter, down to Sound Filter (past Kickstart and six more), Enter,
+# Model), Enter, down to Sound Filter (past Kickstart and eight more), Enter,
 # down to Off, Enter.
 script='200 key 0x45 1\n201 key 0x45 0\n'
 f=220
 for i in 1 2 3; do script="$script$f key 0x51 1\n$((f + 1)) key 0x51 0\n"; f=$((f + 10)); done
 script="$script$f key 0x28 1\n$((f + 1)) key 0x28 0\n"; f=$((f + 20))
-for i in 1 2 3 4 5 6 7; do script="$script$f key 0x51 1\n$((f + 1)) key 0x51 0\n"; f=$((f + 10)); done
+for i in 1 2 3 4 5 6 7 8 9; do script="$script$f key 0x51 1\n$((f + 1)) key 0x51 0\n"; f=$((f + 10)); done
 script="$script$f key 0x28 1\n$((f + 1)) key 0x28 0\n"; f=$((f + 20))
 script="$script$f key 0x51 1\n$((f + 1)) key 0x51 0\n"; f=$((f + 10))
 script="$script$f key 0x28 1\n$((f + 1)) key 0x28 0\n$((f + 30)) quit\n"
