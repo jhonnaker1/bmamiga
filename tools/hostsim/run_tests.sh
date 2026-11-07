@@ -200,6 +200,16 @@ echo "Gamepad"
 # whose joystick is the one in the Amiga's port 2.
 run gamepad 50 "$OUT/aros" "" '200 pad 0 1\n210 pad 0 0\n300 quit\n'
 check_log gamepad "input p1 b down" "fire reaches the joystick in port 2"
+# A pad with an analog stick at rest (its position runs 0 to 65535, the
+# centre 32767) holds no direction; its D-pad's down still reaches the
+# joystick, once (frames 260 to 270).
+run stick 50 "$OUT/aros" "" '200 axis 0 32767 32767\n201 pad 0 0\n260 pad 0 0x2000\n270 pad 0 0\n300 quit\n'
+if [ "$(grep -c 'input p1 dpad_down down' "$OUT/stick/log.txt")" = 1 ] && \
+   ! grep -q 'input p1 dpad_right down' "$OUT/stick/log.txt"; then
+    pass "stick: a stick at rest holds no direction, the D-pad still works"
+else
+    fail stick "a stick at rest holds a direction (see out/stick/log.txt)"
+fi
 
 echo "Hard drives and CD"
 # A folder as DH0: and an ISO in the CD drive (uaescsi.device, which

@@ -61,6 +61,22 @@ void bmamiga_clock_frame(int display_paces, double period)
 	frame_paced = display_paces;
 }
 
+/* Paced by the display, Amiberry's own wait for the end of its frame (the
+   main thread's sleeps) passes on its clock, not the Pi's: the display's
+   wait is the only one. Slept for real, it took whatever a frame was quicker
+   than the slowest so far, kept that from then on (its next frame is due one
+   frame after its last wait, and its time moves on one frame per frame
+   shown), and the 0.03 ms a frame between a 50.08/49.92 Hz Amiga and the
+   display added up, until each frame missed its refresh and waited for the
+   next: half speed (a Pi 500 at 50 Hz, 2026-11-07). */
+static int frame_sleep(double us)
+{
+	if (!frame_paced)
+		return 0;
+	offset += us / 1e6;
+	return 1;
+}
+
 static int is_monotonic(clockid_t id)
 {
 	if (id == CLOCK_MONOTONIC)
@@ -122,6 +138,8 @@ int bma_nanosleep(const struct timespec *req, struct timespec *rem)
 	if (bma_threads_sleep(us / 1e6))
 		return 0;
 	bma_threads_yield();
+	if (frame_sleep(us))
+		return 0;
 	bmamiga_clock_slept += us / 1e6;
 	host_sleep_us(us > 4e9 ? 4000000000u : (unsigned) us);
 	return 0;
@@ -132,6 +150,8 @@ int bma_usleep(useconds_t us)
 	if (bma_threads_sleep(us / 1e6))
 		return 0;
 	bma_threads_yield();
+	if (frame_sleep(us))
+		return 0;
 	bmamiga_clock_slept += us / 1e6;
 	host_sleep_us((unsigned) us);
 	return 0;
