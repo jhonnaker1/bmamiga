@@ -482,18 +482,29 @@ static void feed_silence(void)
 }
 
 /* Sound from the core, stereo. The Amiga runs at the display's pace or a
-   timer's, never quite the sound output's, so the buffer is kept about
-   half full: a sample dropped when it's getting full, and when it runs dry
-   (the Amiga starting, or a Pi too slow for it) the batch stretched by up
-   to twice its length, lower in pitch, rather than leaving gaps (as in
-   BMCoco). */
+   timer's, never quite the sound output's, so the buffer drifts. It is
+   kept about half full by dynamic rate control (as RetroArch does): the
+   sound is resampled all the time, by linear interpolation carried from
+   batch to batch, at a rate a little over or under the core's, by up to
+   0.5% (inaudible) as the buffer is under or over half full; 2% when it
+   is nearly dry or full (the Amiga starting, or a Pi too slow for it).
+   Dropping a sample when the buffer got full and stretching a whole batch
+   when it ran low, as before, made pings and blips in the music. */
 #define AO_MAX 4096
+#define AO_OUT_MAX (AO_MAX * 2 + 16)
+
+static double ao_phase;           /* next output's position, in input frames from the batch's start */
+static int16_t ao_last[2];        /* the previous batch's last frame (position -1) */
+static double ao_ratio_sum;       /* for the log: the rate adjustments, */
+static unsigned ao_ratio_count;   /* how many, */
+static unsigned ao_fill_min = ~0u, ao_fill_max;   /* and the buffer's lowest and highest, in % */
 
 static size_t core_audio_batch(const int16_t *data, size_t frames)
 {
-	static int16_t buf[AO_MAX * 2 * 2 + 2];
-	unsigned free_frames, used, n = (unsigned) frames, i;
+	static int16_t buf[AO_OUT_MAX * 2];
+	unsigned free_frames, used, n = (unsigned) frames, out = 0, c;
 	int v = bmamiga_volume();
+	double error, ratio, step, p;
 	if (ao_open == 0 || frames == 0)
 		return frames;
 	audio_this_frame += (unsigned) frames;
@@ -501,34 +512,59 @@ static size_t core_audio_batch(const int16_t *data, size_t frames)
 		n = AO_MAX;
 	free_frames = host_sound_free_frames();
 	used = free_frames < ao_latency ? ao_latency - free_frames : 0;
-	if (!warp && used < ao_latency / 4 && n > 1) {
-		unsigned quarter = ao_latency / 4;
-		unsigned want = n + 1 + n * (quarter - used) / quarter;
-		if (want > AO_MAX * 2)
-			want = AO_MAX * 2;
-		for (i = 0; i < want; i++) {
-			/* Linear interpolation, in 16.16 fixed point. */
-			uint32_t pos = (uint32_t) (((uint64_t) i * (n - 1) << 16) / (want - 1));
-			unsigned j = pos >> 16, c;
-			int frac = (int) (pos & 0xffff);
-			for (c = 0; c < 2; c++) {
-				int a = data[j * 2 + c];
-				int b = j + 1 < n ? data[(j + 1) * 2 + c] : a;
-				buf[i * 2 + c] = (int16_t) ((a + (((b - a) * frac) >> 16)) * v / 100);
-			}
-		}
-		n = want;
-	} else {
-		for (i = 0; i < n * 2; i++)
-			buf[i] = (int16_t) (data[i] * v / 100);
-		if (!warp && used > (ao_latency * 3) / 4 && n > 1)
-			n--;   /* getting full: one sample less */
+	if (ao_latency > 0) {
+		unsigned fill = used * 100 / ao_latency;
+		if (fill < ao_fill_min)
+			ao_fill_min = fill;
+		if (fill > ao_fill_max)
+			ao_fill_max = fill;
 	}
-	if (n > free_frames)
-		n = free_frames;
-	if (n > 0)
-		host_sound_write(buf, n);
+	/* Output frames per input frame: over 1 when the buffer is under half. */
+	error = ao_latency > 0 ? ((double) ao_latency / 2 - used) / ((double) ao_latency / 2) : 0.0;
+	if (error > 1.0)
+		error = 1.0;
+	if (error < -1.0)
+		error = -1.0;
+	ratio = 1.0 + error * (error > 0.75 || error < -0.75 ? 0.02 : 0.005);
+	if (warp)
+		ratio = 1.0;
+	ao_ratio_sum += ratio;
+	ao_ratio_count++;
+	step = 1.0 / ratio;
+	/* Input positions -1 (the last batch's last frame) to n - 1. */
+	for (p = ao_phase; p <= (double) (n - 1) && out < AO_OUT_MAX; p += step, out++) {
+		int j = (int) (p < 0.0 ? -1 : p);
+		double frac = p - j;
+		for (c = 0; c < 2; c++) {
+			int a = j < 0 ? ao_last[c] : data[j * 2 + c];
+			int b = data[(j + 1 < (int) n ? j + 1 : (int) n - 1) * 2 + c];
+			buf[out * 2 + c] = (int16_t) ((a + (b - a) * frac) * v / 100);
+		}
+	}
+	ao_phase = p - n;   /* from -1 up: carried into the next batch */
+	if (ao_phase < -1.0)
+		ao_phase = -1.0;
+	ao_last[0] = data[(n - 1) * 2];
+	ao_last[1] = data[(n - 1) * 2 + 1];
+	if (out > free_frames)
+		out = free_frames;
+	if (out > 0)
+		host_sound_write(buf, out);
 	return frames;
+}
+
+/* For the log every 10 s: how full the sound buffer stayed and the
+   average rate adjustment; then started again. */
+static void sound_report(void)
+{
+	if (ao_open == 0 || ao_ratio_count == 0)
+		return;
+	LOG("sound: buffer %u%% to %u%% full, rate %+.2f%%\n", ao_fill_min, ao_fill_max,
+	    (ao_ratio_sum / ao_ratio_count - 1.0) * 100.0);
+	ao_ratio_sum = 0.0;
+	ao_ratio_count = 0;
+	ao_fill_min = ~0u;
+	ao_fill_max = 0;
 }
 
 static void core_audio_sample(int16_t left, int16_t right)
@@ -1338,6 +1374,7 @@ static void report_speed(double now)
 		last_us = us;
 		last_writes = writes;
 	}
+	sound_report();
 	/* bench=1: tools/bench's floppy counts its loops at $F0; how many a
 	   second, to compare the CPU's speed with and without the JIT. */
 	if (option_on("bench", FALSE)) {
