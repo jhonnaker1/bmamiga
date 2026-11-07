@@ -10,14 +10,16 @@
  *    nothing; munmap() frees a whole mapping. posix_memalign() with
  *    more than Circle's memalign() can align (see below), with free()
  *    wrapped (--wrap=free) to give the right block back.
- *  - Files: access(), pread(), pwrite(), realpath() (wrapped); chmod()
- *    and chown() do nothing (FAT has no owners and no modes).
+ *  - Files: access(), pread(), pwrite(), realpath() (wrapped); chmod(),
+ *    chown(), fchown() and utime() do nothing (FAT has no owners and no
+ *    modes, and nothing on the Pi needs a file's time set).
  *  - Text: iconv() between UTF-8 and ISO-8859-1, the conversion Amiberry
  *    uses for the Amiga's file names (osdep/amiberry_filesys.cpp).
  *  - timegm(); gettimeofday() before Circle's timer exists (wrapped).
  *  - What there is none of, which fails: processes (popen(), execvp(),
  *    forkpty(), waitpid()), shared libraries (dlopen()), shared memory,
- *    terminals, signals (sigaction() does nothing), ioctl().
+ *    terminals, signals (sigaction() does nothing), ioctl(), the host's
+ *    network interfaces (getifaddrs()).
  *  - inet_addr(), inet_aton(), inet_ntoa(), gethostname(), getuid().
  *
  * This file is part of BMAmiga, a bare metal Amiga emulator for the
@@ -28,6 +30,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <iconv.h>
+#include <ifaddrs.h>
 #include <limits.h>
 #include <pty.h>
 #include <signal.h>
@@ -39,6 +42,7 @@
 #include <termios.h>
 #include <time.h>
 #include <unistd.h>
+#include <utime.h>
 #include <arpa/inet.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
@@ -273,6 +277,18 @@ int chmod(const char *path, mode_t mode)
 int chown(const char *path, uid_t owner, gid_t group)
 {
 	(void) path; (void) owner; (void) group;
+	return 0;
+}
+
+int fchown(int fd, uid_t owner, gid_t group)
+{
+	(void) fd; (void) owner; (void) group;
+	return 0;
+}
+
+int utime(const char *path, const struct utimbuf *times)
+{
+	(void) path; (void) times;
 	return 0;
 }
 
@@ -582,6 +598,18 @@ int openpty(int *amaster, int *aslave, char *name, const struct termios *termp, 
 	(void) amaster; (void) aslave; (void) name; (void) termp; (void) winp;
 	errno = ENOSYS;
 	return -1;
+}
+
+int getifaddrs(struct ifaddrs **ifap)
+{
+	*ifap = NULL;
+	errno = ENOSYS;
+	return -1;
+}
+
+void freeifaddrs(struct ifaddrs *ifa)
+{
+	(void) ifa;
 }
 
 void *dlopen(const char *file, int mode)

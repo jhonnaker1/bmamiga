@@ -1,6 +1,6 @@
 /*
  * bma_circle.h - included before each of Amiberry's files when it is built
- * for the Pi (-include, see src/port/amiberry.mk), so that Amiberry builds
+ * for the Pi (-include, see src/port/circle/circle.mk), so that Amiberry builds
  * unmodified with newlib and the toolchain's libstdc++, which have no
  * threads and lack some Linux names.
  *
@@ -12,11 +12,12 @@
  *  - struct tm's tm_gmtoff, which newlib's hasn't: read as 0 (UTC; the
  *    Pi's clock is UTC).
  *
- * C++: std::mutex and std::condition_variable, which libstdc++ only has with
- * threads (_GLIBCXX_HAS_GTHREADS); BMAmiga's cooperative threads
- * (src/port/circle/threads.c) do the waiting. std::thread can't be given
- * a way to start (libstdc++ defines the class): the two files that start
- * one are replaced (src/port/circle/osdsync.cpp, zz9000_media.cpp).
+ * C++: std::mutex, std::recursive_mutex and std::condition_variable, which
+ * libstdc++ only has with threads (_GLIBCXX_HAS_GTHREADS); BMAmiga's
+ * cooperative threads (src/port/circle/threads.c) do the waiting.
+ * std::thread can't be given
+ * a way to start (libstdc++ defines the class), so Amiberry is built
+ * with NO_STD_THREAD=1 (CHD's work queues run their work at once).
  *
  * This file is part of BMAmiga, a bare metal Amiga emulator for the
  * Raspberry Pi. See LICENSE for licensing details.
@@ -129,6 +130,21 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     ~mutex() { bma_object_forget(this); }
     mutex(const mutex &) = delete;
     mutex &operator=(const mutex &) = delete;
+    void lock() { bma_object_lock(this); }
+    bool try_lock() noexcept { return bma_object_trylock(this) != 0; }
+    void unlock() { bma_object_unlock(this); }
+  private:
+    char _M_unused = 0;
+  };
+
+  /* BMAmiga's locks are recursive already (src/port/circle/threads.c). */
+  class recursive_mutex
+  {
+  public:
+    recursive_mutex() noexcept = default;
+    ~recursive_mutex() { bma_object_forget(this); }
+    recursive_mutex(const recursive_mutex &) = delete;
+    recursive_mutex &operator=(const recursive_mutex &) = delete;
     void lock() { bma_object_lock(this); }
     bool try_lock() noexcept { return bma_object_trylock(this) != 0; }
     void unlock() { bma_object_unlock(this); }
