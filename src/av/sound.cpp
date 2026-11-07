@@ -109,12 +109,15 @@ bool Pi4Sound::Initialize(CInterruptSystem *pInterrupt, int volume, Output outpu
                "Headphone jack");
 }
 
-unsigned Pi4Sound::Open(int channels, unsigned latency_frames) {
+unsigned Pi4Sound::Open(int channels, unsigned latency_frames, unsigned freq) {
   if (m_pDevice == 0 || !m_pDevice->IsActive()) {
     return 0;
   }
   m_nChannels = channels == 2 ? 2 : 1;
-  m_nLatency = (unsigned)((unsigned long)latency_frames * SAMPLE_RATE / 44100);
+  if (freq < 8000) {
+    freq = 44100;
+  }
+  m_nLatency = (unsigned)((unsigned long)latency_frames * SAMPLE_RATE / freq);
   unsigned max = SAMPLE_RATE * QUEUE_MS / 1000;
   if (m_nLatency > max - CHUNK_SIZE) {
     m_nLatency = max - CHUNK_SIZE;

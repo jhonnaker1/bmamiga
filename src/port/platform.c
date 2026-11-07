@@ -1022,6 +1022,12 @@ static const char *core_option(const char *key)
 	   it by the clock itself (pace_by_clock()). */
 	if (strcmp(key, "amiberry_internal_vsync") == 0)
 		return vsync_lock ? "standard" : "disabled";
+	/* The core's sound at the output's rate: made at 44.1 kHz and played at
+	   the Pi's 48 kHz, 9% of it was missing, and the batches stretched to
+	   fill the gap made the sound throb (a Pi 500 with Indy Heat,
+	   2026-11-07). */
+	if (strcmp(key, "amiberry_audio_rate") == 0)
+		return ao_open == 48000 ? "48000" : ao_open == 44100 ? "44100" : "auto";
 	if (strcmp(key, "amiberry_video_standard") == 0)
 		return host_option("video_standard", "auto");
 	if (strcmp(key, "amiberry_floppy_speed") == 0) {
@@ -1390,6 +1396,9 @@ void bmamiga_main(void)
 	retro_set_input_state(core_input_state);
 	retro_init();
 	set_start_options();
+	/* The sound output's rate (48 kHz on the Pi's HDMI), for the core to
+	   make its sound at (amiberry_audio_rate). */
+	open_sound();
 	if (!retro_load_game(NULL))
 		fatal("Amiberry did not start. The log (see the User Guide) says why.");
 	retro_set_controller_port_device(0, RETRO_DEVICE_MOUSE);

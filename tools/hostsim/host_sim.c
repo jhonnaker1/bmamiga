@@ -297,12 +297,11 @@ static void sound_advance(void)
 unsigned host_sound_open(unsigned freq, int channels, unsigned latency_frames)
 {
 	const char *rate = getenv("BMAMIGA_SIM_RATE");
-	(void) freq;
 	if (rate != NULL && atoi(rate) >= 8000)
 		hw_rate = (unsigned) atoi(rate);
 	snd_open = 1;
 	snd_channels = channels;
-	snd_capacity = (unsigned) ((unsigned long) latency_frames * hw_rate / 44100);
+	snd_capacity = (unsigned) ((unsigned long) latency_frames * hw_rate / (freq >= 8000 ? freq : 44100));
 	snd_last = now;
 	fprintf(stderr, "[sim] sound open: %d channel(s), %u frames\n", channels, snd_capacity);
 	return HW_RATE;

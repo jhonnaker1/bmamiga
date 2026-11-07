@@ -867,8 +867,9 @@ void CKernel::VideoPresent(int wait_vsync) {
 
 unsigned CKernel::SoundOpen(unsigned freq, int channels,
                             unsigned latency_frames) {
-  (void)freq; // HDMI runs at Pi4Sound::SAMPLE_RATE.
-  return mPi4Sound.Open(channels, latency_frames);
+  // HDMI runs at Pi4Sound::SAMPLE_RATE; FREQ is the emulator's, for the
+  // latency, and should be the same (the emulator asks for it).
+  return mPi4Sound.Open(channels, latency_frames, freq);
 }
 
 void CKernel::SoundClose(void) {

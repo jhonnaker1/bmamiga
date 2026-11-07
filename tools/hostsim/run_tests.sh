@@ -195,6 +195,13 @@ else
     fail model "the next boot isn't an Amiga 500+ (see out/model/log2.txt)"
 fi
 
+echo "Sound rate"
+# The Pi's HDMI plays 48 kHz: the core makes its sound at that rate
+# (made at 44.1 kHz, the batches were stretched to fill the gap: throbbing).
+BMAMIGA_SIM_RATE=48000 run rate48 50 "$OUT/aros" "" '300 quit\n'
+check_log rate48 "sound 48000 Hz" "the core's sound at the output's 48 kHz"
+check_log rate48 "FREQ=48000" "Amiberry makes it at 48 kHz"
+
 echo "Warp"
 run warp 50 "$OUT/aros" "" '200 key 0x44 1\n201 key 0x44 0\n400 shot warp.ppm\n401 key 0x44 1\n402 key 0x44 0\n600 quit\n'
 check_log warp "BMAmiga: warp on" "F11 turns warp on"

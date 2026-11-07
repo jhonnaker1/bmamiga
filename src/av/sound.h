@@ -71,7 +71,8 @@ public:
 
   // Core 1, from the emulator (see host.h). LATENCY_FRAMES is how much
   // sound to keep queued, in frames at 44100 Hz.
-  unsigned Open(int channels, unsigned latency_frames);
+  // LATENCY_FRAMES at the emulator's sample rate FREQ.
+  unsigned Open(int channels, unsigned latency_frames, unsigned freq = 44100);
   unsigned FreeFrames(void);
   void Write(const int16_t *samples, unsigned frames);
 
