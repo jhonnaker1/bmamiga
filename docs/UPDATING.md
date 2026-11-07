@@ -4,17 +4,16 @@
 
 Amiberry is a git submodule in `third_party/amiberry`, from
 `https://github.com/BlitterStudio/amiberry`, with libco as its own
-submodule. It is used unmodified: BMAmiga builds its libretro core with
-Amiberry's own `libretro/Makefile`, and everything specific to BMAmiga is
-in `src/port/`:
+submodule. It is used unmodified: BMAmiga builds its libretro core as a
+static library with Amiberry's own `libretro/Makefile`, and everything
+specific to BMAmiga is in `src/port/`:
 
 | File | What it holds |
 | --- | --- |
-| `src/port/amiberry.mk` | Builds the core's objects into a static library (for the PC simulator and, through `circle.mk`, the Pi), leaving out what `BMA_EXCLUDE` names and adding `BMA_EXTRA` |
-| `src/port/platform.c` | The libretro frontend: Amiberry's core options (`amiberry_*`), video, sound, input |
-| `src/port/bridge.cpp` | BMAmiga's direct calls into Amiberry's own functions (disks, resets, warp) |
+| `src/port/platform.c` | The libretro frontend: Amiberry's core options (`amiberry_*`), video, sound, input, and the settings Amiberry takes as it starts (`amiberry_embed.h`) |
+| `src/port/bridge.cpp` | BMAmiga's direct calls into Amiberry's own functions (disks, resets, warp), built with the core's flags (`EXTRA_SOURCES`) |
 | `src/port/keys.c` | USB keys to libretro's keys |
-| `src/port/circle/circle.mk` | The Pi build: compiler flags, and the Amiberry files replaced on Circle (`CIRCLE_AMIBERRY_EXCLUDE`) by BMAmiga's (`CIRCLE_AMIBERRY_EXTRA`) |
+| `src/port/circle/circle.mk` | The Pi build: compiler flags, and the options of Amiberry's Makefile that leave out what Circle hasn't (`NO_STD_THREAD`, `NO_HOST_SIGNALS`, `NO_CHD_SPECIAL_FILES`) |
 | `src/port/circle/` | Threads, POSIX functions, thread-local storage and missing headers for Circle (see its [README](../src/port/circle/README.md)) |
 
 To move to a newer Amiberry:
@@ -36,8 +35,8 @@ To move to a newer Amiberry:
    ```
 
    Look for:
-   - Files added to or removed from the core's `SOURCES_*` lists in
-     `libretro/Makefile` (`amiberry.mk` reads them).
+   - Changes to the options `circle.mk` and `tools/hostsim/Makefile` give
+     Amiberry's `libretro/Makefile` (listed at its top).
    - Changed core option names or values in `libretro/libretro.cpp`
      (`platform.c` answers `amiberry_model`, `amiberry_video_standard` and
      others by name) and Kickstart names (in `docs/ROMS.txt`).
@@ -56,8 +55,9 @@ To move to a newer Amiberry:
 
    (circle-stdlib must be built for the Pi 4 or 5 first.) Anything listed
    as missing needs a stand-in in `src/port/circle/` (`posix.c`, or a
-   header in `include/`), or, for a file that needs threads, sockets or
-   signals Circle hasn't, a replacement named in `circle.mk`. libstdc++
+   header in `include/`), or, for code that needs threads, sockets or
+   signals Circle hasn't, an option in Amiberry's `libretro/Makefile` that
+   leaves it out. libstdc++
    pulls in more than the check sees (it found `usleep()` and `sleep()`
    only at the kernel's link), so build the kernels too:
 

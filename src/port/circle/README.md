@@ -16,15 +16,14 @@ next that can go on runs, all on the emulator's core. Under libretro
 Amiberry starts one thread, "denise", the drawing thread, which only waits:
 libretro builds draw in the emulation (`multithread_enabled` is 0).
 Mutexes and conditions are found by their address, so the same code runs
-in the PC simulator, which uses it too. `std::mutex` and
-`std::condition_variable`, which libstdc++ has only with threads, are
-defined over it in `include/bma_circle.h`.
+in the PC simulator, which uses it too. `std::mutex`,
+`std::recursive_mutex` and `std::condition_variable`, which libstdc++ has
+only with threads, are defined over it in `include/bma_circle.h`.
 
 `std::thread` can't be given a way to start (libstdc++ defines the class
-without one), so the two files that start one are replaced:
-`osdsync.cpp` (CHD's work queues, run at once) and `zz9000_media.cpp` (the
-ZZ9000 card's FFmpeg player, which fails as Amiberry's does without
-FFmpeg).
+without one), so Amiberry is built with `NO_STD_THREAD=1`: CHD's work
+queues run their work at once, on the thread that queues it. The ZZ9000
+card's media player starts no thread without FFmpeg.
 
 ## Thread-local storage (`tls.c`)
 
@@ -53,15 +52,18 @@ before Amiberry starts, gives it one block.
 
 - The Amiga's networking (`bsdsocket.library`): `nosockets.cpp` in place
   of `bsdsocket_host.cpp`; Amiberry then doesn't offer the library.
-- Crash handlers (`nosignals.cpp` for `sigsegv_handler.cpp`): no signals.
-- MAME's special file names, sockets and terminals (`chd_nofiles.cpp`).
+- Crash handlers (`NO_HOST_SIGNALS=1`): no signals.
+- MAME's special file names, sockets and terminals
+  (`NO_CHD_SPECIAL_FILES=1`).
 
 ## Headers (`include/`)
 
 Missing ones (`sys/mman.h`, `dlfcn.h`, `sys/termios.h`, `pty.h`,
-`sys/uio.h`, `sys/un.h`, `sys/ucontext.h`, `sys/ioctl.h`, `sys/mount.h`),
+`sys/uio.h`, `sys/un.h`, `sys/ucontext.h`, `sys/ioctl.h`, `sys/mount.h`,
+`ifaddrs.h`),
 and newlib's with what they lack (`pthread.h` declares its functions,
 `sys/signal.h` POSIX's `struct sigaction`, `sys/dirent.h` without FatFs's
-Windows style types, `arpa/inet.h` and `netinet/in.h`). `bma_circle.h`,
+Windows style types, `arpa/inet.h` and `netinet/in.h`, `utime.h` declares
+`utime()`, `net/if.h` the interface flags). `bma_circle.h`,
 included before each of Amiberry's files: large file names, endian
 functions, `CLOCK_MONOTONIC`, `tm_gmtoff`, and the C++ classes above.

@@ -4,9 +4,9 @@
 #   make -C tools/hostsim
 #   tools/hostsim/run_tests.sh
 #
-# Amiberry's libretro core is built as a static library first, with
-# Amiberry's own libretro/Makefile and src/port/amiberry.mk, under
-# build/amiberry (it takes a few minutes the first time).
+# Amiberry's libretro core is built as a static library first, by
+# Amiberry's own libretro/Makefile, under build/amiberry (it takes a few
+# minutes the first time).
 #
 
 ROOT := $(abspath ../..)
@@ -47,9 +47,13 @@ $(OUT)/amiberry/flags: FORCE
 	@if [ "$$(cat $@ 2>/dev/null)" != "$(BMA_FLAGS)" ]; then \
 	    rm -rf $(OUT)/amiberry; mkdir -p $(OUT)/amiberry; echo "$(BMA_FLAGS)" > $@; fi
 
+# bridge.cpp is built with the core's flags; SLiRP's and bsdsocket's socket
+# calls go to bmnet (src/port/bmnet.h).
 $(AMIBERRY_LIB): $(OUT)/amiberry/flags FORCE
-	@$(MAKE) -s -C $(AMIBERRY)/libretro -f Makefile -f $(ROOT)/src/port/amiberry.mk \
-	    BMA_OBJDIR=$(OUT)/amiberry BMA_LIB=$@ BMA_FLAGS="$(BMA_FLAGS)" $@
+	@$(MAKE) -s -C $(AMIBERRY)/libretro STATIC_LINKING=1 OBJDIR=$(OUT)/amiberry TARGET=$@ \
+	    NLOHMANN_JSON_INCLUDE=$(ROOT)/third_party/nlohmann-json \
+	    EXTRA_SOURCES=$(ROOT)/src/port/bridge.cpp \
+	    CPPFLAGS="$(BMA_FLAGS)" NET_CFLAGS="-include $(ROOT)/src/port/bmnet.h" $@
 
 $(OUT)/port/%.o: $(ROOT)/src/port/%.c $(ROOT)/src/port/bmamiga.h $(ROOT)/src/port/osd.h \
                  $(ROOT)/src/port/bmnet.h $(ROOT)/src/host.h

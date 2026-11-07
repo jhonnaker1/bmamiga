@@ -4,7 +4,7 @@
  *
  * Included before every file of Amiberry's SLiRP (src/slirp/), slirp_uae.cpp,
  * which runs it, and osdep/bsdsocket_host.cpp, the Amiga's bsdsocket.library
- * (-include, src/port/amiberry.mk): their
+ * (-include, through Amiberry's NET_CFLAGS): their
  * socket calls (socket(), connect(), select(), and the read(), write() and
  * close() they also use on sockets) become bmnet's. bmnet's sockets have
  * descriptors of their own (BMNET_FD_BASE and up); read(), write(),
