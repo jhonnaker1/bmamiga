@@ -747,6 +747,18 @@ static void setup_lines(char *out, size_t size)
 		ADD("cachesize=16384\ncomp_trustbyte=indirect\ncomp_trustword=indirect\n"
 		    "comp_trustlong=indirect\ncomp_trustnaddr=indirect\n"
 		    "cpu_speed=max\ncycle_exact=false\ncpu_compatible=false\n");
+	/* The JIT keeps the host address of the code it compiles in 32-bit
+	   registers, read back sign-extended: every Amiga address it meets must
+	   be below 2 GB on the Pi. BMAmiga's block for the Amiga's memory starts
+	   at about 1 GB, so Zorro III RAM at 0x40000000 (Amiberry's "real"
+	   mapping, which it picks thinking that block starts near 0) was past
+	   2 GB, and the JIT crashed compiling code there (AmiKit, xSysInfo with
+	   512 MB, 2026-11-07). Amiberry's "UAE" mapping puts Zorro III at
+	   0x10000000: 512 MB of it and a 64 MB RTG card end at 1.8 GB.
+	   bmamiga.uae can still say otherwise. */
+	if (strcmp(host_option("jit", ""), "on") == 0
+	    && (atoi(host_option("z3_ram", "0")) > 0 || host_option("rtg", "")[0] != '\0'))
+		ADD("z3mapping=uae\n");
 	/* The fastest: as fast as the Pi can, which isn't cycle-exact. */
 	if (strcmp(host_option("cpu_speed", ""), "max") == 0)
 		ADD("cpu_speed=max\ncycle_exact=false\n");

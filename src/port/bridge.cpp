@@ -218,6 +218,7 @@ static struct {
 	int sound_filter, sound_stereo_separation;
 	int cachesize, comptrustbyte, comptrustword, comptrustlong, comptrustnaddr;
 	bool cpu_compatible;
+	int z3_mapping_mode;
 } preset;
 
 static void take_preset(void)
@@ -246,6 +247,7 @@ static void take_preset(void)
 	preset.comptrustlong = changed_prefs.comptrustlong;
 	preset.comptrustnaddr = changed_prefs.comptrustnaddr;
 	preset.cpu_compatible = changed_prefs.cpu_compatible;
+	preset.z3_mapping_mode = changed_prefs.z3_mapping_mode;
 }
 
 static void put_back_preset(void)
@@ -277,6 +279,7 @@ static void put_back_preset(void)
 	changed_prefs.comptrustlong = preset.comptrustlong;
 	changed_prefs.comptrustnaddr = preset.comptrustnaddr;
 	changed_prefs.cpu_compatible = preset.cpu_compatible;
+	changed_prefs.z3_mapping_mode = preset.z3_mapping_mode;
 	if (get_device_romconfig(&changed_prefs, ROMTYPE_A2065, 0) != nullptr)
 		clear_device_rom(&changed_prefs, ROMTYPE_A2065, 0, true);
 	changed_prefs.a2065name[0] = 0;

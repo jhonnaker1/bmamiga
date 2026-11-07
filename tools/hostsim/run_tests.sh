@@ -303,6 +303,13 @@ if ! ppm differ_above "$OUT/jit/screen.ppm" "$OUT/nojit/screen.ppm" 320; then
 else
     fail jit "the picture differs from the one without the JIT (see out/jit/screen.ppm)"
 fi
+# The JIT with Zorro III RAM and an RTG card: Zorro III at 0x10000000
+# (Amiberry's UAE mapping), as the JIT needs every Amiga address below 2 GB
+# on the Pi; at 0x40000000 it crashed compiling code there.
+mkdir -p "$OUT/jitz3"
+printf 'model=A1200\ncpu=68020\njit=on\nz3_ram=64\nrtg=16\n' > "$OUT/jitz3/bmamiga.cfg"
+run jitz3 50 "$OUT/aros" "" '300 quit\n'
+check_log jitz3 "Z3 0x10000000 0x10000000 +64M RAM" "Zorro III RAM at 0x10000000 with the JIT"
 
 echo "The card's second partition"
 # BMAMIGA_SD2 stands for SD2: (the card's second partition, an exFAT one for
