@@ -670,11 +670,12 @@ static const struct {
 	{"FPU", "fpu",
 	 (const char *const[]){"Model's", "None", "68881", "68882", NULL},
 	 (const char *const[]){"", "0", "68881", "68882", NULL}, TRUE},
-	/* Approximate: the real speed, not cycle-exact (an A500's cycle-exact
-	   68000 and blitter took 12 ms a frame on a Pi 5, more than a Pi 4 has). */
+	/* Compatible (the default): the model's speed, not cycle-exact (an A500's
+	   cycle-exact 68000 and blitter took 12 ms a frame on a Pi 5, more than a
+	   Pi 4 has); Cycle-exact for the games that need it. */
 	{"CPU Speed", "cpu_speed",
-	 (const char *const[]){"Model's (real)", "Approximate", "Fastest", NULL},
-	 (const char *const[]){"", "approx", "max", NULL}, TRUE},
+	 (const char *const[]){"Compatible", "Cycle-exact", "Fastest", NULL},
+	 (const char *const[]){"", "exact", "max", NULL}, TRUE},
 	{"Chipset", "chipset",
 	 (const char *const[]){"Model's", "OCS", "ECS", "AGA", NULL},
 	 (const char *const[]){"", "ocs", "ecs", "aga", NULL}, TRUE},

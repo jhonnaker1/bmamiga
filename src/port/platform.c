@@ -798,14 +798,16 @@ static void setup_lines(char *out, size_t size)
 	/* The fastest: as fast as the Pi can, which isn't cycle-exact. */
 	if (strcmp(host_option("cpu_speed", ""), "max") == 0)
 		ADD("cpu_speed=max\ncycle_exact=false\n");
-	/* Approximate: the real speed, but not cycle-exact (the CPU's and the
-	   blitter's every cycle): far lighter, which most games don't notice.
-	   An A500's cycle-exact 68000 took 12 ms of the Pi 5's 20 ms a frame,
-	   and more than a Pi 4 or 400 has (Indy Heat, 2026-11-07). The JIT
-	   sets the speed itself. */
-	else if (strcmp(host_option("cpu_speed", ""), "approx") == 0
+	/* Compatible, the default (empty, or "approx" as 0.3.1's test kernels
+	   wrote it): the model's speed and "more compatible" CPU, but not
+	   cycle-exact (the CPU's and the blitter's every cycle): far lighter,
+	   which most games don't notice. An A500's cycle-exact 68000 took 12 ms
+	   of the Pi 5's 20 ms a frame, and more than a Pi 4 or 400 has (Indy
+	   Heat, 2026-11-07). "exact" keeps the model's cycle-exact timing. The
+	   JIT sets the speed itself. */
+	else if (strcmp(host_option("cpu_speed", ""), "exact") != 0
 	         && strcmp(host_option("jit", ""), "on") != 0)
-		ADD("cpu_speed=real\ncycle_exact=false\ncpu_compatible=true\n");
+		ADD("cycle_exact=false\n");
 	sd_path(path, sizeof path, "bmamiga.uae");
 	f = fopen(path, "r");
 	if (f != NULL) {

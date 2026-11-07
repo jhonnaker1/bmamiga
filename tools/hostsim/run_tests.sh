@@ -202,6 +202,25 @@ BMAMIGA_SIM_RATE=48000 run rate48 50 "$OUT/aros" "" '300 quit\n'
 check_log rate48 "sound 48000 Hz" "the core's sound at the output's 48 kHz"
 check_log rate48 "FREQ=48000" "Amiberry makes it at 48 kHz"
 
+echo "CPU timing"
+# CPU Speed: Compatible by default (an A500's 68000 not cycle-exact, after
+# the setup's hard reset), Cycle-exact when asked for.
+mkdir -p "$OUT/cpucompat" "$OUT/cpuexact"
+printf 'model=A500\n' > "$OUT/cpucompat/bmamiga.cfg"
+printf 'model=A500\ncpu_speed=exact\n' > "$OUT/cpuexact/bmamiga.cfg"
+run cpucompat 50 "$OUT/aros" "" '200 quit\n'
+run cpuexact 50 "$OUT/aros" "" '200 quit\n'
+if grep -a "CPU=68000" "$OUT/cpucompat/log.txt" | tail -1 | grep -q "cycle-exact"; then
+    fail cpucompat "the default is still cycle-exact (see out/cpucompat/log.txt)"
+else
+    pass "cpucompat: an A500's CPU not cycle-exact by default"
+fi
+if grep -a "CPU=68000" "$OUT/cpuexact/log.txt" | tail -1 | grep -q "cycle-exact"; then
+    pass "cpuexact: Cycle-exact when asked for"
+else
+    fail cpuexact "Cycle-exact asked for, not given (see out/cpuexact/log.txt)"
+fi
+
 echo "Warp"
 run warp 50 "$OUT/aros" "" '200 key 0x44 1\n201 key 0x44 0\n400 shot warp.ppm\n401 key 0x44 1\n402 key 0x44 0\n600 quit\n'
 check_log warp "BMAmiga: warp on" "F11 turns warp on"
@@ -240,12 +259,13 @@ check_log drives "uaescsi.device:0 = IMAGE:.*test\.iso" "the ISO in uaescsi.devi
 
 echo "Amiga Setup"
 # A 68020 with 2M of chip RAM from bmamiga.cfg, and 4M of fast RAM from
-# bmamiga.uae (with a comment), all from the hard reset as the Amiga starts.
+# bmamiga.uae (with a comment), all from the hard reset as the Amiga starts;
+# the fourth setting is CPU Speed's default, Compatible (cycle_exact=false).
 mkdir -p "$OUT/setup"
 printf 'cpu=68020\nchip_ram=2048\n' > "$OUT/setup/bmamiga.cfg"
 printf '# more of Amiberry\x27s settings\nfastmem_size=4\n' > "$OUT/setup/bmamiga.uae"
 run setup 50 "$OUT/aros" "" '400 quit\n'
-check_log setup "Amiga setup: 3 setting" "bmamiga.cfg's and bmamiga.uae's settings taken"
+check_log setup "Amiga setup: 4 setting" "bmamiga.cfg's and bmamiga.uae's settings taken"
 check_log setup "CPU=68020" "the 68020 from the CPU setting"
 check_log setup "2048K/[0-9]+ = +2048K .*Chip memory" "2M of chip RAM"
 check_log setup "Fast memory" "fast RAM from bmamiga.uae"
