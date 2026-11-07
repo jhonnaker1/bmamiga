@@ -122,6 +122,11 @@ elif cmd == 'pointer':         # FILE: where the (red) mouse pointer is
     print('%d %d' % (min(p[0] for p in pts), min(p[1] for p in pts)) if pts else 'none')
 elif cmd == 'differ':          # A B: the pictures differ
     sys.exit(0 if load(sys.argv[2])[2] != load(sys.argv[3])[2] else 1)
+elif cmd == 'differ_above':    # A B ROWS: the pictures' first ROWS lines differ
+    wa, ha, pa = load(sys.argv[2])
+    wb, hb, pb = load(sys.argv[3])
+    n = 3 * wa * int(sys.argv[4])
+    sys.exit(0 if (wa, ha) != (wb, hb) or pa[:n] != pb[:n] else 1)
 EOF
 ppm() { python3 "$OUT/ppm.py" "$@"; }
 
@@ -281,7 +286,9 @@ run jit 50 "$OUT/aros" "" '600 shot screen.ppm\n601 quit\n'
 run nojit 50 "$OUT/aros" "" '600 shot screen.ppm\n601 quit\n'
 check_log jit "CPU=68020.*JIT=.*16384" "the JIT, with its 16 MB cache"
 check_log jit "translation cache size : 16384 KB" "its code cache made"
-if ! ppm differ "$OUT/jit/screen.ppm" "$OUT/nojit/screen.ppm"; then
+# AROS's "Waiting for bootable media" line (from line 330) blinks, so only
+# the eyes and the logo above it are compared.
+if ! ppm differ_above "$OUT/jit/screen.ppm" "$OUT/nojit/screen.ppm" 320; then
     pass "jit: the same picture as without it"
 else
     fail jit "the picture differs from the one without the JIT (see out/jit/screen.ppm)"
