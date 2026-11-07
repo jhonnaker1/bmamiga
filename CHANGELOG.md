@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 – 2026-11-06
+
+Tried on a Pi 5 (8 GB): Workbench 3.1 from a folder, a Shell with the JIT,
+and Amelinium showing frogfind.de over the network with 64 MB of Zorro
+III RAM. Only in the simulator so far: the RTG card (a Workbench at
+1280x720, 24-bit), the FPU item and folder drives' disk info. None of
+these fixes has been tried on a Pi 4 yet.
 
 - bsdsocket.library was never there (Amelinium: "no TCP stack"): Amiberry
   puts it, and uaenet.device, in the UAE Boot ROM once, as it starts, from
@@ -18,8 +24,8 @@
   with 12 s stops: FatFs has no cache, and Amiberry's folder drives look
   names up all the time. circle_fatfs_sectorcache_patch.diff: a 4 MB
   write-through cache of single sectors; the log says each 10 s how many
-  reads the card had, how many the cache, and the time reading. Not yet
-  tried on a Pi
+  reads the card had, how many the cache, and the time reading (on a Pi 5,
+  87% from the cache)
 - The Mac's "._" files (macOS keeps a file's extended attributes in one
   on FAT32, and adds one to files it writes) are left out of directory
   listings (readdir, wrapped): the Amiga ran DEVS:Monitors/._PAL from its
