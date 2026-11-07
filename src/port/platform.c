@@ -18,10 +18,9 @@
  *
  * Timing: when the display refreshes at (close to) the Amiga's frame rate
  * (50 Hz for a PAL Amiga), every frame is shown on its own display refresh
- * and paced by it: Amiberry's own vertical sync is on (the core option
- * amiberry_internal_vsync), which makes it time itself by the frames it's
- * given. Otherwise, or when the Pi can't keep up, Amiberry paces itself by
- * the clock (clock.c). Either way the sound is kept in step by dropping or
+ * and paced by it: Amiberry's clock is then the frames' (clock.c), and its
+ * own waits pass on that clock, not the Pi's. Otherwise, or when the Pi
+ * can't keep up, Amiberry paces itself by the real clock. Either way the sound is kept in step by dropping or
  * repeating a sample now and then.
  *
  * This file is part of BMAmiga, a bare metal Amiga emulator for the
@@ -235,8 +234,6 @@ static void update_sync_mode(void)
 		LOG("display %.2f Hz, machine %.2f Hz, %s\n", refresh_rate, machine_rate,
 		    lock ? "synchronised to the display" : "timer paced");
 	}
-	if (lock != vsync_lock)
-		options_dirty = TRUE;   /* amiberry_internal_vsync follows it */
 	vsync_lock = lock;
 }
 
@@ -386,12 +383,10 @@ static void measure_load(double now)
 		stats_late++;
 	if (vsync_lock && !overloaded && load_avg > 0.97) {
 		overloaded = TRUE;
-		options_dirty = TRUE;
 		LOG("frames take %.1f ms, longer than the display's %.1f ms: "
 		    "timer paced until they fit\n", load_avg * period * 1000.0, period * 1000.0);
 	} else if (overloaded && load_avg < 0.85) {
 		overloaded = FALSE;
-		options_dirty = TRUE;
 		LOG("frames fit the display again (%.1f ms), synchronised to it\n",
 		    load_avg * period * 1000.0);
 	}
@@ -838,22 +833,24 @@ static void core_input_poll(void) {}
 
 /* The joystick in the Amiga's port 2: the first gamepad, or a GPIO
    joystick. A face buttons is fire, as the Amiga's one button; B the
-   second (CD32 pads and some games). */
+   second (CD32 pads and some games). The left stick's direction is in the
+   pad's state already (with a dead zone); host_pad_axis()'s position runs
+   from 0 to 65535, so read as -32768 to 32767 a stick at rest (32767) was
+   right and down held (a Pi 500, 2026-11-07). */
 static int16_t joypad(unsigned id)
 {
 	int state = host_pad_state(0), gpio = host_gpio_joystick(1);
-	int ax = host_pad_axis(0, 0), ay = host_pad_axis(0, 1);
 	if (state < 0)
 		state = 0;
 	switch (id) {
 	case RETRO_DEVICE_ID_JOYPAD_UP:
-		return (state & HOST_PAD_UP) || ay < -16384 || (gpio & HOST_JOY_UP);
+		return (state & HOST_PAD_UP) || (gpio & HOST_JOY_UP);
 	case RETRO_DEVICE_ID_JOYPAD_DOWN:
-		return (state & HOST_PAD_DOWN) || ay > 16384 || (gpio & HOST_JOY_DOWN);
+		return (state & HOST_PAD_DOWN) || (gpio & HOST_JOY_DOWN);
 	case RETRO_DEVICE_ID_JOYPAD_LEFT:
-		return (state & HOST_PAD_LEFT) || ax < -16384 || (gpio & HOST_JOY_LEFT);
+		return (state & HOST_PAD_LEFT) || (gpio & HOST_JOY_LEFT);
 	case RETRO_DEVICE_ID_JOYPAD_RIGHT:
-		return (state & HOST_PAD_RIGHT) || ax > 16384 || (gpio & HOST_JOY_RIGHT);
+		return (state & HOST_PAD_RIGHT) || (gpio & HOST_JOY_RIGHT);
 	case RETRO_DEVICE_ID_JOYPAD_B:
 		return (state & HOST_PAD_A) || (gpio & HOST_JOY_FIRE);
 	case RETRO_DEVICE_ID_JOYPAD_A:
@@ -975,9 +972,15 @@ static const char *core_option(const char *key)
 {
 	if (strcmp(key, "amiberry_model") == 0)
 		return bmamiga_model_id(bmamiga_model());
-	/* Paced by the display, Amiberry times itself by its frames. */
+	/* Always off: Amiberry's libretro build paces itself by its clock either
+	   way (isvsync_chipset() is 0 with LIBRETRO; clock.c makes its clock
+	   the frames' when the display paces). Changing it only reconfigured
+	   Amiberry (set_config_changed(), the joystick ports applied again)
+	   each time the Pi fell behind the display or caught up, which a
+	   game at the limit did every few seconds: the sound broke up (a Pi
+	   500 with Indy Heat, 2026-11-07). */
 	if (strcmp(key, "amiberry_internal_vsync") == 0)
-		return display_paces() ? "standard" : "disabled";
+		return "disabled";
 	if (strcmp(key, "amiberry_video_standard") == 0)
 		return host_option("video_standard", "auto");
 	if (strcmp(key, "amiberry_floppy_speed") == 0) {
