@@ -6,7 +6,8 @@ Tried on a Pi 5 (8 GB): Workbench 3.1 from a folder, a Shell with the JIT,
 and Amelinium showing frogfind.de over the network with 64 MB of Zorro
 III RAM. Only in the simulator so far: the RTG card (a Workbench at
 1280x720, 24-bit), the FPU item and folder drives' disk info. None of
-these fixes has been tried on a Pi 4 yet.
+these fixes has been tried on a Pi 4 yet. Thanks to wiisoldier for the
+test images and testing.
 
 - bsdsocket.library was never there (Amelinium: "no TCP stack"): Amiberry
   puts it, and uaenet.device, in the UAE Boot ROM once, as it starts, from
@@ -15,7 +16,7 @@ these fixes has been tried on a Pi 4 yet.
   bmamiga_amiberry_main() (amiberry.mk renames it), which adds the
   setup's network to the start's command line; Network is now "(reboot)"
   in the menu. In the simulator, a slim Workbench 3.1 with Amelinium
-  (from a tester) shows example.com
+  (from wiisoldier) shows example.com
 - The JIT stopped, and the Amiga with it, once it had compiled enough
   (opening a Shell on Workbench 3.1, on a Pi 5): it takes a 16K pool for
   its blocks' records each time the last is full, and the Pi's mmap() had
@@ -53,7 +54,7 @@ these fixes has been tried on a Pi 4 yet.
 - The RTG card offers the HDMI sizes too (1280x720 to 1920x1200, 24 modes
   in all): libretro's build listed only 1920x1080 and Amiberry's classic
   ones, and a Workbench set to 1280x720 on desktop Amiberry fell back to
-  PAL. In the simulator a tester's Workbench now opens at 1280x720, 24-bit
+  PAL. In the simulator wiisoldier's Workbench now opens at 1280x720, 24-bit
 - docs: the JIT's settings; the reason it is in indirect mode
 
 ## 0.2.4 – 2026-11-04
