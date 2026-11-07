@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+- Amiberry updated past BlitterStudio/amiberry#2628 and #2629. Its
+  `libretro/Makefile` now builds the static library itself (static
+  linking, objects outside its tree, BMAmiga's `bridge.cpp` with the
+  core's flags, `json.hpp` from `third_party/nlohmann-json`, bmnet only
+  for the network files), so `src/port/amiberry.mk` is gone, and so are
+  the Pi's stand-ins for Amiberry's files (`osdsync.cpp`,
+  `zz9000_media.cpp`, `nosignals.cpp`, `chd_nofiles.cpp`): Amiberry leaves
+  that code out itself. The network settings Amiberry takes as it starts
+  go through `amiberry_libretro_set_extra_args()` instead of renaming its
+  `amiberry_main()`. The newer Amiberry needs on the Pi:
+  `std::recursive_mutex` (its archive code), which `bma_circle.h` has
+  over BMAmiga's recursive locks; `<ifaddrs.h>` and `<net/if.h>`'s
+  interface flags (bsdsocket's interface ioctls), with `getifaddrs()`
+  finding no interfaces; and `utime()` and `fchown()` (Lhasa, for LHA
+  archives), which do nothing
+- With `amiberry_internal_vsync` on, which BMAmiga sets when the display
+  paces it, Amiberry no longer also waits for its own frame time
+
 ## 0.3.0 – 2026-11-06
 
 Tried on a Pi 5 (8 GB): Workbench 3.1 from a folder, a Shell with the JIT,

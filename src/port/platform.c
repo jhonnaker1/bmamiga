@@ -2,7 +2,7 @@
  * platform.c - the libretro host that runs Amiberry for BMAmiga.
  *
  * Amiberry is built as its libretro core (third_party/amiberry/libretro)
- * and linked in (src/port/amiberry.mk). This file is the "frontend" the
+ * and linked in, as a static library. This file is the "frontend" the
  * core talks to, on top of the Circle kernel services in src/host.h: it
  * answers the core's questions (where the ROMs are, the model, ...), takes
  * its pictures and sound, gives it the keyboard, mouse and joysticks, and
@@ -36,6 +36,7 @@
 #include <unistd.h>
 
 #include "libretro.h"
+#include "amiberry_embed.h"
 
 #include "../host.h"
 #include "bmamiga.h"
@@ -745,31 +746,39 @@ static void setup_lines(char *out, size_t size)
 #undef ADD
 }
 
-/* The setup's settings that Amiberry takes only as it starts (bridge.cpp's
-   bmamiga_amiberry_main()): the Amiga's network, bsdsocket.library or
-   uaenet.device, from the menu or bmamiga.uae. */
-const char *bmamiga_start_options(void)
+/* The setup's settings that Amiberry takes only as it starts: the Amiga's
+   network, bsdsocket.library or uaenet.device, from the menu or
+   bmamiga.uae. Amiberry puts them in the UAE Boot ROM once, by
+   memory_init(), from the settings then, so a hard reset with them turned
+   on (apply_setup()) is too late; the Amiga had no TCP stack. They go on
+   the command line the core starts Amiberry with ("-s" before each, see
+   amiberry_embed.h); a later hard reset turns them on or off. */
+static void set_start_options(void)
 {
-	static char lines[8192], start[512];
+	static char lines[8192];
+	char start[512];
+	const char *argv[32];
 	const char *p = lines;
 	size_t len = 0;
+	int argc = 0;
 	setup_lines(lines, sizeof lines);
-	start[0] = '\0';
 	while (*p != '\0') {
 		const char *end = strchr(p, '\n');
 		size_t n = end != NULL ? (size_t) (end - p) : strlen(p);
 		while (n > 0 && (*p == ' ' || *p == '\t'))
 			p++, n--;
 		if ((strncmp(p, "bsdsocket_emu=", 14) == 0 || strncmp(p, "sana2=", 6) == 0)
-		    && len + n + 2 < sizeof start) {
+		    && len + n + 1 < sizeof start && argc + 2 <= (int) (sizeof argv / sizeof argv[0])) {
 			memcpy(start + len, p, n);
-			len += n;
-			start[len++] = '\n';
-			start[len] = '\0';
+			start[len + n] = '\0';
+			LOG("start with %s\n", start + len);
+			argv[argc++] = "-s";
+			argv[argc++] = start + len;
+			len += n + 1;
 		}
 		p = end != NULL ? end + 1 : p + n;
 	}
-	return start;
+	amiberry_libretro_set_extra_args(argc, argv);
 }
 
 /* Gives Amiberry the setup; a hard reset then uses it (the sound's
@@ -1330,6 +1339,7 @@ void bmamiga_main(void)
 	retro_set_input_poll(core_input_poll);
 	retro_set_input_state(core_input_state);
 	retro_init();
+	set_start_options();
 	if (!retro_load_game(NULL))
 		fatal("Amiberry did not start. The log (see the User Guide) says why.");
 	retro_set_controller_port_device(0, RETRO_DEVICE_MOUSE);

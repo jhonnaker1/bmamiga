@@ -23,8 +23,9 @@ hasn't been tried on a real Pi yet. See [the User Guide](docs/USER_GUIDE.md),
 
 Amiberry is built as its libretro core (`third_party/amiberry/libretro`):
 the emulator without its SDL3 window and its GUI, which gives its pictures
-and sound and takes its input through the libretro API. It is linked into
-BMAmiga as a library (`src/port/amiberry.mk`), and `src/port/platform.c` is
+and sound and takes its input through the libretro API. Amiberry's own
+`libretro/Makefile` builds it as a static library that is linked into
+BMAmiga, and `src/port/platform.c` is
 the "frontend" it talks to, on top of the kernel services in `src/host.h`:
 
 - Pictures go to the display, locked to its refresh when it runs at the

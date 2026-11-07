@@ -176,7 +176,6 @@ with `tools/gen_webui_assets.py` whenever an asset changes.
 | `src/port/clock.c`           | Amiberry's clock, following the frames shown when locked to the display |
 | `src/port/menu.c`, `osd.c`   | The menu and its on-screen display          |
 | `src/port/fswrap.c`          | `stat()` of the SD card's root, which FatFs can't do (`--wrap=stat`) |
-| `src/port/amiberry.mk`       | Builds Amiberry's libretro core as a library |
 | `src/port/circle/`           | What Amiberry needs on Circle: threads, POSIX functions, thread-local storage, headers (see its README) |
 | `src/pi45/`                  | The Pi 5's power button and fan            |
 | `src/patches/`               | Changes applied to Circle and circle-newlib by `make_all.sh` |

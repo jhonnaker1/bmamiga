@@ -3,8 +3,8 @@
 # toolchain's libstdc++), with BMAmiga's Circle layer (src/port/circle) and
 # zlib, as three static libraries in CIRCLE_BUILD:
 #
-#   libamiberry.a   Amiberry's libretro core (src/port/amiberry.mk), JIT
-#                   left out, with the files below in place of Amiberry's
+#   libamiberry.a   Amiberry's libretro core, built by Amiberry's
+#                   libretro/Makefile, with bridge.cpp
 #   libbmacircle.a  BMAmiga's threads, POSIX functions, thread-local storage
 #                   and clock (src/port/circle/*.c, src/port/clock.c)
 #   libz.a          zlib (third_party/zlib)
@@ -16,8 +16,8 @@
 #
 # Amiberry is built unmodified: what it needs that Circle hasn't is in
 # src/port/circle/include (headers, and bma_circle.h included before each
-# file), and the files that need threads, sockets or signals are left out
-# (CIRCLE_AMIBERRY_EXCLUDE) for BMAmiga's (CIRCLE_AMIBERRY_EXTRA). See
+# file), and Amiberry's build leaves out what needs threads, sockets or
+# signals (NO_STD_THREAD, NO_HOST_SIGNALS, NO_CHD_SPECIAL_FILES). See
 # src/port/circle/README.md.
 #
 # This file is part of BMAmiga, a bare metal Amiga emulator for the
@@ -51,14 +51,6 @@ CIRCLE_AMIBERRY_FLAGS := -Dclock_gettime=bma_clock_gettime -Dclock_gettime_nsec_
 	-Dnanosleep=bma_nanosleep -Dusleep=bma_usleep \
 	$(CIRCLE_CXX_INCLUDES) $(CIRCLE_TARGET) -DBMAMIGA_BMNET=3 -DBMAMIGA_JIT=1 $(CIRCLE_FORCED)
 
-# Amiberry's files that need what Circle hasn't, and BMAmiga's in their
-# place (relative to src/port).
-CIRCLE_AMIBERRY_EXCLUDE := src/zz9000_sdk_media_av.o src/archivers/chd/osdsync.o \
-	src/osdep/sigsegv_handler.o \
-	src/archivers/chd/posixsocket.o src/archivers/chd/posixptty.o
-CIRCLE_AMIBERRY_EXTRA := circle/osdsync circle/zz9000_media \
-	circle/nosignals circle/chd_nofiles
-
 CIRCLE_AMIBERRY_LIB := $(CIRCLE_BUILD)/libamiberry.a
 CIRCLE_PORT_LIB := $(CIRCLE_BUILD)/libbmacircle.a
 CIRCLE_ZLIB_LIB := $(CIRCLE_BUILD)/libz.a
@@ -68,19 +60,25 @@ CIRCLE_LIBS := $(CIRCLE_AMIBERRY_LIB) $(CIRCLE_PORT_LIB) $(CIRCLE_ZLIB_LIB)
 # objects don't depend on them), as for the simulator.
 $(CIRCLE_BUILD)/amiberry.flags: FORCE
 	@mkdir -p $(CIRCLE_BUILD)
-	@if [ "$$(cat $@ 2>/dev/null)" != "$(CIRCLE_AMIBERRY_FLAGS) $(CIRCLE_AMIBERRY_EXCLUDE)" ]; then \
-	    rm -rf $(CIRCLE_BUILD)/amiberry; echo "$(CIRCLE_AMIBERRY_FLAGS) $(CIRCLE_AMIBERRY_EXCLUDE)" > $@; fi
+	@if [ "$$(cat $@ 2>/dev/null)" != "$(CIRCLE_AMIBERRY_FLAGS)" ]; then \
+	    rm -rf $(CIRCLE_BUILD)/amiberry; echo "$(CIRCLE_AMIBERRY_FLAGS)" > $@; fi
 
-# Amiberry's libretro/Makefile builds the core (as for the simulator).
+# Amiberry's libretro/Makefile builds the core as a static library (as for
+# the simulator), with what Circle hasn't left out: std::thread (CHD's work
+# queues run at once), signals, and MAME's socket and terminal file names.
+# bridge.cpp is built with the core's flags; SLiRP's and bsdsocket's socket
+# calls go to bmnet (src/port/bmnet.h).
 $(CIRCLE_AMIBERRY_LIB): $(CIRCLE_BUILD)/amiberry.flags FORCE
 	@mkdir -p $(CIRCLE_BUILD)/amiberry
-	@$(MAKE) -s -C $(ROOT)/third_party/amiberry/libretro -f Makefile -f $(ROOT)/src/port/amiberry.mk \
+	@$(MAKE) -s -C $(ROOT)/third_party/amiberry/libretro \
 	    platform=unix ARCH=aarch64 fpic= \
 	    CC=$(CIRCLE_PREFIX)gcc CXX=$(CIRCLE_PREFIX)g++ AR=$(CIRCLE_PREFIX)ar \
 	    ZLIB_CFLAGS=-I$(ROOT)/third_party/zlib ZLIB_LIBS= \
-	    BMA_OBJDIR=$(CIRCLE_BUILD)/amiberry BMA_LIB=$@ \
-	    BMA_FLAGS="$(CIRCLE_AMIBERRY_FLAGS)" \
-	    BMA_EXCLUDE="$(CIRCLE_AMIBERRY_EXCLUDE)" BMA_EXTRA="$(CIRCLE_AMIBERRY_EXTRA)" $@
+	    STATIC_LINKING=1 OBJDIR=$(CIRCLE_BUILD)/amiberry TARGET=$@ \
+	    NO_STD_THREAD=1 NO_HOST_SIGNALS=1 NO_CHD_SPECIAL_FILES=1 \
+	    NLOHMANN_JSON_INCLUDE=$(ROOT)/third_party/nlohmann-json \
+	    EXTRA_SOURCES=$(ROOT)/src/port/bridge.cpp \
+	    CPPFLAGS="$(CIRCLE_AMIBERRY_FLAGS)" NET_CFLAGS="-include $(ROOT)/src/port/bmnet.h" $@
 
 # BMAmiga's Circle layer.
 CIRCLE_PORT_SRCS := circle/threads.c circle/posix.c circle/tls.c clock.c bmnet.c
