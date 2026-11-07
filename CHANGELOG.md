@@ -1,7 +1,47 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 – 2026-11-07
 
+Amiberry 8.5.0, built with its own Makefile options (thanks to midwan,
+Amiberry's author, who made them and sent the change), and fixes for
+games' speed and sound. Tried on a Pi 500 by retromin (BMA800XL's author)
+with Indy Heat, and on a Pi 5: xSysInfo with the JIT and 512 MB of Zorro
+III RAM, and Indy Heat. Thanks to retromin for the testing. Not yet tried:
+CPU Speed's new default on a Pi 4 or 400, and whether Windows still offers
+to scan the card after a shut down.
+
+- The sound throbbed: the core made it at 44.1 kHz and the Pi's HDMI plays
+  48 kHz, with nothing converting between them, so 9% was missing and
+  stretched batches filled the gap. The core now makes its sound at the
+  output's rate (`amiberry_audio_rate`), on every Pi 4 and 5
+- Pings and blips in the music: the sound buffer was kept half full by
+  dropping a sample or stretching a whole batch. It is now resampled all
+  the time at up to 0.5% over or under the core's rate (dynamic rate
+  control, as RetroArch does). The log says every 10 s how full the
+  buffer stayed
+- Half speed on a display at 50 Hz (a Pi 500): Amiberry's own frame wait
+  crept later each frame until every frame missed its refresh. Amiberry
+  #2629 fixed its internal vsync for libretro builds; BMAmiga turns it on
+  while the display runs at the Amiga's rate, and no longer changes it
+  each time the Pi falls behind and catches up (each change reconfigured
+  Amiberry, which broke the sound); behind the display, BMAmiga paces by
+  the clock
+- Amiga Setup, CPU Speed: *Compatible* (the new default), *Cycle-exact*
+  or *Fastest*. Compatible keeps the model's speed but not cycle-exact
+  timing, far lighter: an A500's cycle-exact 68000 took 12 ms of a Pi 5's
+  20 ms frame, and more than a Pi 4 or 400 has. Cycle-exact
+  (`cpu_speed=exact`) keeps the real Amiga's timing for the games that
+  need it
+- A gamepad's analog stick at rest held right and down (its position was
+  read as from -32768 to 32767; it runs from 0 to 65535)
+- The JIT with Zorro III RAM or an RTG card crashed or locked up (AmiKit,
+  xSysInfo with 512 MB): it needs every Amiga address below 2 GB on the
+  Pi, and Zorro III RAM at 0x40000000 was past it. Amiga Setup now puts
+  Zorro III at 0x10000000 (Amiberry's UAE mapping) when the JIT is on
+- Shut down and reboot: all 32 of the C library's files are written out
+  (only 3 to 19 were, and Amiberry keeps the Amiga's open files on folder
+  drives open), then a second for the card before the Pi halts (it was
+  100 ms). Windows offered to scan the card after a shut down
 - Amiberry updated past BlitterStudio/amiberry#2628 and #2629. Its
   `libretro/Makefile` now builds the static library itself (static
   linking, objects outside its tree, BMAmiga's `bridge.cpp` with the
