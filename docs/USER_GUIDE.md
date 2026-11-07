@@ -73,12 +73,13 @@ what the chosen model has, and choosing anything else is kept in
 |-------------------|---------|---------------|
 | Kickstart         | the model's, or a file in `roms` | `kickstart` (a path) |
 | CPU               | 68000, 68010, 68020, 68030, 68040 | `cpu` |
+| FPU               | none, 68881, 68882: a maths coprocessor beside a 68020 or 68030 (a 68040 has its own). Workbenches with Picasso96, and AmiKit, want one | `fpu` (`0`, `68881`, `68882`) |
 | CPU Speed         | real (cycle-exact), or *Fastest*: as fast as the Pi can | `cpu_speed` (`max`) |
 | Chipset           | OCS, ECS, AGA | `chipset` (`ocs`, `ecs`, `aga`) |
-| Chip RAM          | 512K, 1M, 2M | `chip_ram` (in KB) |
+| Chip RAM          | 512K, 1M, 2M, 8M (Amiberry's, more than an Amiga had; AmiKit has it) | `chip_ram` (in KB) |
 | Slow RAM          | none, 512K, 1M, 1.5M, 1.8M | `slow_ram` (in KB) |
 | Fast RAM          | none, 1M, 2M, 4M, 8M | `fast_ram` (in MB) |
-| Zorro III RAM     | none, 16M, 32M, 64M, 128M, 256M: more fast RAM, above the 24-bit 16 MB (see below) | `z3_ram` (in MB) |
+| Zorro III RAM     | none, 16M, 32M, 64M, 128M, 256M, 512M: more fast RAM, above the 24-bit 16 MB (see below) | `z3_ram` (in MB) |
 | RTG Card          | none, 8M, 16M, 32M, 64M: Picasso96's `uaegfx` graphics card, on Zorro III (see below) | `rtg` (in MB) |
 | Sound Filter      | off, emulated, on (the Amiga's low-pass filter) | `sound_filter` |
 | Stereo Separation | mono, 30%, 50%, 70%, 100% | `stereo_separation` (0 to 10) |
@@ -94,7 +95,11 @@ runs with 64 MB. The RTG card is Picasso96's `uaegfx`, for Workbench
 screens bigger and with more colours than the AGA chipset's: Picasso96
 must be installed on the Amiga's disk (`uaegfx` in `DEVS:Monitors`), and
 a `uaegfx` mode chosen in Prefs/ScreenMode; without a card, a Workbench
-that loads `uaegfx` can't open its screen there.
+that loads `uaegfx` can't open its screen there. The card offers the
+sizes of HDMI screens (1280x720 to 1920x1200) as well as Amiberry's own
+(320x200 to 1280x1024), so a Workbench set up on desktop Amiberry finds
+its mode. Such a Workbench usually wants an FPU too: without one, one
+failed with error #80000003 as it opened its RTG screen.
 
 **The JIT** makes a 68020 or later CPU much faster (several times, more on
 code that works in its registers than on code that works in memory), for
@@ -401,7 +406,7 @@ the web UI.
 | Option              | Values                       | Default  | What it does |
 |---------------------|------------------------------|----------|--------------|
 | `model`             | `A500`, `A500OG`, `A500+`, `A600`, `A1200OG`, `A1200`, `A4030`, `A4040`, `CD32`, `CDTV` | `A500` | The Amiga to emulate (the menu's *Model*) |
-| `kickstart`, `cpu`, `cpu_speed`, `chipset`, `chip_ram`, `slow_ram`, `fast_ram`, `z3_ram`, `rtg`, `sound_filter`, `stereo_separation`, `amiga_network` | see Amiga Setup | the model's | The menu's Amiga Setup |
+| `kickstart`, `cpu`, `fpu`, `cpu_speed`, `chipset`, `chip_ram`, `slow_ram`, `fast_ram`, `z3_ram`, `rtg`, `sound_filter`, `stereo_separation`, `amiga_network` | see Amiga Setup | the model's | The menu's Amiga Setup |
 | `df0` ... `df3`     | paths                        | none     | The floppy images in the drives (the menu's *Floppy Drives*) |
 | `dh0` ... `dh3`     | paths                        | none     | The hard drives: hard disk images or folders (the menu's *Hard Drives and CD*) |
 | `cd0`               | path                         | none     | The CD image in the CD drive |

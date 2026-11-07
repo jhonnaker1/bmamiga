@@ -41,6 +41,13 @@
   circle-newlib's statvfs() is a stub that fails without setting errno
   (the log's "Unimplemented error Bad file number", errno left over).
   statvfs() is wrapped and gives FatFs's free space
+- Amiga Setup: FPU (none, 68881, 68882), Chip RAM 8M, Zorro III RAM up to
+  512M: what AmiKit has. A Workbench with Picasso96 failed (#80000003)
+  opening its RTG screen without an FPU
+- The RTG card offers the HDMI sizes too (1280x720 to 1920x1200, 24 modes
+  in all): libretro's build listed only 1920x1080 and Amiberry's classic
+  ones, and a Workbench set to 1280x720 on desktop Amiberry fell back to
+  PAL. In the simulator a tester's Workbench now opens at 1280x720, 24-bit
 - docs: the JIT's settings; the reason it is in indirect mode
 
 ## 0.2.4 – 2026-11-04

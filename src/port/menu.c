@@ -664,15 +664,22 @@ static const struct {
 	{"CPU", "cpu",
 	 (const char *const[]){"Model's", "68000", "68010", "68020", "68030", "68040", NULL},
 	 (const char *const[]){"", "68000", "68010", "68020", "68030", "68040", NULL}, TRUE},
+	/* A 68881 or 68882 beside a 68020 or 68030 (a 68040's is its own):
+	   Workbenches with Picasso96 and AmiKit want one; without it this one
+	   failed (#80000003) opening its RTG screen. */
+	{"FPU", "fpu",
+	 (const char *const[]){"Model's", "None", "68881", "68882", NULL},
+	 (const char *const[]){"", "0", "68881", "68882", NULL}, TRUE},
 	{"CPU Speed", "cpu_speed",
 	 (const char *const[]){"Model's (real)", "Fastest", NULL},
 	 (const char *const[]){"", "max", NULL}, TRUE},
 	{"Chipset", "chipset",
 	 (const char *const[]){"Model's", "OCS", "ECS", "AGA", NULL},
 	 (const char *const[]){"", "ocs", "ecs", "aga", NULL}, TRUE},
+	/* 8M: Amiberry's, more than an Amiga had (AmiKit has it). */
 	{"Chip RAM", "chip_ram",
-	 (const char *const[]){"Model's", "512K", "1M", "2M", NULL},
-	 (const char *const[]){"", "512", "1024", "2048", NULL}, TRUE},
+	 (const char *const[]){"Model's", "512K", "1M", "2M", "8M", NULL},
+	 (const char *const[]){"", "512", "1024", "2048", "8192", NULL}, TRUE},
 	{"Slow RAM", "slow_ram",
 	 (const char *const[]){"Model's", "None", "512K", "1M", "1.5M", "1.8M", NULL},
 	 (const char *const[]){"", "0", "512", "1024", "1536", "1792", NULL}, TRUE},
@@ -681,8 +688,8 @@ static const struct {
 	 (const char *const[]){"", "0", "1", "2", "4", "8", NULL}, TRUE},
 	/* Above 16 MB: the CPU then addresses 32 bits (a 68020 or later). */
 	{"Zorro III RAM", "z3_ram",
-	 (const char *const[]){"None", "16M", "32M", "64M", "128M", "256M", NULL},
-	 (const char *const[]){"", "16", "32", "64", "128", "256", NULL}, TRUE},
+	 (const char *const[]){"None", "16M", "32M", "64M", "128M", "256M", "512M", NULL},
+	 (const char *const[]){"", "16", "32", "64", "128", "256", "512", NULL}, TRUE},
 	/* Picasso96's uaegfx card (Picasso96 on the Amiga's disk), Zorro III. */
 	{"RTG Card", "rtg",
 	 (const char *const[]){"None", "8M", "16M", "32M", "64M", NULL},

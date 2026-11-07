@@ -28,6 +28,7 @@
 #include "rommgr.h"
 #include "memory.h"
 #include "ethernet.h"
+#include "amiberry_gfx.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -295,8 +296,42 @@ static bool is_mount_line(const TCHAR *s)
    over the model's preset (put back first) into changed_prefs, which a
    hard reset then uses, as Amiberry's own settings window does. Returns
    how many lines Amiberry took. */
+/* The sizes Picasso96's uaegfx card offers the Amiga: libretro's build
+   lists one (1920x1080, osdep/libretro/gfx_platform_internal.h), to which
+   Amiberry adds its classic ones (320x200 to 1280x1024); these are the
+   HDMI ones a desktop's monitor would list, as Workbenches set up on
+   desktop Amiberry use them (one set to 1280x720 fell back to PAL). The
+   card reads them as the Amiga starts Picasso96, after the setup. */
+static void add_display_modes(void)
+{
+	static const int sizes[][2] = {
+		{800, 480}, {1024, 600}, {1152, 864}, {1280, 720}, {1280, 768},
+		{1280, 800}, {1280, 960}, {1360, 768}, {1366, 768}, {1440, 900},
+		{1600, 900}, {1600, 1200}, {1680, 1050}, {1920, 1080}, {1920, 1200},
+	};
+	struct MultiDisplay *md = &Displays[0];
+	struct PicassoResolution *modes;
+	int n = 0;
+	if (md->DisplayModes == nullptr || md->DisplayModes[1].inuse)
+		return;   /* not set up yet, or done */
+	modes = xcalloc(struct PicassoResolution, MAX_PICASSO_MODES);
+	if (modes == nullptr)
+		return;
+	for (const auto &size : sizes) {
+		struct PicassoResolution *m = &modes[n++];
+		m->inuse = true;
+		m->res.width = size[0];
+		m->res.height = size[1];
+		m->refresh[0] = 60;
+		_sntprintf(m->name, sizeof m->name, _T("%dx%d"), size[0], size[1]);
+	}
+	xfree(md->DisplayModes);
+	md->DisplayModes = modes;
+}
+
 int bmamiga_core_set_config(const char *lines)
 {
+	add_display_modes();
 	TCHAR line[MAX_DPATH * 2];
 	const char *p = lines;
 	int taken = 0;

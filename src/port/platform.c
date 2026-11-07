@@ -677,6 +677,7 @@ static void setup_lines(char *out, size_t size)
 	} words[] = {
 		{"kickstart", "kickstart_rom_file=%s\n"},
 		{"cpu", "cpu_model=%s\n"},
+		{"fpu", "fpu_model=%s\n"},
 		{"chipset", "chipset=%s\n"},
 		{"sound_filter", "sound_filter=%s\n"},
 	};
