@@ -9,7 +9,9 @@
  * which lets the tests run as fast as the PC can. The time of day
  * (CLOCK_REALTIME, the Amiga's clock and timed waits) stays the real one.
  *
- * Pacing: Amiberry's libretro core always paces itself, waiting at the end
+ * Pacing (with its internal vsync off; on, since Amiberry #2629, it doesn't
+ * wait at all and the display paces it): Amiberry's libretro core paces
+ * itself, waiting at the end
  * of each frame until one Amiga frame (20.03 ms for PAL) has passed since
  * it last waited (isvsync_chipset() is 0 in libretro builds; framewait()
  * in custom.cpp). Locked to a 50 Hz display that is never quite right: its
@@ -59,22 +61,6 @@ void bmamiga_clock_frame(int display_paces, double period)
 		offset = frame_time - now;
 	}
 	frame_paced = display_paces;
-}
-
-/* Paced by the display, Amiberry's own wait for the end of its frame (the
-   main thread's sleeps) passes on its clock, not the Pi's: the display's
-   wait is the only one. Slept for real, it took whatever a frame was quicker
-   than the slowest so far, kept that from then on (its next frame is due one
-   frame after its last wait, and its time moves on one frame per frame
-   shown), and the 0.03 ms a frame between a 50.08/49.92 Hz Amiga and the
-   display added up, until each frame missed its refresh and waited for the
-   next: half speed (a Pi 500 at 50 Hz, 2026-11-07). */
-static int frame_sleep(double us)
-{
-	if (!frame_paced)
-		return 0;
-	offset += us / 1e6;
-	return 1;
 }
 
 static int is_monotonic(clockid_t id)
@@ -138,8 +124,6 @@ int bma_nanosleep(const struct timespec *req, struct timespec *rem)
 	if (bma_threads_sleep(us / 1e6))
 		return 0;
 	bma_threads_yield();
-	if (frame_sleep(us))
-		return 0;
 	bmamiga_clock_slept += us / 1e6;
 	host_sleep_us(us > 4e9 ? 4000000000u : (unsigned) us);
 	return 0;
@@ -150,8 +134,6 @@ int bma_usleep(useconds_t us)
 	if (bma_threads_sleep(us / 1e6))
 		return 0;
 	bma_threads_yield();
-	if (frame_sleep(us))
-		return 0;
 	bmamiga_clock_slept += us / 1e6;
 	host_sleep_us((unsigned) us);
 	return 0;

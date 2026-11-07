@@ -74,7 +74,7 @@ what the chosen model has, and choosing anything else is kept in
 | Kickstart         | the model's, or a file in `roms` | `kickstart` (a path) |
 | CPU               | 68000, 68010, 68020, 68030, 68040 | `cpu` |
 | FPU               | none, 68881, 68882: a maths coprocessor beside a 68020 or 68030 (a 68040 has its own). Workbenches with Picasso96, and AmiKit, want one | `fpu` (`0`, `68881`, `68882`) |
-| CPU Speed         | real (cycle-exact), or *Fastest*: as fast as the Pi can | `cpu_speed` (`max`) |
+| CPU Speed         | real (cycle-exact); *Approximate*: the real speed but not cycle-exact, far lighter (an A500 on a Pi 4 or 400, or when the sound breaks up); or *Fastest*: as fast as the Pi can | `cpu_speed` (`approx`, `max`) |
 | Chipset           | OCS, ECS, AGA | `chipset` (`ocs`, `ecs`, `aga`) |
 | Chip RAM          | 512K, 1M, 2M, 8M (Amiberry's, more than an Amiga had; AmiKit has it) | `chip_ram` (in KB) |
 | Slow RAM          | none, 512K, 1M, 1.5M, 1.8M | `slow_ram` (in KB) |

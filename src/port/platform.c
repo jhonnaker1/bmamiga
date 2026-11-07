@@ -18,9 +18,11 @@
  *
  * Timing: when the display refreshes at (close to) the Amiga's frame rate
  * (50 Hz for a PAL Amiga), every frame is shown on its own display refresh
- * and paced by it: Amiberry's clock is then the frames' (clock.c), and its
- * own waits pass on that clock, not the Pi's. Otherwise, or when the Pi
- * can't keep up, Amiberry paces itself by the real clock. Either way the sound is kept in step by dropping or
+ * and paced by it: Amiberry's internal vsync is on (the core option
+ * amiberry_internal_vsync), with which it shows each frame and goes on at
+ * the next retro_run() without a wait of its own. Otherwise Amiberry paces
+ * itself by the clock (clock.c); locked but behind the display, BMAmiga
+ * does (pace_by_clock()). Either way the sound is kept in step by dropping or
  * repeating a sample now and then.
  *
  * This file is part of BMAmiga, a bare metal Amiga emulator for the
@@ -234,6 +236,8 @@ static void update_sync_mode(void)
 		LOG("display %.2f Hz, machine %.2f Hz, %s\n", refresh_rate, machine_rate,
 		    lock ? "synchronised to the display" : "timer paced");
 	}
+	if (lock != vsync_lock)
+		options_dirty = TRUE;   /* amiberry_internal_vsync follows it */
 	vsync_lock = lock;
 }
 
@@ -351,6 +355,22 @@ static double load_avg;
 static int overloaded;
 static double stats_start, stats_sum, stats_max;
 static unsigned stats_frames, stats_late;
+
+/* Locked to the display but behind it: the core doesn't wait (its internal
+   vsync is on), so one frame an Amiga frame's time, by the clock, without
+   waiting for the display; a frame late starts the count again. */
+static void pace_by_clock(double now)
+{
+	static double next;
+	double period = 1.0 / bmamiga_core_frame_rate();
+	if (period <= 0.0 || period > 0.1)
+		return;
+	next += period;
+	if (next < now - period || next > now + period)
+		next = now;
+	else if (next > now)
+		host_sleep_us((unsigned) ((next - now) * 1e6));
+}
 
 static int display_paces(void)
 {
@@ -730,6 +750,14 @@ static void setup_lines(char *out, size_t size)
 	/* The fastest: as fast as the Pi can, which isn't cycle-exact. */
 	if (strcmp(host_option("cpu_speed", ""), "max") == 0)
 		ADD("cpu_speed=max\ncycle_exact=false\n");
+	/* Approximate: the real speed, but not cycle-exact (the CPU's and the
+	   blitter's every cycle): far lighter, which most games don't notice.
+	   An A500's cycle-exact 68000 took 12 ms of the Pi 5's 20 ms a frame,
+	   and more than a Pi 4 or 400 has (Indy Heat, 2026-11-07). The JIT
+	   sets the speed itself. */
+	else if (strcmp(host_option("cpu_speed", ""), "approx") == 0
+	         && strcmp(host_option("jit", ""), "on") != 0)
+		ADD("cpu_speed=real\ncycle_exact=false\ncpu_compatible=true\n");
 	sd_path(path, sizeof path, "bmamiga.uae");
 	f = fopen(path, "r");
 	if (f != NULL) {
@@ -972,15 +1000,16 @@ static const char *core_option(const char *key)
 {
 	if (strcmp(key, "amiberry_model") == 0)
 		return bmamiga_model_id(bmamiga_model());
-	/* Always off: Amiberry's libretro build paces itself by its clock either
-	   way (isvsync_chipset() is 0 with LIBRETRO; clock.c makes its clock
-	   the frames' when the display paces). Changing it only reconfigured
-	   Amiberry (set_config_changed(), the joystick ports applied again)
-	   each time the Pi fell behind the display or caught up, which a
-	   game at the limit did every few seconds: the sound broke up (a Pi
-	   500 with Indy Heat, 2026-11-07). */
+	/* On while the display runs at the Amiga's rate: the core then shows each
+	   frame and goes on at the next retro_run() without a wait of its own
+	   (Amiberry #2629), so the display alone paces it. It changes only with
+	   the display's rate, not when the Pi falls behind and catches up: each
+	   change reconfigures Amiberry (set_config_changed(), its joystick ports
+	   again), which a game at the limit did every few seconds and the sound
+	   broke up (a Pi 500 with Indy Heat, 2026-11-07). Behind, BMAmiga paces
+	   it by the clock itself (pace_by_clock()). */
 	if (strcmp(key, "amiberry_internal_vsync") == 0)
-		return "disabled";
+		return vsync_lock ? "standard" : "disabled";
 	if (strcmp(key, "amiberry_video_standard") == 0)
 		return host_option("video_standard", "auto");
 	if (strcmp(key, "amiberry_floppy_speed") == 0) {
@@ -1113,11 +1142,17 @@ static void cd_back_in(void)
 
 /* Amiberry writes floppies as the Amiga writes them; since the Pi can be
    switched off at any time, push everything out to the card each second. */
+/* Every open file's data, directory entry and FAT out to the card: all of
+   the C library's 32 (newlib_open_files_patch.diff; Amiberry keeps the
+   Amiga's open files on folder drives open, and they reach past 20, which
+   were never written out, even at a shut down). */
+#define OPEN_FILES 32
+
 static void sync_files(void)
 {
 	int fd;
 	fflush(NULL);
-	for (fd = 3; fd < 20; fd++)
+	for (fd = 3; fd < OPEN_FILES; fd++)
 		fsync(fd);
 }
 
@@ -1395,6 +1430,8 @@ void bmamiga_main(void)
 		now = host_time();
 		if (!warp)
 			measure_load(now);
+		if (vsync_lock && overloaded && !warp)
+			pace_by_clock(now);
 		host_video_present(display_paces());
 		frame_start = host_time();
 		frame_slept = bmamiga_clock_slept;

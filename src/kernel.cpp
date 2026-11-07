@@ -1000,9 +1000,16 @@ double CKernel::Time(void) {
   return (double)CTimer::GetClockTicks64() / CLOCKHZ;
 }
 
+// An SD card goes on writing inside itself for a while after it has said a
+// write is done; a reboot or a halt straight after the last ones (the files
+// synced, the log closed) can cut that short, and Windows then offers to
+// scan the card. A second, as Linux and BMC64 take longer to stop.
+static const unsigned CardSettleMs = 1000;
+
 void CKernel::Reboot(void) {
   mLogger.Write(FromKernel, LogNotice, "Rebooting");
   mLog.Close();
+  CTimer::SimpleMsDelay(CardSettleMs);
   reboot();
 }
 
@@ -1011,7 +1018,7 @@ void CKernel::PowerOff(void) {
   mLogger.Write(FromKernel, LogNotice, "Powering off");
   mLog.Close();
   mVideo.Blank();
-  CTimer::SimpleMsDelay(100);   // the log out of the UART
+  CTimer::SimpleMsDelay(CardSettleMs);   // the card's writes, and the log out of the UART
   // First tell the firmware, as Linux does before every reboot, halt or
   // power off: the mailbox tag RPI_FIRMWARE_NOTIFY_REBOOT, 0x00030048, no
   // data (drivers/firmware/raspberrypi.c, rpi_firmware_notify_reboot and
@@ -1036,6 +1043,7 @@ void CKernel::PowerOff(void) {
 #else
   mLogger.Write(FromKernel, LogNotice, "Halting; safe to switch off");
   mLog.Close();
+  CTimer::SimpleMsDelay(CardSettleMs);
   // Blank the picture so it is clear the Pi has stopped.
   mFrameBuffer.Hide();
   halt();
