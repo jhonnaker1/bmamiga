@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.5.0 – 2026-11-13
+
+The Amiga's clock, files' dates on the card, and RTG screens' shape, found
+running AmigaSYS 2026, wiisoldier's update of AmigaSYS for Amiberry (thanks
+to wiisoldier). Tried on a Pi 5 with AmigaSYS. Not yet tried on a Pi 4 or
+400.
+
+- RTG screens were squeezed to 4:3: the core gives 4:3 for every picture,
+  and a 1920x1080 Workbench lost one column in four, its text hard to
+  read. An RTG screen is now shown with square pixels, filling a 16:9
+  display
+- Every file on the card was from 1 January 1970 (circle-newlib's
+  `stat()` left the time at 0; `newlib_stat_time_patch.diff`). Before
+  the Amiga's 1978, so AmigaOS's `AddDataTypes REFRESH` added none of
+  `DEVS:DataTypes`, and AmigaSYS's backdrop pictures were of an "unknown
+  data type". Files now have their dates and times, in local time as a PC
+  or Mac reads them
+- The Amiga couldn't set a file's date (`SetDate`, copies keeping dates):
+  `utimes()` was a stub (`newlib_utime_patch.diff`). And a date set read
+  back moved by the time zone: Amiberry's `tm_gmtoff`, which newlib
+  lacks, read as 0
+- The Amiga's clock: AmigaOS started at 1 January 1978. Every Amiga but
+  the CD32 now has a clock chip (an MSM6242B, as A500 and A1200 clock
+  add-ons had), reading the Pi's time; the Pi, which has no clock of its
+  own, saves its time on the card (`saves/clock.txt`) and starts from it;
+  and when the network sets the time, and after the menu, AmigaOS's time
+  is set again (Amiberry's `synchronize_clock`). `rtc=none` and
+  `synchronize_clock=false` in `bmamiga.uae` turn them off
+- The time zone (`timezone`) is used with or without the network
+
 ## 0.4.0 – 2026-11-07
 
 Amiberry 8.5.0, built with its own Makefile options (thanks to midwan,

@@ -355,13 +355,33 @@ started with **Reboot**. A mistake in `cmdline.txt` or `config.txt` can stop
 the Pi starting, and then needs the card in a computer (the `.bak` copy
 makes that easy).
 
+An RTG screen is shown with square pixels, so a 1920x1080 or 1280x720
+Workbench fills a 16:9 display (the chipset's screens keep a TV's 4:3).
+
 The web UI is open to anyone on your network. To protect it with a PIN, set
 `webui_pin=1234` in `cmdline.txt`; the browser then asks for a user name
 (anything) and the PIN. To network without the web UI, set `webui=0`.
 
-The network also sets the Pi's clock, so files saved on the card get the
-right date and time. Set `timezone` to your offset from UTC in minutes, for
-example `timezone=600` for UTC+10.
+The network also sets the Pi's clock. Set `timezone` to your offset from
+UTC in minutes, for example `timezone=600` for UTC+10 or `timezone=-480`
+for UTC-8: it is used with or without the network.
+
+**The Amiga's clock.** Every Amiga but the CD32 has a clock chip (an
+MSM6242B, as A500 and A1200 clock add-ons had; the CDTV has its own),
+which reads the Pi's time, so AmigaOS starts with the date and time
+rather than 1 January 1978. The Pi has no clock of its own: BMAmiga saves
+its time on the card (`saves/clock.txt`) every 10 minutes, when the
+network sets it, and at reboot and shut down, and starts from it. When
+the network then sets the time, and after the menu (while which the Amiga
+stands still), AmigaOS's time is set again (Amiberry's
+`synchronize_clock`, through its hard drives: with a folder or hard disk
+image mounted). Without the network the Amiga starts from the time of the
+last shut down. In `bmamiga.uae`, `rtc=none` takes the clock chip out and
+`synchronize_clock=false` stops the setting.
+
+Files on the card have their dates and times, as on a PC or Mac (FAT keeps
+local time, to 2 seconds, from 1980 to 2107), and the Amiga can set them
+(`SetDate`, or a copy keeping dates).
 
 ## The Amiga's network
 
@@ -432,7 +452,7 @@ the web UI.
 | `network`           | `off`, `ethernet`, `wifi`    | `off`    | Networking (see Networking and the web UI) |
 | `webui`             | `0`, `1`                     | `1`      | Web UI when networking is on |
 | `webui_pin`         | digits                       | none     | PIN for the web UI |
-| `timezone`          | minutes east of UTC          | `0`      | Time zone for the network clock |
+| `timezone`          | minutes east of UTC          | `0`      | Time zone: the Amiga's clock and the card's file times (see Networking and the web UI) |
 | `usbpowerdelay`     | milliseconds                 | Circle's | Circle: wait for USB devices to power up (by default 300 ms, 510 ms behind a hub) |
 
 ## Logging
