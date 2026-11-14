@@ -168,6 +168,9 @@ for 512 MB of Zorro III RAM (`z3mem_size=512`) and an RTG card. `bmamiga.uae.exa
 card has more. A wrong name or value is ignored (with
 `enable_logging=file`, the log says which).
 
+Amiberry's native code interface (`native_code`, its `uaenative.library`)
+is on: AmiKit's own tools need it. `native_code=false` turns it off.
+
 ## Floppy disks
 
 *Floppy Drives* shows the four drives. Choose one to insert a disk: the
@@ -362,6 +365,14 @@ The web UI is open to anyone on your network. To protect it with a PIN, set
 `webui_pin=1234` in `cmdline.txt`; the browser then asks for a user name
 (anything) and the PIN. To network without the web UI, set `webui=0`.
 
+**Wait for Network at Start** (Network menu, `wait_for_network=1`): the
+Pi's Wi-Fi takes 20 to 40 seconds after power-on to connect, and an Amiga
+program started with the Workbench can look for the network before then
+(AmiKit's weather and menu bar then say NO NET until the next check). With
+this on, BMAmiga waits on its start screen until the network is connected,
+then starts the Amiga. A key starts the Amiga at once; a network that is
+off or fails, or one that isn't up after a minute, isn't waited for.
+
 The network also sets the Pi's clock. Set `timezone` to your offset from
 UTC in minutes, for example `timezone=600` for UTC+10 or `timezone=-480`
 for UTC-8: it is used with or without the network.
@@ -450,6 +461,7 @@ the web UI.
 | `gpio_joysticks`    | `0`, `1`                     | `0`      | A joystick on the GPIO header |
 | `enable_logging`    | `off`, `uart`, `file`        | `off`    | Where the log goes (see Logging) |
 | `network`           | `off`, `ethernet`, `wifi`    | `off`    | Networking (see Networking and the web UI) |
+| `wait_for_network`  | `0`, `1`                     | `0`      | Start the Amiga only once the network is connected, for a minute at most (see Networking and the web UI) |
 | `webui`             | `0`, `1`                     | `1`      | Web UI when networking is on |
 | `webui_pin`         | digits                       | none     | PIN for the web UI |
 | `timezone`          | minutes east of UTC          | `0`      | Time zone: the Amiga's clock and the card's file times (see Networking and the web UI) |

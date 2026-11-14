@@ -95,6 +95,8 @@ int osd_browse_dir(const char *title, char *dir, size_t dir_size, char *path, si
    seconds): BMAmiga's name, VERSION and STATUS. The Amiga's first picture
    replaces it. */
 void osd_splash(const char *version, const char *status);
+/* A smaller line of text under the splash screen's status. */
+void osd_splash_note(const char *note);
 
 /* Draws a one line message over the emulator's picture, for a few seconds. */
 void osd_notify(const char *text);

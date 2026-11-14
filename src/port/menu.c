@@ -315,7 +315,7 @@ static int scan_wifi(void)
 
 static void network_menu(void)
 {
-	enum { N_DEVICE, N_SCAN, N_SSID, N_PASSWORD, N_COUNTRY, N_WEBUI, N_PIN, N_TIMEZONE, N_REBOOT };
+	enum { N_DEVICE, N_WAIT, N_SCAN, N_SSID, N_PASSWORD, N_COUNTRY, N_WEBUI, N_PIN, N_TIMEZONE, N_REBOOT };
 	static const char *const devices[] = {"off", "ethernet", "wifi", NULL};
 	static const char *const device_names[] = {"Off", "Ethernet", "Wi-Fi", NULL};
 	int sel = 2;
@@ -338,6 +338,7 @@ static void network_menu(void)
 				{status, NULL, OSD_ITEM_LABEL, -1},
 				{"", NULL, OSD_ITEM_LABEL, -1},
 				{"Network", device_names[device], OSD_ITEM_SUBMENU, N_DEVICE},
+				{"Wait for Network at Start", NULL, check(setting_on("wait_for_network", FALSE)), N_WAIT},
 				{"Scan for Wi-Fi Networks", NULL, OSD_ITEM_SUBMENU, N_SCAN},
 				{"Wi-Fi Network", wifi_ssid[0] ? wifi_ssid : "(none)", OSD_ITEM_SUBMENU, N_SSID},
 				{"Wi-Fi Password", wifi_psk[0] ? "********" : "(none)", OSD_ITEM_SUBMENU, N_PASSWORD},
@@ -358,6 +359,9 @@ static void network_menu(void)
 				save_setting("network", devices[i]);
 				reboot_needed = TRUE;
 			}
+			break;
+		case N_WAIT:
+			save_setting("wait_for_network", setting_on("wait_for_network", FALSE) ? "0" : "1");
 			break;
 		case N_SCAN:
 			if (scan_wifi() == 2) {

@@ -390,6 +390,19 @@ else
     echo "SKIP  netprobe: DNS (this computer is offline)"
 fi
 
+# Wait for Network at Start: the simulator's Wi-Fi is "connecting" for its
+# first 100 frames (2 s), then up; a key goes on without it.
+BMAMIGA_IP=192.168.1.50 run waitnet 50 "$OUT/aros" "network=wifi wait_for_network=1" '400 quit\n'
+check_log waitnet "network up after [12]\.[0-9] s: 192\.168\.1\.50" "the Amiga starts once the network is up"
+BMAMIGA_IP=192.168.1.50 run waitskip 50 "$OUT/aros" "network=wifi wait_for_network=1" '20 key 0x2c 1\n21 key 0x2c 0\n400 quit\n'
+check_log waitskip "waiting for the network skipped: Wi-Fi connecting" "a key starts it at once"
+BMAMIGA_IP=192.168.1.50 run nowait 50 "$OUT/aros" "network=wifi" '400 quit\n'
+if grep -Eq "network up after|waiting for the network" "$OUT/nowait/log.txt"; then
+    fail nowait "waited for the network with wait_for_network off"
+else
+    pass "nowait: no waiting with the option off"
+fi
+
 if [ -n "${BMAMIGA_ROMS:-}" ] && [ -n "${BMAMIGA_WORKBENCH:-}" ]; then
     echo "Workbench 1.3 (Kickstart from $BMAMIGA_ROMS)"
     mkdir -p "$OUT/wb/disks"

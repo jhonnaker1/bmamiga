@@ -17,7 +17,7 @@
 |---|---|
 | [BUILDING.md](BUILDING.md) | Building the kernels and the SD card |
 | [SIMULATOR.md](SIMULATOR.md) | Testing and debugging BMAmiga on a PC (and its start in QEMU), and getting a log from the Pi |
-| [AMIKIT.md](AMIKIT.md) | Running AmiKit on BMAmiga: what it needs, what's done, what's next |
+| [AMIKIT.md](AMIKIT.md) | Running AmiKit on BMAmiga: copying it to the card, its settings, what works |
 | [UPDATING.md](UPDATING.md) | Moving to a new Amiberry or Circle |
 | [THIRD_PARTY.md](THIRD_PARTY.md) | Third-party software and licences |
 | [../src/port/circle/README.md](../src/port/circle/README.md) | What Amiberry needs on Circle, and how BMAmiga gives it |

@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.6.0 – 2026-11-14
+
+AmiKit runs: its Workbench at 1920x1080, Directory Opus, the dock, its
+weather and its other programs on the network. Tried on a Pi 5 and a Pi 4
+with AmiKit X, and in the simulator.
+
+- AmiKit stopped at a grey screen: IPrefs looped for ever in
+  `locale.library`. AmiKit's own tools (its `env-handler` for `ENV:`, and
+  Directory Opus) call the Mac through Amiberry's native code interface
+  (`native_code`), which BMAmiga left off; `env-handler` then served empty
+  files, and an empty `locale.prefs` sent IPrefs round for ever, and
+  Directory Opus crashed. Native code is now on (`native_code=false` in
+  `bmamiga.uae` turns it off)
+- 32-bit RTG screens had red and blue swapped (AmiKit's orange panther
+  was blue, AmigaSYS's cubes too): Amiberry's libretro core hands over
+  RTG pictures in a desktop window's byte order. BMAmiga swaps them back
+- The ' and " key did nothing, and nor did the key by the left Shift on
+  ISO (European) keyboards (< and > on a German one): Amiberry's libretro
+  keyboard leaves them out. BMAmiga now sends them itself
+- After some minutes of AmiKit, files on a folder drive failed to open
+  ("Too many open files": MUI's images, fonts, music): the Pi could have
+  32 files open. Now 128 (`newlib_open_files_patch.diff`)
+- A Pi 4 locked up when the Amiga's picture was taller than the display
+  (AmiKit's 1920x1080 RTG screen on a 1280x720 one): the sharp picture
+  was drawn past the end of the display's memory. Lines are now left out
+  evenly
+- New: *Wait for Network at Start* in the Network menu
+  (`wait_for_network=1`). The Pi's Wi-Fi takes seconds to connect, and
+  an Amiga program that looks for the network before then (AmiKit's
+  weather and menu bar) finds none. With this on, BMAmiga waits
+  on its start screen until the network is connected (a minute at most; a
+  key starts the Amiga at once)
+- The Pi's clock is set from the network sooner: a failed try is tried
+  again after 15 s for two minutes, not after 5 minutes. The first try,
+  just after the Wi-Fi connects, often fails
+- [AMIKIT.md](docs/AMIKIT.md) says how to run AmiKit
+
 ## 0.5.0 – 2026-11-13
 
 The Amiga's clock, files' dates on the card, and RTG screens' shape, found

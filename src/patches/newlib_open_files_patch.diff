@@ -1,5 +1,5 @@
 diff --git a/libgloss/circle/filetable.h b/libgloss/circle/filetable.h
-index 390050dd6..764a84c32 100644
+index 390050d..764a84c 100644
 --- a/libgloss/circle/filetable.h
 +++ b/libgloss/circle/filetable.h
 @@ -100,8 +100,8 @@ namespace _CircleStdlib
@@ -8,8 +8,73 @@ index 390050dd6..764a84c32 100644
  
 -        static constexpr unsigned int MAX_OPEN_FILES = 20;
 -        static constexpr unsigned int MAX_OPEN_DIRS = 20;
-+        static constexpr unsigned int MAX_OPEN_FILES = 32;
++        static constexpr unsigned int MAX_OPEN_FILES = 128;
 +        static constexpr unsigned int MAX_OPEN_DIRS = 64;
  
      private:
          static CircleFile fileTab[MAX_OPEN_FILES];
+diff --git a/libgloss/circle/select.cpp b/libgloss/circle/select.cpp
+index 46e796b..f437ba6 100644
+--- a/libgloss/circle/select.cpp
++++ b/libgloss/circle/select.cpp
+@@ -20,8 +20,7 @@ extern "C" void FD_CLR(int fd, fd_set *fdset)
+         return;
+     }
+ 
+-    int const mask = ~(1 << fd);
+-    fdset->_x &= mask;
++    fdset->_x[fd / 32] &= ~(1u << (fd % 32));
+ }
+ 
+ extern "C" int FD_ISSET(int fd, fd_set *fdset)
+@@ -31,8 +30,7 @@ extern "C" int FD_ISSET(int fd, fd_set *fdset)
+         return 0;
+     }
+ 
+-    int const mask = 1 << fd;
+-    return (fdset->_x & mask) != 0;
++    return (fdset->_x[fd / 32] & (1u << (fd % 32))) != 0;
+ }
+ 
+ extern "C" void FD_SET(int fd, fd_set *fdset)
+@@ -42,13 +40,15 @@ extern "C" void FD_SET(int fd, fd_set *fdset)
+         return;
+     }
+ 
+-    int const mask = 1 << fd;
+-    fdset->_x |= mask;
++    fdset->_x[fd / 32] |= 1u << (fd % 32);
+ }
+ 
+ extern "C" void FD_ZERO(fd_set *fdset)
+ {
+-    fdset->_x = 0;
++    for (unsigned int i = 0; i < sizeof fdset->_x / sizeof fdset->_x[0]; i++)
++    {
++        fdset->_x[i] = 0;
++    }
+ }
+ 
+ extern "C" int pselect(int nfds, fd_set *readfds,
+diff --git a/newlib/libc/sys/circle/sys/select.h b/newlib/libc/sys/circle/sys/select.h
+index 5132b43..b9e88a5 100644
+--- a/newlib/libc/sys/circle/sys/select.h
++++ b/newlib/libc/sys/circle/sys/select.h
+@@ -22,7 +22,7 @@ typedef	__sigset_t	sigset_t;
+ #endif
+ 
+ typedef struct {
+-    int _x;
++    unsigned int _x[4];
+ } fd_set;
+ 
+ int pselect(int nfds, fd_set *readfds,
+@@ -38,7 +38,7 @@ int FD_ISSET(int fd, fd_set *fdset);
+ void FD_SET(int fd, fd_set *fdset);
+ void FD_ZERO(fd_set *fdset);
+ 
+-#define FD_SETSIZE 32
++#define FD_SETSIZE 128
+ 
+ #ifdef __cplusplus
+ }

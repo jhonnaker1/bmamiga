@@ -31,6 +31,8 @@
 #include "ethernet.h"
 #include "amiberry_gfx.h"
 #include "xwin.h"
+#include "picasso96.h"
+#include "gfx_colors.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -343,7 +345,7 @@ int bmamiga_core_set_config(const char *lines)
 	TCHAR line[MAX_DPATH * 2];
 	const char *p = lines;
 	int taken = 0;
-	bool rtc_given = false, clock_sync_given = false;
+	bool rtc_given = false, clock_sync_given = false, native_given = false;
 	if (!preset.taken)
 		take_preset();
 	put_back_preset();
@@ -377,6 +379,8 @@ int bmamiga_core_set_config(const char *lines)
 			rtc_given = true;
 		if (_tcsnicmp(s, _T("synchronize_clock="), 18) == 0)
 			clock_sync_given = true;
+		if (_tcsnicmp(s, _T("native_code="), 12) == 0)
+			native_given = true;
 		cfgfile_parse_line(&changed_prefs, s, 0);
 		taken++;
 	}
@@ -399,6 +403,16 @@ int bmamiga_core_set_config(const char *lines)
 	   bmamiga_core_sync_clock()). */
 	if (!clock_sync_given)
 		changed_prefs.tod_hack = currprefs.tod_hack = true;
+	/* Amiberry's native interface (UNI, uaenative.cpp) on, as AmiKit's own
+	   settings have it: AmiKit's host tools ask it for a host library, and
+	   with it off the answer ("not enabled") left Directory Opus calling
+	   through a null pointer, and AmiKit's env-handler serving empty files
+	   (an empty locale.prefs, on which IPrefs looped for ever), 2026-11-13.
+	   On the Pi there are no host libraries to open, which the Amiga's
+	   programs take as they would on a desktop. bmamiga.uae's native_code=
+	   line wins. */
+	if (!native_given)
+		changed_prefs.native_code = currprefs.native_code = true;
 	set_config_changed();
 	return taken;
 }
@@ -534,4 +548,27 @@ int bmamiga_core_rtg_on(void)
 	return adisplays[0].picasso_on ? 1 : 0;
 }
 
+/* Whether the RTG picture has red and blue swapped: Amiberry lays out an
+   RTG screen for the host surface it would pick on a desktop, ABGR8888
+   (R8G8B8A8 in memory) for every format but B8G8R8A8, copying R8G8B8A8
+   pixels unchanged (picasso96.cpp, copyrow) and building its colour
+   tables for that layout; the libretro picture is XRGB8888, so
+   pictures came out with red and blue swapped (AmiKit's panther,
+   AmigaSYS's cubes). platform.c swaps them back as it converts. */
+int bmamiga_core_rtg_swapped(void)
+{
+	return adisplays[0].picasso_on && p96_get_host_rgb_format_for_monitor(0, 4) == RGBFB_R8G8B8A8;
+}
+
+}
+
+/* A key Amiberry's libretro keyboard callback drops (its RETROK to SDL
+   table has no RETROK_QUOTE, and no key for the ISO keyboard's extra key
+   by the left Shift): straight to Amiberry's keyboard handler, as its
+   desktop builds send it. USAGE is the USB HID usage, which is the SDL
+   scancode. */
+extern bool my_kbd_handler(int, int, int, bool);
+extern "C" void bmamiga_core_key(int usage, int down)
+{
+	my_kbd_handler(0, usage, down ? 1 : 0, false);
 }

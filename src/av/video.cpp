@@ -350,7 +350,13 @@ void Pi4Video::DrawSharp(uint8_t *page) {
   if (m_nDestW * bytes > sizeof line) {
     return;
   }
-  for (int y = 0; y < m_nViewH; y++) {
+  // A picture taller than the display (a 1920x1080 RTG screen on a 720
+  // line one) loses lines evenly; otherwise each line is repeated. Lines
+  // past the display's would be written past the framebuffer.
+  const bool shrink = (unsigned)m_nViewH > m_nDestH;
+  const int rows = shrink ? (int)m_nDestH : m_nViewH;
+  for (int row = 0; row < rows; row++) {
+    const int y = shrink ? (int)(((unsigned)row * (unsigned)m_nViewH) / m_nDestH) : row;
     const uint16_t *src = m_pSource + (size_t)(m_nViewY + y) * m_nSourceWidth;
     if (m_nDepth == 16) {
       uint16_t *line16 = (uint16_t *)line;
@@ -365,7 +371,7 @@ void Pi4Video::DrawSharp(uint8_t *page) {
         line32[i] = Pi4Rgb565ToArgb(src[m_pColumn[i]]);
       }
     }
-    uint8_t *dst = page + (size_t)(m_nDestY + y * m_nRepeat) * m_nPitch +
+    uint8_t *dst = page + (size_t)(m_nDestY + row * m_nRepeat) * m_nPitch +
                    m_nDestX * bytes;
     for (unsigned r = 0; r < m_nRepeat; r++) {
       ToFrameBuffer(dst, line, m_nDestW * bytes, 0);

@@ -69,13 +69,18 @@ public:
       CScheduler::Get()->Sleep(1);
     }
 
+    // A failed try is tried again soon at first: the first lookup comes
+    // right after DHCP, when the network's DNS can still be slow to answer
+    // (a Pi 5 on Wi-Fi), and the clock then ran from the card's saved
+    // time for 5 minutes or more.
+    unsigned failures = 0;
     for (;;) {
       CIPAddress server;
       CDNSClient dns(mNetwork);
       if (!dns.Resolve("pool.ntp.org", &server)) {
         CLogger::Get()->Write("ntp", LogWarning,
                               "Cannot resolve NTP server: pool.ntp.org");
-        CScheduler::Get()->Sleep(300);
+        CScheduler::Get()->Sleep(RetryDelay(++failures));
         continue;
       }
 
@@ -84,7 +89,7 @@ public:
       if (timestamp == 0) {
         CLogger::Get()->Write("ntp", LogWarning,
                               "Cannot get time from NTP server: pool.ntp.org");
-        CScheduler::Get()->Sleep(300);
+        CScheduler::Get()->Sleep(RetryDelay(++failures));
         continue;
       }
 
@@ -95,8 +100,15 @@ public:
         CLogger::Get()->Write("ntp", LogWarning,
                               "Cannot set system time from NTP");
       }
+      failures = 0;
       CScheduler::Get()->Sleep(900);
     }
+  }
+
+  // Seconds to wait after the FAILURES'th failure in a row: 15 s for the
+  // first 8 (two minutes), then 5 minutes.
+  static unsigned RetryDelay(unsigned failures) {
+    return failures <= 8 ? 15 : 300;
   }
 
 private:

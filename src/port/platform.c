@@ -64,6 +64,7 @@ void bmamiga_core_reset(int hard);
 void bmamiga_core_warp(int on);
 double bmamiga_core_frame_rate(void);
 int bmamiga_core_rtg_on(void);
+int bmamiga_core_rtg_swapped(void);
 void bmamiga_core_sync_clock(void);
 /* clock.c */
 void bmamiga_clock_frame(int display_paces, double period);
@@ -320,16 +321,25 @@ void bmamiga_display_mode_changed(void)
 static void core_video(const void *data, unsigned w, unsigned h, size_t pitch)
 {
 	unsigned x, y;
+	int swap_rb;
 	if (data == NULL || osd_view)
 		return;  /* the same picture again, or the menu is showing */
 	if (w > FB_W)
 		w = FB_W;
 	if (h > FB_H)
 		h = FB_H;
+	swap_rb = bmamiga_core_rtg_swapped();
 	for (y = 0; y < h; y++) {
 		uint16_t *out = fb_pixels + y * fb_pitch_px;
 		const uint8_t *row = (const uint8_t *) data + y * pitch;
-		if (pixel_format == RETRO_PIXEL_FORMAT_XRGB8888) {
+		if (pixel_format == RETRO_PIXEL_FORMAT_XRGB8888 && swap_rb) {
+			/* An RTG picture laid out as ABGR (bmamiga_core_rtg_swapped) */
+			const uint32_t *in = (const uint32_t *) row;
+			for (x = 0; x < w; x++) {
+				uint32_t p = in[x];
+				out[x] = (uint16_t) (((p << 8) & 0xf800) | ((p >> 5) & 0x07e0) | ((p >> 19) & 0x001f));
+			}
+		} else if (pixel_format == RETRO_PIXEL_FORMAT_XRGB8888) {
 			const uint32_t *in = (const uint32_t *) row;
 			for (x = 0; x < w; x++) {
 				uint32_t p = in[x];
@@ -913,6 +923,18 @@ static void insert_saved_media(void)
 /* ---- Input -------------------------------------------------------------------- */
 
 static retro_keyboard_event_t keyboard_cb;
+
+/* Keys Amiberry's libretro keyboard callback drops (see bridge.cpp's
+   bmamiga_core_key()): ' and " (on a US keyboard), and the ISO keyboard's
+   extra key by the left Shift (< and > on a German one). */
+#define USAGE_QUOTE         0x34
+#define USAGE_ISO_BACKSLASH 0x64
+void bmamiga_core_key(int usage, int down);   /* bridge.cpp */
+
+static int amiberry_drops(int usage)
+{
+	return usage == USAGE_QUOTE || usage == USAGE_ISO_BACKSLASH;
+}
 static int open_menu;
 static int pad_last_menu[HOST_PADS];
 static int mouse_dx, mouse_dy, mouse_buttons;
@@ -1018,6 +1040,11 @@ static void process_input(void)
 				bmamiga_set_warp(!warp);
 			continue;
 		}
+		if (amiberry_drops(usage)) {
+			if (core_running)
+				bmamiga_core_key(usage, pressed);
+			continue;
+		}
 		if (keyboard_cb != NULL) {
 			unsigned code = bmamiga_usage_to_retrok(usage);
 			if (code != RETROK_UNKNOWN)
@@ -1042,6 +1069,10 @@ static void process_input(void)
 static void release_keys(void)
 {
 	int usage;
+	if (core_running) {
+		bmamiga_core_key(USAGE_QUOTE, 0);
+		bmamiga_core_key(USAGE_ISO_BACKSLASH, 0);
+	}
 	if (keyboard_cb == NULL)
 		return;
 	for (usage = 0; usage < 256; usage++) {
@@ -1400,6 +1431,57 @@ static void report_speed(double now)
 	speed_amiga = 0.0;
 }
 
+/* "Wait for Network at Start" (wait_for_network=1): before Amiberry
+   starts, waits on the splash screen until the network has an address
+   (Wi-Fi takes 20 to 40 s after power-on), so that the Amiga's programs
+   find it the way they do on a desktop. A key goes on without it, and so
+   does a network that is off or has failed, or one minute. */
+static void wait_for_network(const char *version)
+{
+	const char *value = host_option("wait_for_network", "0");
+	double start, now;
+	int shown = -1;
+	if (strcmp(value, "1") != 0 && strcasecmp(value, "yes") != 0
+	    && strcasecmp(value, "true") != 0 && strcasecmp(value, "on") != 0)
+		return;
+	if (strcmp(host_option("network", "off"), "off") == 0)
+		return;
+	start = host_time();
+	for (;;) {
+		char status[64], ip[32], line[80];
+		int usage, pressed, left;
+		if (host_network_address(ip, sizeof ip)) {
+			LOG("network up after %.1f s: %s\n", host_time() - start, ip);
+			return;
+		}
+		host_network_status(status, sizeof status);
+		if (strstr(status, "starting") == NULL && strstr(status, "waiting") == NULL
+		    && strstr(status, "connecting") == NULL) {
+			LOG("not waiting for the network: %s\n", status);
+			return;
+		}
+		now = host_time();
+		if (now - start >= 60.0) {
+			LOG("network not up after 60 s: %s\n", status);
+			return;
+		}
+		while (host_key_event(&usage, &pressed))
+			if (pressed) {
+				LOG("waiting for the network skipped: %s\n", status);
+				return;
+			}
+		left = 60 - (int) (now - start);
+		if (left != shown) {
+			snprintf(line, sizeof line, "%s, %d s left. A key starts the Amiga now.", status, left);
+			osd_splash(version, "Waiting for the network to connect");
+			osd_splash_note(line);
+			host_video_present(TRUE);
+			shown = left;
+		}
+		host_sleep_us(50000);
+	}
+}
+
 void bmamiga_main(void)
 {
 	struct retro_system_av_info av;
@@ -1433,6 +1515,7 @@ void bmamiga_main(void)
 	{
 		char version[64];
 		snprintf(version, sizeof version, "Version %s", BMAMIGA_VERSION);
+		wait_for_network(version);
 		osd_splash(version, "Starting the Amiga...");
 		host_video_present(TRUE);
 	}

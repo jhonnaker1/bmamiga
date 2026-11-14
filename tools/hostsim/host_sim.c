@@ -985,6 +985,8 @@ void host_network_status(char *text, unsigned size)
 	char ip[32];
 	if (host_network_address(ip, sizeof(ip)))
 		snprintf(text, size, "Wi-Fi %s", ip);
+	else if (getenv("BMAMIGA_IP") != NULL)
+		snprintf(text, size, "Wi-Fi connecting");   /* the first 100 frames */
 	else
 		snprintf(text, size, "Off");
 }

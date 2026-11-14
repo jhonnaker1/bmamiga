@@ -181,6 +181,13 @@ void osd_splash(const char *version, const char *status)
 	bmamiga_osd_view(TRUE);
 }
 
+void osd_splash_note(const char *note)
+{
+	char line[2 * OSD_COLS + 1];
+	fit(line, sizeof line, note, 2 * OSD_COLS);
+	draw_big_text(380, line, 1, C_GREEN);
+}
+
 /* ---- Opening and closing ------------------------------------------------------ */
 
 void osd_open(void)
