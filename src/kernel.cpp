@@ -25,10 +25,12 @@
 #include "kernel.h"
 #include "logging.h"
 #include "network.h"
+#include "network_time_sync.h"
 #include "pi45/board.h"
 
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <circle/bcmpropertytags.h>
@@ -231,6 +233,12 @@ bool CKernel::Initialize(void) {
   }
   // Settings saved by the BMAmiga menu win over cmdline.txt.
   mOptions.LoadSettings("SD:/bmamiga.cfg");
+  // The time zone, for the Amiga's clock chip and the card's file times
+  // (both local time), with or without a network; and the time saved at
+  // the last shut down, as the Pi has no clock of its own and the
+  // network's comes about 45 s after the Amiga has read its clock.
+  ConfigureSystemTimeZone(mOptions.GetInt("timezone", 0));
+  RestoreSavedClock();
   // A second partition (exFAT, for disk images over 4 GB; or FAT32), as
   // SD2:. The Pi boots from the first, which must be FAT32.
   s_bVolume2 = f_mount(&mFileSystem2, "SD2:", 1) == FR_OK;
@@ -1007,7 +1015,64 @@ double CKernel::Time(void) {
 // scan the card. A second, as Linux and BMC64 take longer to stop.
 static const unsigned CardSettleMs = 1000;
 
+// The time, saved on the card (fake-hwclock, as Raspberry Pi OS has it
+// without a clock): restored at the start when the Pi has no time yet,
+// so the Amiga's clock chip starts near the right time instead of 1970.
+// Saved every 10 minutes, at once when the network sets the time, and at
+// reboot and power off; from the emulator's core (the frame loop, as the
+// log file), never at the same time as the Amiga's file systems.
+static const char ClockFile[] = "SD:/saves/clock.txt";
+static const unsigned ClockValidFrom = 1735689600;   // 2025-01-01, UTC
+static unsigned s_nClockSaved, s_nClockSeen;
+
+void CKernel::RestoreSavedClock(void) {
+  if (CTimer::Get()->GetUniversalTime() >= ClockValidFrom) {
+    return;
+  }
+  FIL file;
+  if (f_open(&file, ClockFile, FA_READ) != FR_OK) {
+    return;
+  }
+  char text[24] = {0};
+  UINT got = 0;
+  f_read(&file, text, sizeof text - 1, &got);
+  f_close(&file);
+  unsigned long seconds = strtoul(text, nullptr, 10);
+  if (seconds >= ClockValidFrom && seconds < 0xFFFFFFFFUL
+      && CTimer::Get()->SetTime((unsigned) seconds, FALSE)) {
+    s_nClockSaved = s_nClockSeen = (unsigned) seconds;
+    mLogger.Write(FromKernel, LogNotice, "Clock set from %s: %lu UTC", ClockFile, seconds);
+  }
+}
+
+boolean CKernel::SaveClock(boolean bNow) {
+  unsigned now = CTimer::Get()->GetUniversalTime();
+  if (now < ClockValidFrom) {
+    return FALSE;
+  }
+  // The time jumped (the network set it, or the first time the Pi has
+  // one at all): save it at once.
+  boolean bJumped = s_nClockSeen == 0 || now > s_nClockSeen + 60 || now + 60 < s_nClockSeen;
+  s_nClockSeen = now;
+  if (!bNow && !bJumped && s_nClockSaved != 0 && now < s_nClockSaved + 600 && now >= s_nClockSaved) {
+    return FALSE;
+  }
+  f_mkdir("SD:/saves");
+  FIL file;
+  if (f_open(&file, ClockFile, FA_WRITE | FA_CREATE_ALWAYS) != FR_OK) {
+    return bJumped;
+  }
+  char text[24];
+  int len = snprintf(text, sizeof text, "%u\n", now);
+  UINT put = 0;
+  f_write(&file, text, (UINT) len, &put);
+  f_close(&file);
+  s_nClockSaved = now;
+  return bJumped;
+}
+
 void CKernel::Reboot(void) {
+  SaveClock(TRUE);
   mLogger.Write(FromKernel, LogNotice, "Rebooting");
   mLog.Close();
   CTimer::SimpleMsDelay(CardSettleMs);
@@ -1015,6 +1080,7 @@ void CKernel::Reboot(void) {
 }
 
 void CKernel::PowerOff(void) {
+  SaveClock(TRUE);
 #if RASPPI >= 4
   mLogger.Write(FromKernel, LogNotice, "Powering off");
   mLog.Close();
@@ -1273,6 +1339,8 @@ int host_gpio_joystick(int port) { return CKernel::Get()->GpioJoystick(port); }
 void host_reboot(void) { CKernel::Get()->Reboot(); }
 
 void host_power_off(void) { CKernel::Get()->PowerOff(); }
+
+int host_save_clock(void) { return CKernel::Get()->SaveClock(FALSE) ? 1 : 0; }
 
 extern int circle_get_network_ip_address(char *address, unsigned int size);
 

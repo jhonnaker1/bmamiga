@@ -63,6 +63,8 @@ void bma_threads_yield(void);   /* circle/threads.c */
 void bmamiga_core_reset(int hard);
 void bmamiga_core_warp(int on);
 double bmamiga_core_frame_rate(void);
+int bmamiga_core_rtg_on(void);
+void bmamiga_core_sync_clock(void);
 /* clock.c */
 void bmamiga_clock_frame(int display_paces, double period);
 extern double bmamiga_clock_slept;
@@ -180,9 +182,17 @@ static void apply_view(void)
 {
 	if (osd_view)
 		host_video_set_view(0, 0, 640, 480, 4.0 / 3.0);
-	else
+	else {
+		/* The core gives 4:3 for every picture; an RTG card's screen
+		   (1920x1080, 1280x720 ...) has square pixels, and squeezed to
+		   4:3 it lost one column in four and its text was hard to read
+		   (AmigaSYS, 2026-11-13). */
+		double aspect = pic_aspect;
+		if (bmamiga_core_rtg_on() && pic_w > 0 && pic_h > 0)
+			aspect = (double) pic_w / pic_h;
 		host_video_set_view(0, 0, pic_w, pic_h,
-		                    pic_aspect * host_option_double("aspect", 1.0));
+		                    aspect * host_option_double("aspect", 1.0));
+	}
 }
 
 void bmamiga_osd_view(int on)
@@ -1462,6 +1472,7 @@ void bmamiga_main(void)
 			bmamiga_menu();
 			release_keys();
 			frame_start = 0.0;
+			bmamiga_core_sync_clock();   /* the Amiga stood still */
 		}
 
 		audio_this_frame = 0;
@@ -1501,6 +1512,8 @@ void bmamiga_main(void)
 		if (now - last_second >= 1.0) {
 			last_second = now;
 			sync_files();
+			if (host_save_clock())
+				bmamiga_core_sync_clock();   /* the network set the time */
 			show_network_address();
 			if (++speed_seconds >= 10) {
 				speed_seconds = 0;

@@ -130,6 +130,9 @@ public:
   double Time(void);
   void Reboot(void);
   void PowerOff(void);
+  // The time saved on the card (kernel.cpp)
+  void RestoreSavedClock(void);
+  boolean SaveClock(boolean bNow);   // TRUE if the time jumped (the network set it)
   bool SetLogDestination(int destination);
   int GetLogDestination(void) const { return mLog.GetDestination(); }
   // Core 1: writes queued log text to the log file.

@@ -1,0 +1,42 @@
+--- a/libgloss/circle/stat.cpp	2026-11-13 15:07:06
++++ b/libgloss/circle/stat.cpp	2026-11-13 15:22:41
+@@ -12,6 +12,7 @@
+ #include <sys/stat.h>
+ #include <errno.h>
+ #include <string.h>
++#include <time.h>
+ #include <assert.h>
+ #include "circle_macros.h"
+ #include "circle_glue.h"
+@@ -78,6 +79,31 @@
+ 	statbuf->st_blksize = 512;
+ 	statbuf->st_blocks = (finfo.fsize + 511) / 512;
+ 
++	// The file's date and time, which FatFs gives as FAT stores them: local
++	// time (as Windows and macOS read it, with TZ, which BMAmiga sets from
++	// its time zone), to 2 seconds. Without them every file was from
++	// 1 January 1970: before the Amiga's 1978, and AmigaOS's AddDataTypes
++	// REFRESH then added none of DEVS:DataTypes (BMAmiga).
++	if (finfo.fdate != 0)
++	{
++		struct tm tm;
++		memset (&tm, 0, sizeof tm);
++		tm.tm_year = 80 + (finfo.fdate >> 9);
++		tm.tm_mon = ((finfo.fdate >> 5) & 15) - 1;
++		tm.tm_mday = finfo.fdate & 31;
++		tm.tm_hour = finfo.ftime >> 11;
++		tm.tm_min = (finfo.ftime >> 5) & 63;
++		tm.tm_sec = (finfo.ftime & 31) * 2;
++		tm.tm_isdst = -1;
++		time_t const t = mktime (&tm);
++		if (t != (time_t) -1)
++		{
++			statbuf->st_mtime = t;
++			statbuf->st_atime = t;
++			statbuf->st_ctime = t;
++		}
++	}
++
+ 	return 0;
+ }
+ 

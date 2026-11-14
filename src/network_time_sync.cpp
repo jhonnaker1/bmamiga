@@ -36,6 +36,8 @@
 #include <stdlib.h>
 #include <time.h>
 
+extern "C" void bma_set_gmtoff(long seconds_east);   // src/port/circle/posix.c
+
 bool ConfigureSystemTimeZone(int offset_minutes) {
   int absolute_offset = offset_minutes;
   if (absolute_offset < 0) {
@@ -50,6 +52,7 @@ bool ConfigureSystemTimeZone(int offset_minutes) {
     return false;
   }
   _tzset_r(_REENT);
+  bma_set_gmtoff(static_cast<long>(offset_minutes) * 60);   // Amiberry's tm_gmtoff
   return CTimer::Get()->SetTimeZone(offset_minutes);
 }
 

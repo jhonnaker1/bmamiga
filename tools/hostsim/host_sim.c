@@ -744,6 +744,11 @@ void host_reboot(void)
 	exit(0);
 }
 
+int host_save_clock(void)
+{
+	return 0;
+}
+
 void host_power_off(void)
 {
 	fprintf(stderr, "[sim] %ld yields between frames\n", yields);

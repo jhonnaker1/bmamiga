@@ -129,6 +129,10 @@ int host_gpio_joystick(int port);
 
 void host_reboot(void);
 void host_power_off(void);
+/* Called once a second: saves the time on the card now and then, for the
+   next start (the Pi has no clock of its own). Returns 1 when the time
+   jumped (the network set it). */
+int host_save_clock(void);
 /* The Pi's IP address as text, when the network is up. Returns 0 if not. */
 int host_network_address(char *address, unsigned size);
 /* Network state for people: "Wi-Fi 192.168.1.50", "Off", "Ethernet:

@@ -9,8 +9,9 @@
  *    already 64 bits.
  *  - CLOCK_MONOTONIC and clock_gettime(), which newlib leaves out for
  *    Circle (Amiberry's is BMAmiga's, src/port/clock.c).
- *  - struct tm's tm_gmtoff, which newlib's hasn't: read as 0 (UTC; the
- *    Pi's clock is UTC).
+ *  - struct tm's tm_gmtoff, which newlib's hasn't: read as the offset of
+ *    the time zone BMAmiga sets (TZ, from its timezone option), for every
+ *    time (a fixed offset: no summer time).
  *
  * C++: std::mutex, std::recursive_mutex and std::condition_variable, which
  * libstdc++ only has with threads (_GLIBCXX_HAS_GTHREADS); BMAmiga's
@@ -67,8 +68,16 @@ int usleep(useconds_t usec);
 }
 #endif
 
-/* lt->tm_gmtoff reads as 0. */
-#define tm_gmtoff tm_isdst * 0
+/* lt->tm_gmtoff reads as the time zone's offset, east of UTC, in seconds.
+   Read as 0 before, a file's date read by Amiberry (fsdb_host.cpp's
+   my_stat()) was not moved into local time though a date written was
+   (by mktime()): the Amiga's SetFileDate() of 12:00 read back as 20:00 at
+   UTC-8. The member's place takes a postfix expression, as lt->tm_isdst is
+   one: tm_isdst indexes bma_gmtoff_at (-1, 0 or 1, all the same offset),
+   so "t - lt->tm_gmtoff" stays t minus the offset. Set by
+   bma_set_gmtoff() (src/network_time_sync.cpp) with TZ. */
+extern long *const bma_gmtoff_at;
+#define tm_gmtoff tm_isdst[bma_gmtoff_at]
 
 #ifdef __cplusplus
 extern "C" {

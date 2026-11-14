@@ -708,3 +708,13 @@ char *inet_ntoa(struct in_addr in)
 	         (unsigned) (v >> 8) & 255, (unsigned) v & 255);
 	return text;
 }
+
+/* struct tm's tm_gmtoff for Amiberry (bma_circle.h): the time zone's offset
+   east of UTC in seconds, indexed by tm_isdst (-1, 0 or 1). */
+static long bma_gmtoff_slots[3];
+long *const bma_gmtoff_at = bma_gmtoff_slots + 1;
+
+void bma_set_gmtoff(long seconds_east)
+{
+	bma_gmtoff_slots[0] = bma_gmtoff_slots[1] = bma_gmtoff_slots[2] = seconds_east;
+}

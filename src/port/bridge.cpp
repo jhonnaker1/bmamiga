@@ -30,6 +30,7 @@
 #include "memory.h"
 #include "ethernet.h"
 #include "amiberry_gfx.h"
+#include "xwin.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -219,6 +220,7 @@ static struct {
 	int cachesize, comptrustbyte, comptrustword, comptrustlong, comptrustnaddr;
 	bool cpu_compatible;
 	int z3_mapping_mode;
+	int cs_rtc;
 } preset;
 
 static void take_preset(void)
@@ -248,6 +250,7 @@ static void take_preset(void)
 	preset.comptrustnaddr = changed_prefs.comptrustnaddr;
 	preset.cpu_compatible = changed_prefs.cpu_compatible;
 	preset.z3_mapping_mode = changed_prefs.z3_mapping_mode;
+	preset.cs_rtc = changed_prefs.cs_rtc;   /* the clock chip given at the start */
 }
 
 static void put_back_preset(void)
@@ -280,6 +283,7 @@ static void put_back_preset(void)
 	changed_prefs.comptrustnaddr = preset.comptrustnaddr;
 	changed_prefs.cpu_compatible = preset.cpu_compatible;
 	changed_prefs.z3_mapping_mode = preset.z3_mapping_mode;
+	changed_prefs.cs_rtc = preset.cs_rtc;
 	if (get_device_romconfig(&changed_prefs, ROMTYPE_A2065, 0) != nullptr)
 		clear_device_rom(&changed_prefs, ROMTYPE_A2065, 0, true);
 	changed_prefs.a2065name[0] = 0;
@@ -339,6 +343,7 @@ int bmamiga_core_set_config(const char *lines)
 	TCHAR line[MAX_DPATH * 2];
 	const char *p = lines;
 	int taken = 0;
+	bool rtc_given = false, clock_sync_given = false;
 	if (!preset.taken)
 		take_preset();
 	put_back_preset();
@@ -368,10 +373,32 @@ int bmamiga_core_set_config(const char *lines)
 			taken++;
 			continue;
 		}
+		if (_tcsnicmp(s, _T("rtc="), 4) == 0)
+			rtc_given = true;
+		if (_tcsnicmp(s, _T("synchronize_clock="), 18) == 0)
+			clock_sync_given = true;
 		cfgfile_parse_line(&changed_prefs, s, 0);
 		taken++;
 	}
 	fixup_prefs(&changed_prefs, true);
+	/* A clock chip, which reads the Pi's time (it saves it on the card for
+	   the next start, kernel.cpp): an MSM6242B, as A500 and A1200 clock
+	   add-ons had. Amiberry gives the A500 and A1200 one only with more
+	   memory than they came with (fixup_prefs), and without one AmigaOS
+	   started at 1 January 1978. Not the CD32's (it had none; the CDTV has
+	   its own). bmamiga.uae's rtc= line wins. A hard reset doesn't take
+	   cs_rtc from changed_prefs (memory_reset() copies some chipset
+	   settings, not this one), so currprefs gets it here; the clock is read
+	   through currprefs.cs_rtc (cia.cpp). */
+	if (!rtc_given && changed_prefs.cs_rtc == 0 && !changed_prefs.cs_cd32cd)
+		changed_prefs.cs_rtc = 1;
+	currprefs.cs_rtc = changed_prefs.cs_rtc;
+	/* And AmigaOS's own time kept to the Pi's (synchronize_clock, as
+	   AmigaSYS's Amiberry settings have it): AmigaOS reads the clock chip
+	   only as it starts, and the network's time comes later (see
+	   bmamiga_core_sync_clock()). */
+	if (!clock_sync_given)
+		changed_prefs.tod_hack = currprefs.tod_hack = true;
 	set_config_changed();
 	return taken;
 }
@@ -490,6 +517,21 @@ void bmamiga_core_warp(int on)
 double bmamiga_core_frame_rate(void)
 {
 	return fake_vblank_hz > 1.0f ? fake_vblank_hz : vblank_hz;
+}
+
+/* Sets AmigaOS's time from the Pi's (Amiberry's setsystime(): through its
+   file system's interrupt, so with a folder or hard drive of Amiberry's;
+   and only with synchronize_clock). For when the network has set the
+   Pi's time, and after the menu, while which the Amiga stood still. */
+void bmamiga_core_sync_clock(void)
+{
+	setsystime();
+}
+
+/* Whether the picture is the RTG card's (Picasso96), not the chipset's. */
+int bmamiga_core_rtg_on(void)
+{
+	return adisplays[0].picasso_on ? 1 : 0;
 }
 
 }
