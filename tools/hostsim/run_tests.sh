@@ -265,7 +265,7 @@ mkdir -p "$OUT/setup"
 printf 'cpu=68020\nchip_ram=2048\n' > "$OUT/setup/bmamiga.cfg"
 printf '# more of Amiberry\x27s settings\nfastmem_size=4\n' > "$OUT/setup/bmamiga.uae"
 run setup 50 "$OUT/aros" "" '400 quit\n'
-check_log setup "Amiga setup: 4 setting" "bmamiga.cfg's and bmamiga.uae's settings taken"
+check_log setup "Amiga setup: 5 setting" "bmamiga.cfg's and bmamiga.uae's settings taken"
 check_log setup "CPU=68020" "the 68020 from the CPU setting"
 check_log setup "2048K/[0-9]+ = +2048K .*Chip memory" "2M of chip RAM"
 check_log setup "Fast memory" "fast RAM from bmamiga.uae"
@@ -282,7 +282,7 @@ script="$script$f key 0x51 1\n$((f + 1)) key 0x51 0\n"; f=$((f + 10))
 script="$script$f key 0x28 1\n$((f + 1)) key 0x28 0\n$((f + 30)) quit\n"
 run setupmenu 50 "$OUT/aros" "" "$script"
 check_cfg setupmenu "^sound_filter=off" "Sound Filter Off kept in bmamiga.cfg"
-check_log setupmenu "Amiga setup: 1 setting" "and given to Amiberry at once"
+check_log setupmenu "Amiga setup: 3 setting" "and given to Amiberry at once"
 
 echo "A CD32's disc with the Amiga Setup"
 # The setup's hard reset as the Amiga starts empties a CD32's own drive; the

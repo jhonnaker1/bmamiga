@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.6.1 – 2026-11-15
+
+IBrowse on AmigaSYS reaches the web, and Amiberry is midwan's latest, with
+his fixes for the keys, the shape and the colours of RTG screens that
+0.6.0 worked round. Tried on a Pi 5 with AmiKit and AmigaSYS, and in the
+simulator.
+
+- IBrowse on AmigaSYS said "Network error: Operation now in progress"
+  and loaded nothing. bsdsocket.library waits itself for a blocking
+  socket to connect, if the socket says it blocks; BMAmiga's sockets
+  all said they didn't, so a program that connects the ordinary way
+  (IBrowse) got its connect back unfinished. Sockets now block or not as
+  the Amiga sets them (AmiKit's weather, which doesn't block, worked
+  already)
+- Amiberry is midwan's latest (2cff105, 2026-11-15), with his fixes for
+  three things BMAmiga worked round in 0.6.0, which it now leaves to
+  Amiberry: the ' and " key and the ISO key by the left Shift
+  (BlitterStudio/amiberry#2666), the shape of RTG screens (#2667), and
+  red and blue on 32-bit RTG screens (#2672). Amiberry's CPU, which now
+  runs on a thread of its own on computers with two cores or more, stays
+  on BMAmiga's one (`cpu_threaded=false`)
+- An RTG screen's shape is shown as soon as Amiberry reports it, not at
+  the picture's next change of size (the shape comes a frame after the
+  size)
+
 ## 0.6.0 – 2026-11-14
 
 AmiKit runs: its Workbench at 1920x1080, Directory Opus, the dock, its

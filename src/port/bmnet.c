@@ -98,6 +98,10 @@ struct bsock {
 	/* made with BSD's numbers (the Amiga's, see bmnet_socket()): its
 	   addresses go back with BSD's AF_INET too */
 	int bsd;
+	/* O_NONBLOCK, as fcntl() and FIONBIO set it: bmnet's calls never
+	   wait either way, but bsdsocket.library waits for a blocking socket
+	   itself (bsdthr_blockingstuff()) when F_GETFL says it is one */
+	int nonblock;
 };
 
 static struct bsock socks[BMNET_MAX];
@@ -949,8 +953,11 @@ int bmnet_ioctl(int fd, unsigned long request, ...)
 	s = get(fd);
 	if (s == NULL)
 		return fail(EBADF);
-	if (request == FIONBIO)
-		return 0;                 /* bmnet's sockets never wait anyway */
+	if (request == FIONBIO) {
+		if (arg != NULL)
+			s->nonblock = *(int *) arg != 0;
+		return 0;
+	}
 	if (request == FIONREAD && arg != NULL) {
 		size_t n = 0;
 		if (s->type == SOCK_DGRAM) {
@@ -971,6 +978,7 @@ int bmnet_ioctl(int fd, unsigned long request, ...)
 
 int bmnet_fcntl(int fd, int cmd, ...)
 {
+	struct bsock *s;
 	va_list ap;
 	int arg;
 	va_start(ap, cmd);
@@ -978,11 +986,17 @@ int bmnet_fcntl(int fd, int cmd, ...)
 	va_end(ap);
 	if (bmnet_fd_index(fd) < 0)
 		return fcntl(fd, cmd, arg);
-	if (get(fd) == NULL)
+	s = get(fd);
+	if (s == NULL)
 		return fail(EBADF);
+	/* Blocking or not, as set: always "non-blocking" made bsdsocket.library
+	   hand a blocking connect() back with EINPROGRESS (IBrowse's "Network
+	   error: Operation now in progress") instead of waiting. */
 	if (cmd == F_GETFL)
-		return O_RDWR | O_NONBLOCK;
-	return 0;                     /* F_SETFL O_NONBLOCK: never waits anyway */
+		return O_RDWR | (s->nonblock ? O_NONBLOCK : 0);
+	if (cmd == F_SETFL)
+		s->nonblock = (arg & O_NONBLOCK) != 0;
+	return 0;
 }
 
 int bmnet_gethostname(char *name, size_t len)

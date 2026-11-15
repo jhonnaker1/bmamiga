@@ -443,6 +443,21 @@ int main(void)
 		bmnet_close(fds[0]);
 		bmnet_close(fds[1]);
 	}
+	{
+		/* bsdsocket.library asks F_GETFL whether to wait itself: a new
+		   socket is blocking, as BSD's are, until it is made non-blocking */
+		int fd = bmnet_socket(AF_INET, SOCK_STREAM, 0), on = 1, off = 0;
+		CHECK(!(bmnet_fcntl(fd, F_GETFL, 0) & O_NONBLOCK), "a new socket is blocking");
+		bmnet_fcntl(fd, F_SETFL, O_RDWR | O_NONBLOCK);
+		CHECK(bmnet_fcntl(fd, F_GETFL, 0) & O_NONBLOCK, "F_SETFL makes it non-blocking");
+		bmnet_fcntl(fd, F_SETFL, O_RDWR);
+		CHECK(!(bmnet_fcntl(fd, F_GETFL, 0) & O_NONBLOCK), "and blocking again");
+		bmnet_ioctl(fd, FIONBIO, &on);
+		CHECK(bmnet_fcntl(fd, F_GETFL, 0) & O_NONBLOCK, "FIONBIO 1 makes it non-blocking");
+		bmnet_ioctl(fd, FIONBIO, &off);
+		CHECK(!(bmnet_fcntl(fd, F_GETFL, 0) & O_NONBLOCK), "FIONBIO 0 blocking");
+		bmnet_close(fd);
+	}
 	/* Names */
 	{
 		pthread_t th;

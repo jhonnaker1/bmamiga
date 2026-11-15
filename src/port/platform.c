@@ -30,6 +30,7 @@
  */
 
 #include <stdarg.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -63,8 +64,6 @@ void bma_threads_yield(void);   /* circle/threads.c */
 void bmamiga_core_reset(int hard);
 void bmamiga_core_warp(int on);
 double bmamiga_core_frame_rate(void);
-int bmamiga_core_rtg_on(void);
-int bmamiga_core_rtg_swapped(void);
 void bmamiga_core_sync_clock(void);
 /* clock.c */
 void bmamiga_clock_frame(int display_paces, double period);
@@ -184,15 +183,10 @@ static void apply_view(void)
 	if (osd_view)
 		host_video_set_view(0, 0, 640, 480, 4.0 / 3.0);
 	else {
-		/* The core gives 4:3 for every picture; an RTG card's screen
-		   (1920x1080, 1280x720 ...) has square pixels, and squeezed to
-		   4:3 it lost one column in four and its text was hard to read
-		   (AmigaSYS, 2026-11-13). */
-		double aspect = pic_aspect;
-		if (bmamiga_core_rtg_on() && pic_w > 0 && pic_h > 0)
-			aspect = (double) pic_w / pic_h;
+		/* The core's shape: 4:3 for the chipset's picture, an RTG
+		   screen's own (square pixels) since Amiberry's #2668 */
 		host_video_set_view(0, 0, pic_w, pic_h,
-		                    aspect * host_option_double("aspect", 1.0));
+		                    pic_aspect * host_option_double("aspect", 1.0));
 	}
 }
 
@@ -321,25 +315,16 @@ void bmamiga_display_mode_changed(void)
 static void core_video(const void *data, unsigned w, unsigned h, size_t pitch)
 {
 	unsigned x, y;
-	int swap_rb;
 	if (data == NULL || osd_view)
 		return;  /* the same picture again, or the menu is showing */
 	if (w > FB_W)
 		w = FB_W;
 	if (h > FB_H)
 		h = FB_H;
-	swap_rb = bmamiga_core_rtg_swapped();
 	for (y = 0; y < h; y++) {
 		uint16_t *out = fb_pixels + y * fb_pitch_px;
 		const uint8_t *row = (const uint8_t *) data + y * pitch;
-		if (pixel_format == RETRO_PIXEL_FORMAT_XRGB8888 && swap_rb) {
-			/* An RTG picture laid out as ABGR (bmamiga_core_rtg_swapped) */
-			const uint32_t *in = (const uint32_t *) row;
-			for (x = 0; x < w; x++) {
-				uint32_t p = in[x];
-				out[x] = (uint16_t) (((p << 8) & 0xf800) | ((p >> 5) & 0x07e0) | ((p >> 19) & 0x001f));
-			}
-		} else if (pixel_format == RETRO_PIXEL_FORMAT_XRGB8888) {
+		if (pixel_format == RETRO_PIXEL_FORMAT_XRGB8888) {
 			const uint32_t *in = (const uint32_t *) row;
 			for (x = 0; x < w; x++) {
 				uint32_t p = in[x];
@@ -759,6 +744,11 @@ static void setup_lines(char *out, size_t size)
 	FILE *f;
 	out[0] = '\0';
 #define ADD(...) do { if (len < size) len += (size_t) snprintf(out + len, size - len, __VA_ARGS__); } while (0)
+	/* The CPU on its own thread (Amiberry runs it so on any computer with
+	   two cores or more since 2026-11-14): BMAmiga's threads take turns
+	   on one core (src/port/circle/threads.c), and a CPU thread spinning
+	   for the chipset's would wait for ever. */
+	ADD("cpu_threaded=false\n");
 	for (i = 0; i < sizeof words / sizeof words[0]; i++) {
 		const char *value = host_option(words[i].key, "");
 		if (value[0] != '\0')
@@ -923,18 +913,6 @@ static void insert_saved_media(void)
 /* ---- Input -------------------------------------------------------------------- */
 
 static retro_keyboard_event_t keyboard_cb;
-
-/* Keys Amiberry's libretro keyboard callback drops (see bridge.cpp's
-   bmamiga_core_key()): ' and " (on a US keyboard), and the ISO keyboard's
-   extra key by the left Shift (< and > on a German one). */
-#define USAGE_QUOTE         0x34
-#define USAGE_ISO_BACKSLASH 0x64
-void bmamiga_core_key(int usage, int down);   /* bridge.cpp */
-
-static int amiberry_drops(int usage)
-{
-	return usage == USAGE_QUOTE || usage == USAGE_ISO_BACKSLASH;
-}
 static int open_menu;
 static int pad_last_menu[HOST_PADS];
 static int mouse_dx, mouse_dy, mouse_buttons;
@@ -1040,11 +1018,6 @@ static void process_input(void)
 				bmamiga_set_warp(!warp);
 			continue;
 		}
-		if (amiberry_drops(usage)) {
-			if (core_running)
-				bmamiga_core_key(usage, pressed);
-			continue;
-		}
 		if (keyboard_cb != NULL) {
 			unsigned code = bmamiga_usage_to_retrok(usage);
 			if (code != RETROK_UNKNOWN)
@@ -1069,10 +1042,6 @@ static void process_input(void)
 static void release_keys(void)
 {
 	int usage;
-	if (core_running) {
-		bmamiga_core_key(USAGE_QUOTE, 0);
-		bmamiga_core_key(USAGE_ISO_BACKSLASH, 0);
-	}
 	if (keyboard_cb == NULL)
 		return;
 	for (usage = 0; usage < 256; usage++) {
@@ -1175,9 +1144,17 @@ static bool core_environment(unsigned cmd, void *data)
 		take_av_info(data);
 		return true;
 	case RETRO_ENVIRONMENT_SET_GEOMETRY: {
+		/* A new shape (an RTG screen's own, its width over its height,
+		   since Amiberry's #2668) comes a frame after its new size: shown
+		   at once, not at the next change of size. The core sends an RTG
+		   screen's again and again, worked out two ways that differ in the
+		   float's last bit (1.777777, 1.777778): a change that small is
+		   none */
 		const struct retro_game_geometry *g = data;
-		if (g->aspect_ratio > 0.1f)
+		if (g->aspect_ratio > 0.1f && fabs(g->aspect_ratio - pic_aspect) > pic_aspect * 1e-4) {
 			pic_aspect = g->aspect_ratio;
+			apply_view();
+		}
 		return true;
 	}
 	default:

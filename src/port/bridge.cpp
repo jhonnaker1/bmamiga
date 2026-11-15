@@ -31,8 +31,6 @@
 #include "ethernet.h"
 #include "amiberry_gfx.h"
 #include "xwin.h"
-#include "picasso96.h"
-#include "gfx_colors.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -542,33 +540,5 @@ void bmamiga_core_sync_clock(void)
 	setsystime();
 }
 
-/* Whether the picture is the RTG card's (Picasso96), not the chipset's. */
-int bmamiga_core_rtg_on(void)
-{
-	return adisplays[0].picasso_on ? 1 : 0;
 }
 
-/* Whether the RTG picture has red and blue swapped: Amiberry lays out an
-   RTG screen for the host surface it would pick on a desktop, ABGR8888
-   (R8G8B8A8 in memory) for every format but B8G8R8A8, copying R8G8B8A8
-   pixels unchanged (picasso96.cpp, copyrow) and building its colour
-   tables for that layout; the libretro picture is XRGB8888, so
-   pictures came out with red and blue swapped (AmiKit's panther,
-   AmigaSYS's cubes). platform.c swaps them back as it converts. */
-int bmamiga_core_rtg_swapped(void)
-{
-	return adisplays[0].picasso_on && p96_get_host_rgb_format_for_monitor(0, 4) == RGBFB_R8G8B8A8;
-}
-
-}
-
-/* A key Amiberry's libretro keyboard callback drops (its RETROK to SDL
-   table has no RETROK_QUOTE, and no key for the ISO keyboard's extra key
-   by the left Shift): straight to Amiberry's keyboard handler, as its
-   desktop builds send it. USAGE is the USB HID usage, which is the SDL
-   scancode. */
-extern bool my_kbd_handler(int, int, int, bool);
-extern "C" void bmamiga_core_key(int usage, int down)
-{
-	my_kbd_handler(0, usage, down ? 1 : 0, false);
-}
