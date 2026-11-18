@@ -1162,6 +1162,60 @@ static bool core_environment(unsigned cmd, void *data)
 	}
 }
 
+/* ---- USB sticks ------------------------------------------------------------------ */
+
+static int on_volume(const char *path, const char *root)
+{
+	return path[0] != '\0' && root != NULL && strncmp(path, root, strlen(root)) == 0;
+}
+
+/* Once a frame: a USB stick pulled out (or swapped for another) takes the
+   floppies and the CD loaded from it with it, as BMA800XL's does; a hard
+   drive on it can't be taken away from the Amiga while it runs, so that is
+   only said. A stick plugged in is said too. */
+static void watch_usb_sticks(void)
+{
+	static unsigned seen[HOST_USB_STICKS];
+	char text[96];
+	int i, d;
+	for (i = 0; i < HOST_USB_STICKS; i++) {
+		unsigned now = host_usb_stick(i);
+		const char *root = host_usb_root(i);
+		if (now == seen[i])
+			continue;
+		if (seen[i] != 0) {
+			int ejected = 0, drives = 0;
+			for (d = 0; d < BMAMIGA_FLOPPIES; d++)
+				if (on_volume(floppy[d], root)) {
+					bmamiga_eject_floppy(d);
+					ejected++;
+				}
+			if (on_volume(cd_image, root)) {
+				bmamiga_set_cd("");
+				ejected++;
+			}
+			for (d = 0; d < BMAMIGA_HARD_DRIVES; d++)
+				if (on_volume(hard_drive[d], root))
+					drives++;
+			LOG("USB stick %d out: %d disk(s) ejected, %d hard drive(s) on it\n",
+			    i + 1, ejected, drives);
+			if (drives > 0)
+				snprintf(text, sizeof text, "USB stick out: a hard drive was on it");
+			else if (ejected > 0)
+				snprintf(text, sizeof text, "USB stick out: its disks ejected");
+			else
+				snprintf(text, sizeof text, "USB stick out");
+			osd_notify(text);
+		}
+		if (now != 0) {
+			LOG("USB stick %d in: %s\n", i + 1, root ? root : "?");
+			snprintf(text, sizeof text, "USB stick in: %.*s", (int) strcspn(root ? root : "", "/"), root ? root : "");
+			osd_notify(text);
+		}
+		seen[i] = now;
+	}
+}
+
 /* ---- Warp and resets ---------------------------------------------------------- */
 
 int bmamiga_warp(void) { return warp; }
@@ -1544,6 +1598,8 @@ void bmamiga_main(void)
 		bma_threads_yield();
 		bmamiga_core_cd32_pad();
 		cd_back_in();
+		if (core_running)
+			watch_usb_sticks();
 		speed_amiga += host_time() - amiga_start;
 		speed_frames++;
 		/* Frames without sound (the Amiga starting): silence instead,

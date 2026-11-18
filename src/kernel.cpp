@@ -53,6 +53,10 @@ int bma_tls_init(void);
 
 static const char FromKernel[] = "bmamiga";
 
+// FatFs volumes of the USB sticks umsd1..umsd3 (Circle's
+// addon/fatfs/ffconf.h FF_VOLUME_STRS and diskio.cpp).
+static const char *const kUSBVolume[HOST_USB_STICKS] = {"USB:", "USB2:", "USB3:"};
+
 // Sample rate the VideoCore plays audio at.
 #define HW_SAMPLE_RATE 44100
 
@@ -167,8 +171,13 @@ CKernel::CKernel(void)
 #endif
       m_MergedModifiers(0),
       m_KeyQueueHead(0), m_KeyQueueTail(0), m_pMouse(0), m_MouseDx(0),
-      m_MouseDy(0), m_MouseButtons(0), m_bGPIOJoysticks(false) {
+      m_MouseDy(0), m_MouseButtons(0), m_USBSticks(0), m_bGPIOJoysticks(false) {
   s_pThis = this;
+  for (unsigned i = 0; i < HOST_USB_STICKS; i++) {
+    m_pUSBStick[i] = 0;
+    m_USBStickIndex[i] = i;
+    m_USBStick[i] = 0;
+  }
   bma_timer_ready = 1; // mTimer exists
   for (unsigned i = 0; i < MAX_KEYBOARDS; i++) {
     m_pKeyboard[i] = 0;
@@ -268,6 +277,11 @@ bool CKernel::Initialize(void) {
   if (!mUSBHCI.Initialize()) {
     return false;
   }
+  for (unsigned i = 0; i < HOST_USB_STICKS; i++) {
+    if (f_mount(&mUSBFileSystem[i], kUSBVolume[i], 0) != FR_OK) {
+      mLogger.Write(FromKernel, LogError, "Cannot mount %s", kUSBVolume[i]);
+    }
+  }
   mLog.Flush();
 
   const char *audio_out = mOptions.Get("audio_out", "auto");
@@ -334,6 +348,7 @@ void CKernel::UpdateUSBPlugAndPlay(void) {
     SetupUSBKeyboards();
     SetupUSBGamePads();
     SetupUSBMouse();
+    SetupUSBSticks();
   }
 }
 
@@ -341,6 +356,7 @@ TShutdownMode CKernel::Run(void) {
   SetupUSBKeyboards();
   SetupUSBGamePads();
   SetupUSBMouse();
+  SetupUSBSticks();
   mLog.Flush();
   mStarting = false;
 
@@ -778,6 +794,45 @@ int CKernel::MouseRead(int *dx, int *dy, int *buttons) {
 }
 
 //
+// USB sticks (from BMA800XL)
+//
+
+// Core 0, task level. The sticks' files are read and written by the
+// emulator, through FatFs, as "USB:/", "USB2:/" and "USB3:/"; here it is
+// only noted which are there.
+void CKernel::SetupUSBSticks(void) {
+  for (unsigned i = 0; i < HOST_USB_STICKS; i++) {
+    if (m_pUSBStick[i] != 0) {
+      continue;
+    }
+    char name[16];
+    snprintf(name, sizeof name, "umsd%u", i + 1);
+    CDevice *stick = mDeviceNameService.GetDevice(name, TRUE);
+    if (stick == 0) {
+      continue;
+    }
+    stick->RegisterRemovedHandler(USBStickRemovedHandler, &m_USBStickIndex[i]);
+    m_pUSBStick[i] = stick;
+    if (++m_USBSticks == 0) {
+      m_USBSticks = 1;
+    }
+    m_USBStick[i] = m_USBSticks;
+    mLogger.Write(FromKernel, LogNotice, "USB stick connected as %s", kUSBVolume[i]);
+  }
+}
+
+void CKernel::USBStickRemovedHandler(CDevice *pDevice, void *pContext) {
+  CKernel *k = s_pThis;
+  unsigned i = *(unsigned *)pContext;
+  if (k == 0 || i >= HOST_USB_STICKS || pDevice != k->m_pUSBStick[i]) {
+    return;
+  }
+  k->m_pUSBStick[i] = 0;
+  k->m_USBStick[i] = 0;
+  k->mLogger.Write(FromKernel, LogNotice, "USB stick %s removed", kUSBVolume[i]);
+}
+
+//
 // GPIO joysticks
 //
 
@@ -851,11 +906,25 @@ bool CKernel::DisplayResolutionChoice(void) { return mVideo.ResolutionChoice(); 
 // (host_video_times()).
 static u64 s_PresentTicks[3];
 
+// The least time Circle's tasks get each frame, in clock ticks
+// (task_time_us in cmdline.txt, 1000 by default; 0 is one turn).
+static u64 s_TaskTicks = (u64)-1;
+
 void CKernel::VideoPresent(int wait_vsync) {
-  // Let Circle's tasks (the network, the web UI) run once per frame.
+  // Let Circle's tasks (the network, the Wi-Fi driver, the web UI) run.
+  // They share this core with the emulator, and one turn a frame starved
+  // them when the Amiga took the whole frame (AmigaSYS with the JIT at full
+  // speed: pings took 250 ms, the web UI sent 8 KB/s and HTTPS took 5 s), so
+  // they have at least s_TaskTicks, turn after turn.
   Core1Beat("running Circle tasks");
+  if (s_TaskTicks == (u64)-1) {
+    int us = mOptions.GetInt("task_time_us", 1000);
+    s_TaskTicks = us > 0 ? (u64)us * (CLOCKHZ / 1000000) : 0;
+  }
   u64 t0 = CTimer::GetClockTicks64();
-  CScheduler::Get()->Yield();
+  do {
+    CScheduler::Get()->Yield();
+  } while (CTimer::GetClockTicks64() - t0 < s_TaskTicks);
   Core1Beat("writing the log file");
   u64 t1 = CTimer::GetClockTicks64();
   mLog.Drain();
@@ -1273,6 +1342,13 @@ void host_sleep_us(unsigned us) {
 void host_yield(void) { CScheduler::Get()->Yield(); }
 
 const char *host_volume2(void) { return s_bVolume2 ? "SD2:/" : 0; }
+
+unsigned host_usb_stick(int n) { return CKernel::Get()->USBStick(n); }
+
+const char *host_usb_root(int n) {
+  static const char *const kRoot[HOST_USB_STICKS] = {"USB:/", "USB2:/", "USB3:/"};
+  return n >= 0 && n < HOST_USB_STICKS ? kRoot[n] : 0;
+}
 
 // The Amiga's memory: from above 1 GB if the Pi has it (HEAP_ANY), else
 // below. Up to 2 GB (AmiKit's Zorro III RAM at 1 GB into the Amiga's

@@ -181,6 +181,14 @@ int host_dns_server(uint32_t *ip);
    (exFAT, for disk images over FAT32's 4 GB; or FAT32): its root, as a
    path to open files with ("SD2:/" on the Pi); 0 if there is none. */
 const char *host_volume2(void);
+/* USB sticks (FAT32 or exFAT), as the FatFs volumes USB:, USB2: and USB3:
+   (from BMA800XL). host_usb_stick(N) is a number for stick N
+   (0..HOST_USB_STICKS-1) plugged in now, different for each stick plugged
+   in since boot, or 0 when there is none; host_usb_root(N) the path its
+   files are under ("USB:/", "USB2:/", "USB3:/"). */
+#define HOST_USB_STICKS 3
+unsigned host_usb_stick(int n);
+const char *host_usb_root(int n);
 /* Large blocks: the Amiga's memory (src/port/circle/posix.c's mmap()). On
    the Pi they come from all its memory, above 1 GB too, which malloc()
    doesn't reach (Circle keeps that below 1 GB, where its drivers' DMA can

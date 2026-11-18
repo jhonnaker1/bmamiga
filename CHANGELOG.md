@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.6.2 – 2026-11-18
+
+USB sticks, a network and web UI that keep up while the Amiga is busy, the
+web UI in Safari, and Amiberry 8.6.0. Tried on a Pi 5 with AmigaSYS and
+AmiKit, and in the simulator.
+
+- Amiberry 8.6.0, midwan's latest (8597bb7, 2026-11-18): among its fixes,
+  WinUAE's for bsdsocket.library, Picasso96 and AHI, and bsdsocket's
+  settings kept when a reset rebuilds the boot ROM. BMAmiga builds it with
+  8 input devices of each kind instead of 20, which midwan made possible
+  (BlitterStudio/amiberry#2712): 19 MB less memory, leaving more room under
+  the kernel's 80 MB
+- The network and web UI crawled while the Amiga was busy the whole frame
+  (AmigaSYS with the JIT at full speed: pings took 250 ms, the web UI sent
+  8 KB/s, and AmiKit's HTTPS took 5 s). The Pi's own tasks share a core
+  with the Amiga and had one turn a frame; now they have at least 1 ms
+  (`task_time_us` in `cmdline.txt`)
+- The web UI in Safari: Safari opens connections before it needs them and
+  sends its request seconds later, by when the web UI had closed them.
+  Connections now wait for their request (up to 30 s) while others are
+  served
+- USB sticks (from BMA800XL): up to three, FAT32 or exFAT, as USB:, USB2:
+  and USB3:, plugged in before BMAmiga starts or while it runs. The menu's
+  file browser lists them at the card's top, for floppies, hard disk
+  images, folders and CD images. Pulling one out ejects the floppies and
+  CD that came from it. The web UI's Files page and dashboard show them
+- Web UI uploads of several MB could stop with "upload truncated" (from
+  BMA800XL and BMC64): a read that waited could sleep through data that
+  had already come, until the 8 s timeout. Reads no longer wait, and
+  slow and failed uploads are logged. The TCP
+  receive window is set when the network starts: 44 segments on Wi-Fi as
+  before, Circle's 10 on Ethernet
+
 ## 0.6.1 – 2026-11-15
 
 IBrowse on AmigaSYS reaches the web, and Amiberry is midwan's latest, with

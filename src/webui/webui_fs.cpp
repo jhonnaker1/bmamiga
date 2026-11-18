@@ -59,8 +59,9 @@ using webhttp::CChunkedResponse;
 namespace {
 
 // The volume a request is for (ResolveTarget()): "" for the card's own
-// (circle_get_disk_volume()), or "SD2", the card's second partition
-// (host_volume2()), whose paths go to sd_fs with its name ("SD2:/x").
+// (circle_get_disk_volume()), "SD2", the card's second partition
+// (host_volume2()), or "USB", "USB2", "USB3", a USB stick plugged in
+// (host_usb_stick()); their paths go to sd_fs with the name ("SD2:/x").
 char g_volume[8] = "";
 
 // PATH (a sandboxed path, "/x") on the request's volume, for sd_fs. Four
@@ -82,8 +83,10 @@ const char *VolumeName(void) {
 }
 
 const unsigned WEBUI_FS_MAX_ENTRIES = 6000;
-// Matches Circle's TCP receive window (see circle_tcp_window_patch.diff), so
-// one upload batch can take a whole window of segments.
+// Uploads are collected into batches of this size before each SD write:
+// fewer, larger writes are much faster than one per TCP segment, and on a
+// Pi 3 a 64 KB write (about 11 ms) is short enough for the network to keep
+// up. Downloads read the card in pieces of this size too.
 const unsigned WEBUI_FS_IO_CHUNK = 64 * 1024;
 // Largest file the editor will open or save (the config files are a few KB;
 // the body is streamed to a temp file, so this is not a RAM limit).
@@ -210,6 +213,18 @@ int SanitizeRelPath(const char *in, char *out, unsigned out_size) {
   return 0;
 }
 
+// The USB stick (0..HOST_USB_STICKS-1) VOL names ("USB", "USB2", "USB3"),
+// if it is plugged in; -1 otherwise.
+int UsbStickOf(const char *vol) {
+  static const char *const kNames[HOST_USB_STICKS] = {"USB", "USB2", "USB3"};
+  for (int i = 0; i < HOST_USB_STICKS; i++) {
+    if (strcmp(vol, kNames[i]) == 0) {
+      return host_usb_stick(i) != 0 ? i : -1;
+    }
+  }
+  return -1;
+}
+
 // Resolve and validate the vol/path query parameters. Returns 0 on
 // success and fills clean, a path on the card for sd_fs.h; on failure it has
 // already sent an error response and returns -1.
@@ -227,6 +242,8 @@ int ResolveTarget(CSocket *socket, const char *query, char *clean,
     g_volume[0] = '\0';
   } else if (strcmp(vol, "SD2") == 0 && host_volume2() != 0) {
     strcpy(g_volume, "SD2");
+  } else if (UsbStickOf(vol) >= 0) {
+    strcpy(g_volume, vol);
   } else {
     webhttp::SendText(socket, 404, "Not Found", "unknown volume\n");
     return -1;
@@ -383,7 +400,7 @@ BodyResult ReceiveBodyToFile(CSocket *socket, const char *temppath,
   }
 
   // Circle returns one TCP segment per Receive, so fill the whole buffer
-  // before writing: a blocking Receive on an empty queue lets the other
+  // before writing: waiting on an empty queue (webhttp::Receive) lets the other
   // tasks run, and the SD card gets a few large writes instead of many
   // small ones (no task, including the network, runs during a write).
   // A Receive into less space than the segment drops the rest of it, so
@@ -394,6 +411,11 @@ BodyResult ReceiveBodyToFile(CSocket *socket, const char *temppath,
   u64 wait_ticks = 0;
   u64 write_ticks = 0;
   u64 yield_ticks = 0;
+  // The longest single wait and the number of long ones tell a few long
+  // stalls (lost packets being resent) from a steady slow trickle.
+  u64 longest_wait_ticks = 0;
+  unsigned long long_waits = 0;
+  const u64 long_wait_limit = 100 * (CLOCKHZ / 1000);
   while (result == BODY_OK && written < total) {
     unsigned fill = 0;
     for (;;) {
@@ -404,10 +426,24 @@ BodyResult ReceiveBodyToFile(CSocket *socket, const char *temppath,
       }
       unsigned want = remain < space ? (unsigned) remain : space;
       u64 t0 = CTimer::GetClockTicks64();
-      int n = socket->Receive(s_io_buffer + fill, want, 0);
-      wait_ticks += CTimer::GetClockTicks64() - t0;
+      int n = webhttp::Receive(socket, s_io_buffer + fill, want);
+      u64 waited = CTimer::GetClockTicks64() - t0;
+      wait_ticks += waited;
+      if (waited > longest_wait_ticks) {
+        longest_wait_ticks = waited;
+      }
+      if (waited >= long_wait_limit) {
+        long_waits++;
+      }
       if (n <= 0) {
         result = BODY_TRUNCATED;
+        CLogger::Get()->Write("webui", LogWarning,
+                              "Upload truncated at %lu of %lu bytes after "
+                              "%lu ms: Receive returned %d",
+                              written + fill, total,
+                              (unsigned long) ((CTimer::GetClockTicks64() - t0) /
+                                               (CLOCKHZ / 1000)),
+                              n);
         break;
       }
       fill += (unsigned) n;
@@ -432,22 +468,34 @@ BodyResult ReceiveBodyToFile(CSocket *socket, const char *temppath,
     yield_ticks += CTimer::GetClockTicks64() - t2;
   }
 
-  // Throughput, the average batch size and where the time went show what
-  // limits an upload: waiting for data (the network; other tasks also run
-  // while it waits), SD writes, or other tasks between batches.
-  if (result == BODY_OK && batches > 0) {
+  // Throughput for every upload. When something waited 100 ms or more, also
+  // the average batch size and where the time went: waiting for data (the
+  // network; other tasks also run while it waits), SD writes, or other tasks
+  // between batches. The serial log is written synchronously, so normal
+  // uploads get the short line.
+  if (result == BODY_OK && batches > 0 && long_waits == 0) {
+    const u64 per_ms = CLOCKHZ / 1000;
+    u64 ms = (CTimer::GetClockTicks64() - start_ticks) / per_ms;
+    CLogger::Get()->Write("webui", LogNotice,
+                          "Received %lu bytes in %lu ms (%lu KB/s)",
+                          total, (unsigned long) ms,
+                          ms > 0 ? (unsigned long) (total / ms) : 0UL);
+  } else if (result == BODY_OK && batches > 0) {
     const u64 per_ms = CLOCKHZ / 1000;
     u64 ms = (CTimer::GetClockTicks64() - start_ticks) / per_ms;
     CLogger::Get()->Write("webui", LogNotice,
                           "Received %lu bytes in %lu ms (%lu KB/s), "
                           "%lu batches of %lu bytes avg; "
-                          "waiting %lu ms, SD writes %lu ms, other tasks %lu ms",
+                          "waiting %lu ms, SD writes %lu ms, other tasks %lu ms; "
+                          "longest wait %lu ms, %lu waits of 100 ms or more",
                           total, (unsigned long) ms,
                           ms > 0 ? (unsigned long) (total / ms) : 0UL,
                           batches, (unsigned long) (total / batches),
                           (unsigned long) (wait_ticks / per_ms),
                           (unsigned long) (write_ticks / per_ms),
-                          (unsigned long) (yield_ticks / per_ms));
+                          (unsigned long) (yield_ticks / per_ms),
+                          (unsigned long) (longest_wait_ticks / per_ms),
+                          long_waits);
   }
 
   if (sd_close(file) != SD_OK && result == BODY_OK) {
@@ -558,6 +606,18 @@ void WebUiFsVolumes(CSocket *socket) {
     r.Write(rc == SD_OK ? ",{\"id\":\"SD2\"" : "{\"id\":\"SD2\"");
     r.Printf(",\"kind\":\"partition\",\"total_kb\":%lu,\"free_kb\":%lu}",
              (unsigned long) total_kb, (unsigned long) free_kb);
+    rc = SD_OK;
+  }
+  // The USB sticks plugged in.
+  static const char *const kUsb[HOST_USB_STICKS] = {"USB", "USB2", "USB3"};
+  for (int i = 0; i < HOST_USB_STICKS; i++) {
+    if (host_usb_stick(i) != 0 &&
+        sd_volume_space_kb(kUsb[i], &total_kb, &free_kb) == SD_OK) {
+      r.Printf("%s{\"id\":\"%s\"", rc == SD_OK ? "," : "", kUsb[i]);
+      r.Printf(",\"kind\":\"usb\",\"total_kb\":%lu,\"free_kb\":%lu}",
+               (unsigned long) total_kb, (unsigned long) free_kb);
+      rc = SD_OK;
+    }
   }
   r.Write("]}");
   r.Finish();

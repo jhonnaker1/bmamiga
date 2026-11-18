@@ -58,6 +58,7 @@
 #include <circle/net/socket.h>
 #include <circle/sched/scheduler.h>
 #include <circle/sched/task.h>
+#include <circle/string.h>
 #include <circle/timer.h>
 #include <circle/types.h>
 
@@ -79,8 +80,16 @@ extern "C" void bmamiga_request_coldstart(void);
 #define WEBUI_PORT             80
 #define WEBUI_ALT_PORT         8080
 #define WEBUI_TASK_STACK       0x10000
-#define WEBUI_RECV_TIMEOUT_US  8000000
 #define WEBUI_REQUEST_MAX      4096
+#define WEBUI_SLOW_HEADER_MS   1000
+// Browsers open spare connections that send nothing until needed (Safari
+// uses one seconds later, and gives up if it was closed meanwhile: dropping
+// them after 2 s, as BMA800XL does, broke the web UI in Safari). Connections
+// wait in a pool until their request comes, while others are served
+// (CWebUiAcceptTask, CWebUiTask); one that sends nothing for this long, or
+// the oldest when the pool is full, is closed.
+#define WEBUI_POOL             8
+#define WEBUI_IDLE_MS          30000
 #define WEBUI_LISTEN_BACKLOG   8
 #define WEBUI_PIN_MAX          16
 #define WEBUI_AUTH_FAIL_MS     500  // slow brute-forcing a wrong PIN
@@ -400,26 +409,58 @@ void Send401(CSocket *socket) {
   }
 }
 
-boolean HandleConnection(CSocket *socket) {
-  socket->SetOptionReceiveTimeout(WEBUI_RECV_TIMEOUT_US);
-
+// INITIAL: the first bytes of the request, already received (the pool).
+boolean HandleConnection(CSocket *socket, const CIPAddress &client_ip,
+                         u16 client_port, const char *initial,
+                         unsigned initial_length) {
   char request[WEBUI_REQUEST_MAX];
-  unsigned length = 0;
-  for (;;) {
+  unsigned length = initial_length < sizeof(request) - 1
+                        ? initial_length : sizeof(request) - 1;
+  memcpy(request, initial, length);
+  request[length] = '\0';
+  u64 header_start = CTimer::GetClockTicks64();
+  while (strstr(request, "\r\n\r\n") == 0) {
     if (length >= sizeof(request) - 1) {
       SendText(socket, 431, "Request Header Fields Too Large",
                "request too large\n");
       return FALSE;
     }
-    int n = socket->Receive(request + length, sizeof(request) - 1 - length, 0);
+    int n = webhttp::Receive(socket, request + length,
+                             sizeof(request) - 1 - length,
+                             webhttp::RECEIVE_TIMEOUT_MS);
     if (n <= 0) {
-      return FALSE;  // client closed, timed out, or error
+      // Client closed, timed out, or error. A browser's spare connection that
+      // never sent anything is normal, so only a request cut off part way
+      // is logged, with the client it came from.
+      if (length > 0) {
+        CString client;
+        client_ip.Format(&client);
+        CLogger::Get()->Write(WEBUI_LOG, LogNotice,
+                              "Dropped a connection after %lu ms: Receive "
+                              "returned %d with %u bytes of request, from %s:%u",
+                              (unsigned long) ((CTimer::GetClockTicks64() -
+                                                header_start) / (CLOCKHZ / 1000)),
+                              n, length, (const char *) client,
+                              (unsigned) client_port);
+      }
+      return FALSE;
     }
     length += (unsigned) n;
     request[length] = '\0';
-    if (strstr(request, "\r\n\r\n") != 0) {
-      break;
-    }
+  }
+
+  // Headers normally arrive in a millisecond or two; a slow start to a
+  // request (a lost packet being resent) shows up here, not in the
+  // upload's own timing.
+  unsigned long header_ms = (unsigned long)
+      ((CTimer::GetClockTicks64() - header_start) / (CLOCKHZ / 1000));
+  if (header_ms >= WEBUI_SLOW_HEADER_MS) {
+    CString client;
+    client_ip.Format(&client);
+    CLogger::Get()->Write(WEBUI_LOG, LogNotice,
+                          "Request headers took %lu ms (%u bytes), from %s:%u",
+                          header_ms, length, (const char *) client,
+                          (unsigned) client_port);
   }
 
   // Body bytes that arrived in the same read(s) as the headers, plus the
@@ -586,11 +627,37 @@ boolean HandleConnection(CSocket *socket) {
   return FALSE;
 }
 
-class CWebUiTask : public CTask {
+// Connections accepted and waiting for their request (CWebUiAcceptTask
+// adds them, CWebUiTask serves them). Circle's tasks take turns, never
+// interrupting each other, so the pool needs no lock.
+struct PooledConnection {
+  CSocket *socket;
+  CIPAddress client_ip;
+  u16 client_port;
+  u64 since;  // CTimer::GetClockTicks64() when accepted
+};
+PooledConnection s_pool[WEBUI_POOL];
+unsigned s_pooled;
+// The first bytes of the request being served, read from the pool.
+char s_first[WEBUI_REQUEST_MAX];
+
+void PoolRemove(unsigned i) {
+  s_pool[i].socket = 0;
+  for (; i + 1 < s_pooled; i++) {
+    s_pool[i] = s_pool[i + 1];
+  }
+  s_pooled--;
+  s_pool[s_pooled].socket = 0;
+}
+
+// Accepts connections into the pool: Accept() waits, so it has a task of
+// its own. It owns the listening socket, and ends (freeing the port) at
+// the first connection after the web UI is disabled.
+class CWebUiAcceptTask : public CTask {
 public:
-  explicit CWebUiTask(CNetSubSystem *network)
+  explicit CWebUiAcceptTask(CNetSubSystem *network)
       : CTask(WEBUI_TASK_STACK), m_network(network) {
-    SetName("webui");
+    SetName("webui-accept");
   }
 
   void Run(void) override {
@@ -627,21 +694,77 @@ public:
         CScheduler::Get()->MsSleep(50);
         continue;
       }
-      HandleConnection(connection);
-      delete connection;
       if (g_webui_stop) {
+        delete connection;
         break;
       }
-      CScheduler::Get()->Yield();
+      // Full: the one waiting longest makes room.
+      if (s_pooled == WEBUI_POOL) {
+        delete s_pool[0].socket;
+        PoolRemove(0);
+      }
+      PooledConnection &c = s_pool[s_pooled++];
+      c.socket = connection;
+      c.client_ip.Set(client_ip);
+      c.client_port = client_port;
+      c.since = CTimer::GetClockTicks64();
     }
-
     // listener goes out of scope here, freeing the port.
-    CLogger::Get()->Write(WEBUI_LOG, LogNotice, "Web UI stopped");
-    s_started = FALSE;
   }
 
 private:
   CNetSubSystem *m_network;
+};
+
+// Serves the pooled connections, in the order they came, as each one's
+// request arrives.
+class CWebUiTask : public CTask {
+public:
+  CWebUiTask(void) : CTask(WEBUI_TASK_STACK) {
+    SetName("webui");
+  }
+
+  void Run(void) override {
+    while (!g_webui_stop) {
+      boolean served = FALSE;
+      const u64 now = CTimer::GetClockTicks64();
+      for (unsigned i = 0; i < s_pooled && !g_webui_stop;) {
+        PooledConnection &c = s_pool[i];
+        int n = c.socket->Receive(s_first, sizeof(s_first) - 1, MSG_DONTWAIT);
+        if (n == 0) {
+          if (now - c.since < (u64) WEBUI_IDLE_MS * (CLOCKHZ / 1000)) {
+            i++;
+            continue;  // still waiting for its request
+          }
+        } else if (n > 0) {
+          // Taken out of the pool first: the accept task may add to it
+          // while this request is served.
+          CSocket *socket = c.socket;
+          CIPAddress client_ip(c.client_ip);
+          u16 client_port = c.client_port;
+          PoolRemove(i);
+          HandleConnection(socket, client_ip, client_port, s_first,
+                           (unsigned) n);
+          delete socket;
+          served = TRUE;
+          break;  // the pool may have changed; start again
+        }
+        // Closed by the client, an error, or idle too long.
+        delete c.socket;
+        PoolRemove(i);
+      }
+      if (!served) {
+        CScheduler::Get()->MsSleep(5);
+      }
+    }
+
+    while (s_pooled > 0) {
+      delete s_pool[0].socket;
+      PoolRemove(0);
+    }
+    CLogger::Get()->Write(WEBUI_LOG, LogNotice, "Web UI stopped");
+    s_started = FALSE;
+  }
 };
 
 }  // namespace
@@ -656,7 +779,8 @@ void WebUiStart(CNetSubSystem *network, const char *pin) {
     strncpy(s_pin, pin, sizeof(s_pin) - 1);
     s_pin[sizeof(s_pin) - 1] = '\0';
   }
-  new CWebUiTask(network);  // registers itself with the scheduler
+  new CWebUiAcceptTask(network);  // register themselves with the scheduler
+  new CWebUiTask();
 }
 
 #else  // no Circle networking on this machine build

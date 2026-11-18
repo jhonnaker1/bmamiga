@@ -40,6 +40,7 @@
  *   <frame> audio                  print audio statistics
  *   <frame> webui <reboot|coldstart>  a request from the web UI
  *   <frame> run <path>             the web UI starts a file
+ *   <frame> usb <0|1>              pull out or plug in BMAMIGA_USB's stick
  *   <frame> netprobe <dhcp|dns>    SLiRP is asked for an address or a name
  *   <frame> peek <addr>            print the Amiga's longword at addr
  *   <frame> quit                   end the test
@@ -87,6 +88,11 @@ unsigned bmamiga_core_peek_long(unsigned addr);
 void bmamiga_request_power(int power_off);
 void bmamiga_request_coldstart(void);
 void emu_autostart_interrupt(const char *path);
+
+/* The USB stick's state (host_usb_stick() below): -1 as BMAMIGA_USB says,
+   0 pulled out, 1 plugged in; and its number. */
+static int sim_usb_in = -1;        /* -1: as BMAMIGA_USB says */
+static unsigned sim_usb_number = 1;
 
 /* ---- Options ---------------------------------------------------------------- */
 
@@ -634,6 +640,12 @@ static void run_script(void)
 			sscanf(line + n, "%i", &addr);
 			fprintf(stderr, "[sim] frame %ld: peek 0x%x = %u (%.2f ms CPU so far)\n",
 			        frame, addr, bmamiga_core_peek_long(addr), sim_cpu_ms());
+		} else if (strcmp(cmd, "usb") == 0) {
+			int in = atoi(line + n);
+			if (in && sim_usb_in == 0)
+				sim_usb_number++;
+			sim_usb_in = in;
+			fprintf(stderr, "[sim] USB stick %s\n", in ? "plugged in" : "pulled out");
 		} else if (strcmp(cmd, "netprobe") == 0) {
 			bmamiga_core_net_probe(strstr(line + n, "dns") != NULL);
 		} else if (strcmp(cmd, "audio") == 0) {
@@ -882,6 +894,28 @@ const char *host_volume2(void)
 {
 	const char *dir = getenv("BMAMIGA_SD2");
 	return dir != NULL && dir[0] != '\0' ? dir : NULL;
+}
+
+/* USB sticks (host.h): BMAMIGA_USB, a folder, is stick 0, plugged in from
+   the start; the script's "usb 0" pulls it out and "usb 1" puts it back,
+   as a new stick (a new number). */
+
+unsigned host_usb_stick(int n)
+{
+	const char *dir = getenv("BMAMIGA_USB");
+	if (n != 0 || dir == NULL || dir[0] == '\0' || sim_usb_in == 0)
+		return 0;
+	return sim_usb_number;
+}
+
+const char *host_usb_root(int n)
+{
+	static char root[512];
+	const char *dir = getenv("BMAMIGA_USB");
+	if (n != 0 || dir == NULL || dir[0] == '\0')
+		return NULL;
+	snprintf(root, sizeof root, "%s%s", dir, dir[strlen(dir) - 1] == '/' ? "" : "/");
+	return root;
 }
 
 /* Large blocks (host.h): the PC's malloc(), up to 2 GB, as the Pi gives. */

@@ -42,6 +42,11 @@ CIRCLE_CXX_INCLUDES := -nostdinc -I$(ROOT)/src/port/circle/include \
 	-isystem $(CIRCLE_STDLIB)/libs/circle/addon
 CIRCLE_FORCED := -include $(ROOT)/src/port/circle/include/bma_circle.h
 
+# 8 input devices of each kind (keyboards, mice, joysticks), not Amiberry's
+# 20: BMAmiga has a keyboard, a mouse and a few gamepads, and each of
+# uae_prefs' three copies is 6.4 MB smaller (BlitterStudio/amiberry#2716).
+BMA_INPUT_DEVICES := -DMAX_INPUT_DEVICES=8
+
 # Amiberry's time and sleeps are BMAmiga's (src/port/clock.c). Its JIT is
 # on: in indirect mode (memory through Amiberry's banks: direct mode is
 # chosen when the emulator starts, before the Amiga Setup's hard reset, and
@@ -49,7 +54,8 @@ CIRCLE_FORCED := -include $(ROOT)/src/port/circle/include/bma_circle.h
 # SIGSEGV), in the heap, which circle_jit_exec_patch.diff lets hold code.
 CIRCLE_AMIBERRY_FLAGS := -Dclock_gettime=bma_clock_gettime -Dclock_gettime_nsec_np=bma_clock_gettime_nsec_np \
 	-Dnanosleep=bma_nanosleep -Dusleep=bma_usleep \
-	$(CIRCLE_CXX_INCLUDES) $(CIRCLE_TARGET) -DBMAMIGA_BMNET=3 -DBMAMIGA_JIT=1 $(CIRCLE_FORCED)
+	$(CIRCLE_CXX_INCLUDES) $(CIRCLE_TARGET) -DBMAMIGA_BMNET=3 -DBMAMIGA_JIT=1 $(CIRCLE_FORCED) \
+	$(BMA_INPUT_DEVICES)
 
 CIRCLE_AMIBERRY_LIB := $(CIRCLE_BUILD)/libamiberry.a
 CIRCLE_PORT_LIB := $(CIRCLE_BUILD)/libbmacircle.a

@@ -257,6 +257,24 @@ mounted when BMAmiga starts.
 From the web UI, clicking a hard disk image starts the Amiga from it as
 DH0:, and clicking a CD image starts it with that disc in the CD drive.
 
+## USB sticks
+
+Up to three USB sticks (FAT32 or exFAT) can be plugged in, as BMAmiga runs
+or before it starts. They are **USB:**, **USB2:** and **USB3:**, in the
+order they were plugged in, and the menu's file browser lists them at the
+card's top (*..* at a stick's top goes back to the card). Floppy disks,
+hard disk images, folders and CD images can all be used from a stick, as
+from the card.
+
+Pulling a stick out ejects the floppies and the CD that came from it (and
+takes them out of `bmamiga.cfg`). A hard drive on a stick can't be taken
+away from a running Amiga: BMAmiga says so, and the Amiga will find it
+gone. Remove it in *Hard Drives and CD* first, or pull the stick out with
+BMAmiga off. A stick that is a hard drive must be in when BMAmiga starts.
+
+The web UI's Files page lists the sticks plugged in beside the card, and
+the dashboard shows the space left on each.
+
 ## Keyboard
 
 USB keyboards work as an Amiga keyboard, with Amiberry's usual PC layout:
@@ -465,6 +483,7 @@ the web UI.
 | `webui`             | `0`, `1`                     | `1`      | Web UI when networking is on |
 | `webui_pin`         | digits                       | none     | PIN for the web UI |
 | `timezone`          | minutes east of UTC          | `0`      | Time zone: the Amiga's clock and the card's file times (see Networking and the web UI) |
+| `task_time_us`      | microseconds                 | 1000     | The least time each frame for the Pi's own work beside the Amiga's (the network, Wi-Fi, the web UI). With the Amiga busy the whole frame (a JIT at full speed), less made the network and web UI crawl; 0 gives it one turn a frame, as before 0.6.2 |
 | `usbpowerdelay`     | milliseconds                 | Circle's | Circle: wait for USB devices to power up (by default 300 ms, 510 ms behind a hub) |
 
 ## Logging

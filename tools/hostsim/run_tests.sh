@@ -358,6 +358,33 @@ mkdir -p "$OUT/sd2"
 check_cfg sd2 "^dh0=$OUT/sd2/second/hd/big\.hdf\$" "a disk image chosen on SD2:, its long path kept whole"
 check_log sd2 "Drive DH0: .*second/hd/big\.hdf" "and mounted as DH0:"
 
+echo "USB sticks"
+# BMAMIGA_USB stands for a USB stick (USB:): the same keys as for SD2: above
+# reach it, listed at the card's top where SD2: was. Pulled out once the
+# menu is closed, it says a hard drive was on it.
+mkdir -p "$OUT/usbhd/disks" "$OUT/usbhd/stick/hd"
+dd if=/dev/zero of="$OUT/usbhd/stick/hd/big.hdf" bs=1024 count=4096 2> /dev/null
+f=200
+script="$f key 0x45 1\n$((f + 1)) key 0x45 0\n"; f=$((f + 20))
+for key in 0x51 0x28 0x28 0x28 0x52 0x28 0x52 0x28 0x28 0x28 0x28; do
+    script="$script$f key $key 1\n$((f + 1)) key $key 0\n"; f=$((f + 15))
+done
+script="$script$((f + 40)) key 0x45 1\n$((f + 41)) key 0x45 0\n$((f + 80)) usb 0\n$((f + 140)) quit\n"
+(cd "$OUT/usbhd" && printf "$script" | BMAMIGA_USB="$OUT/usbhd/stick" BMAMIGA_REFRESH=50 \
+    BMAMIGA_CMDLINE="root=." perl -e 'alarm 300; exec @ARGV' "$SIM" > log.txt 2>&1)
+check_cfg usbhd "^dh0=$OUT/usbhd/stick/hd/big\.hdf\$" "a disk image chosen on a USB stick"
+check_log usbhd "Drive DH0: .*stick/hd/big\.hdf" "and mounted as DH0:"
+check_log usbhd "USB stick 1 out: 0 disk\(s\) ejected, 1 hard drive\(s\) on it" "pulled out, the hard drive on it is said"
+# A floppy from the stick is ejected when it is pulled out.
+mkdir -p "$OUT/usbdf/stick"
+dd if=/dev/zero of="$OUT/usbdf/stick/disk.adf" bs=1024 count=880 2> /dev/null
+printf 'df0=%s\n' "$OUT/usbdf/stick/disk.adf" > "$OUT/usbdf/bmamiga.cfg"
+(cd "$OUT/usbdf" && printf '300 usb 0\n360 quit\n' | BMAMIGA_USB="$OUT/usbdf/stick" BMAMIGA_REFRESH=50 \
+    BMAMIGA_CMDLINE="root=." perl -e 'alarm 300; exec @ARGV' "$SIM" > log.txt 2>&1)
+check_log usbdf "DF0: .*stick/disk\.adf" "a floppy from the USB stick"
+check_log usbdf "USB stick 1 out: 1 disk\(s\) ejected" "ejected when the stick is pulled out"
+check_cfg usbdf "^df0=\$" "and no longer in bmamiga.cfg"
+
 echo "Drives from bmamiga.uae"
 # bmamiga.uae's drive (as AmiKit's: a device name and volume name of its
 # own) after the menu's DH0:, once each, and again once after a hard reset.

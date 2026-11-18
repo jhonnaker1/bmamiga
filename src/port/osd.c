@@ -806,10 +806,42 @@ static int same_dir(const char *a, const char *b)
 	return la == lb && strncmp(a, b, la) == 0;
 }
 
+/* The other volumes, listed at the card's top: the card's second
+   partition (host_volume2(), SD2:) and the USB sticks plugged in
+   (host_usb_root(), USB: to USB3:). VOLS gets their roots, NAMES what the
+   list shows; returns how many. */
+#define MAX_VOLS (1 + HOST_USB_STICKS)
+static int other_volumes(const char *vols[MAX_VOLS], const char *names[MAX_VOLS])
+{
+	static const char *const usb_names[HOST_USB_STICKS] = {
+		"USB: (USB stick)", "USB2: (USB stick)", "USB3: (USB stick)"};
+	int n = 0, i;
+	if (host_volume2() != NULL) {
+		vols[n] = host_volume2();
+		names[n++] = "SD2: (second partition)";
+	}
+	for (i = 0; i < HOST_USB_STICKS; i++)
+		if (host_usb_stick(i) != 0 && host_usb_root(i) != NULL) {
+			vols[n] = host_usb_root(i);
+			names[n++] = usb_names[i];
+		}
+	return n;
+}
+
+/* Which of VOLS DIR is the top of, or -1. */
+static int top_of_volume(const char *dir, const char *const vols[], int nvols)
+{
+	int i;
+	for (i = 0; i < nvols; i++)
+		if (same_dir(dir, vols[i]))
+			return i;
+	return -1;
+}
+
 /* osd_browse(), and osd_browse_dir() with PICK_DIR: "Use This Folder" at
-   the top chooses the folder shown. At the card's top, the card's second
-   partition (host_volume2(), SD2:) is there too, and ".." at its top goes
-   back to the card. */
+   the top chooses the folder shown. At the card's top, the other volumes
+   (other_volumes(): SD2:, USB sticks) are there too, and ".." at the top of
+   one goes back to the card. */
 static int browse(const char *title, char *dir, size_t dir_size,
                   const char *const exts[], char *path, size_t path_size, int pick_dir)
 {
@@ -832,12 +864,13 @@ static int browse(const char *title, char *dir, size_t dir_size,
 			return 0;
 		}
 
-		/* The directory, ("Use This Folder"), "..", (SD2:), then the
-		   entries. */
-		const char *vol2 = host_volume2();
+		/* The directory, ("Use This Folder"), "..", (the other volumes),
+		   then the entries. */
+		const char *vols[MAX_VOLS], *vol_names[MAX_VOLS];
+		int nvols = other_volumes(vols, vol_names);
 		int at_top = same_dir(dir, "/") || same_dir(dir, bmamiga_sd_root());
-		int show_vol2 = vol2 != NULL && at_top;
-		int first = (pick_dir ? 3 : 2) + show_vol2;
+		int shown_vols = at_top ? nvols : 0;
+		int first = (pick_dir ? 3 : 2) + shown_vols;
 		items = calloc(n + first, sizeof(*items));
 		if (items == NULL) {
 			free_entries(list, n);
@@ -851,13 +884,13 @@ static int browse(const char *title, char *dir, size_t dir_size,
 			items[1].text = "Use This Folder";
 			items[1].id = -4;
 		}
-		items[first - 1 - show_vol2].text = "..";
-		items[first - 1 - show_vol2].value = "<DIR>";
-		items[first - 1 - show_vol2].id = -3;
-		if (show_vol2) {
-			items[first - 1].text = "SD2: (second partition)";
-			items[first - 1].value = "<DIR>";
-			items[first - 1].id = -5;
+		items[first - 1 - shown_vols].text = "..";
+		items[first - 1 - shown_vols].value = "<DIR>";
+		items[first - 1 - shown_vols].id = -3;
+		for (i = 0; i < shown_vols; i++) {
+			items[first - shown_vols + i].text = vol_names[i];
+			items[first - shown_vols + i].value = "<DIR>";
+			items[first - shown_vols + i].id = -10 - i;
 		}
 		for (i = 0; i < n; i++) {
 			items[i + first].text = list[i].name;
@@ -883,8 +916,8 @@ static int browse(const char *title, char *dir, size_t dir_size,
 			free_entries(list, n);
 			return 1;
 		}
-		if (chosen == -5) {
-			snprintf(dir, dir_size, "%s", vol2);
+		if (chosen <= -10 && chosen > -10 - nvols) {
+			snprintf(dir, dir_size, "%s", vols[-10 - chosen]);
 			came_from[0] = '\0';
 			free_entries(list, n);
 			continue;
@@ -892,8 +925,8 @@ static int browse(const char *title, char *dir, size_t dir_size,
 		if (chosen == -3) {
 			char *slash;
 			size_t len = strlen(dir);
-			if (vol2 != NULL && same_dir(dir, vol2)) {
-				/* From SD2:'s top, back to the card's. */
+			if (top_of_volume(dir, vols, nvols) >= 0) {
+				/* From another volume's top, back to the card's. */
 				snprintf(dir, dir_size, "%s", bmamiga_sd_root());
 				came_from[0] = '\0';
 				free_entries(list, n);
@@ -909,9 +942,10 @@ static int browse(const char *title, char *dir, size_t dir_size,
 			snprintf(came_from, sizeof(came_from), "%s", slash ? slash + 1 : "");
 			parent_dir(dir);
 			/* "SD2:/hd"'s parent ("SD2:"): SD2:'s top, as host_volume2()
-			   names it. */
-			if (vol2 != NULL && same_dir(dir, vol2))
-				snprintf(dir, dir_size, "%s", vol2);
+			   names it (the same for "USB:/x"). */
+			i = top_of_volume(dir, vols, nvols);
+			if (i >= 0)
+				snprintf(dir, dir_size, "%s", vols[i]);
 			free_entries(list, n);
 			continue;
 		}

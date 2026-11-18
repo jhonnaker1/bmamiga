@@ -37,7 +37,7 @@ import { toggleMenu } from "./menu.js";
 import { canRun } from "./machine.js";
 
 // current location (set by loadDir); "SD" is the card, "SD2" its second
-// partition (if it has one)
+// partition (if it has one), "USB" to "USB3" the USB sticks plugged in
 const CARD = "SD";
 let fbVol = CARD;
 let fbVolumes = []; // the device's volumes, when it has more than one
@@ -207,7 +207,8 @@ const shortTime = (mtime) => mtime.slice(0, 16).replace("T", " ");
 
 export async function loadDir(path, vol = fbVol) {
   path = normPath(path);
-  if (!fbVolumes.length) {
+  // Asked again at a volume's top, as USB sticks come and go.
+  if (!fbVolumes.length || path === "/") {
     try {
       fbVolumes = ((await api.getVolumes()).volumes || []).map((v) => v.id);
     } catch (e) {
@@ -232,7 +233,7 @@ export async function loadDir(path, vol = fbVol) {
   fbVol = listed;
   fbPath = data.path || path;
   renderCrumbs(listed, fbPath);
-  $("fb-drop-dest").textContent = fbPath;
+  $("fb-drop-dest").textContent = (fbVol !== CARD ? fbVol + ":" : "") + fbPath;
 
   const entries = (data.entries || []).slice().sort((a, b) => {
     if (!!a.dir !== !!b.dir) return a.dir ? -1 : 1;
