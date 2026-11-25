@@ -6,7 +6,7 @@ The original copyright, license, and attribution notices supplied with these com
 
 ## Amiberry
 
-BMAmiga incorporates [Amiberry](https://github.com/BlitterStudio/amiberry), the Amiga emulator by Dimitris Panokostas and contributors, version 8.4.1, under the GNU General Public License version 3. Amiberry is built on [WinUAE](https://www.winuae.net) by Toni Wilen and UAE by Bernd Schmidt and others, whose parts are under the GNU General Public License version 2 or later. BMAmiga builds Amiberry's libretro core, unmodified, into its kernels; what it needs on Circle is in [`src/port/circle/`](../src/port/circle/).
+BMAmiga incorporates [Amiberry](https://github.com/BlitterStudio/amiberry), the Amiga emulator by Dimitris Panokostas and contributors, version 8.6.0, under the GNU General Public License version 3. Amiberry is built on [WinUAE](https://www.winuae.net) by Toni Wilen and UAE by Bernd Schmidt and others, whose parts are under the GNU General Public License version 2 or later. BMAmiga builds Amiberry's libretro core, unmodified, into its kernels; what it needs on Circle is in [`src/port/circle/`](../src/port/circle/).
 
 See `third_party/amiberry/` (a submodule of `https://github.com/BlitterStudio/amiberry`) for the source and its accompanying copyright and license information.
 

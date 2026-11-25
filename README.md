@@ -63,6 +63,11 @@ boot Workbench, type at its CLI and move the mouse.
 
 - [wiisoldier](https://github.com/wiisoldier): testing on a Raspberry Pi
   with AmigaSYS 2026, and the reports behind many of BMAmiga's fixes.
+- retromin ([aminch](https://github.com/aminch)): BMA800XL, the bare metal
+  Atari 800 emulator BMAmiga is built on, and its USB stick support and web
+  UI upload fix.
+- [midwan](https://github.com/midwan) (Dimitris Panokostas): Amiberry, and
+  the fixes and changes to its libretro core that BMAmiga asked for.
 
 ## License
 
