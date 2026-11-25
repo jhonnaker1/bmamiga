@@ -59,6 +59,11 @@ boot AROS, open the menu, choose disks and models and check the display
 lock and the sound; with a Kickstart 1.3 ROM and a Workbench 1.3 disk they
 boot Workbench, type at its CLI and move the mouse.
 
+## Contributors
+
+- [wiisoldier](https://github.com/wiisoldier): testing on a Raspberry Pi
+  with AmigaSYS 2026, and the reports behind many of BMAmiga's fixes.
+
 ## License
 
 GPL 3 (see LICENSE). Amiberry is GPL 3 too; the code it and BMAmiga
